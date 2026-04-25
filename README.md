@@ -1,50 +1,136 @@
-# Welcome to your Expo app 👋
+# ExpenseTracker
+A production-ready personal finance Android app built with Expo and React Native. Features include expense and income tracking, account management, analytics with interactive charts, expense books, bill splitting, recharge reminders, notifications, PDF export, and secure backup/restore. Designed with a minimal and professional UI.
+💰 Expense Tracker App
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A production-ready personal finance Android application built using Expo + React Native.
+Designed with a minimal, professional UI and built with a product-focused mindset.
 
-## Get started
+🚀 Features
+💸 Expense & Income Management
 
-1. Install dependencies
+Add, edit, delete expenses
 
-   ```bash
-   npm install
-   ```
+Add, edit, delete income
 
-2. Start the app
+Multiple accounts with real-time balance updates
 
-   ```bash
-   npx expo start
-   ```
+Category & subcategory management
 
-In the output, you'll find options to open the app in a
+Source of income tracking
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+📊 Advanced Analytics
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+Monthly, weekly, and daily expense graphs
 
-## Get a fresh project
+Interactive pie charts
 
-When you're ready, run:
+Income vs Expense comparison graphs
 
-```bash
-npm run reset-project
-```
+Category-wise & subcategory-wise breakdown
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Expense book analytics
 
-## Learn more
+📘 Expense Books
 
-To learn more about developing your project with Expo, look at the following resources:
+Create separate books (e.g., Painting Cost, Trip Budget)
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+Add income & expense inside books
 
-## Join the community
+Auto total calculation
 
-Join our community of developers creating universal apps.
+Income vs Expense graph per book
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Export book as professional PDF
+
+👥 Bill Splitter (Group Expense Book)
+
+Add members
+
+Auto split (equal/custom)
+
+Track who owes whom
+
+Settlement tracking
+
+📅 Smart Recharge & Upcoming Expenses
+
+Track mobile recharge validity (28/56/84 days)
+
+Automatic expiry calculation
+
+Local reminder notifications
+
+Upcoming expenses section
+
+🔔 Notifications
+
+Daily 9 PM expense reminder
+
+Recharge expiry reminder
+
+💾 Backup & Restore
+
+Export data as JSON
+
+Full restore support (including recharge metadata)
+
+🔊 UX Enhancements
+
+Separate sounds for expense & income
+
+Animated professional landing screen
+
+SafeArea support for all devices
+
+Gold coin adaptive app icon
+
+🛠 Tech Stack
+
+Expo (EAS Build)
+
+React Native
+
+TypeScript
+
+SQLite (expo-sqlite)
+
+React Query
+
+Lucide Icons
+
+Local Notifications
+
+PDF Generation
+
+📦 Installation (Development)
+npm install
+npx expo start
+
+📲 Build APK (Android)
+eas build --platform android --profile preview
+
+🔐 Data Safety
+
+Atomic transaction updates
+
+No destructive schema changes
+
+Secure financial balance recalculations
+
+Backup support before updates
+
+🎯 Product Vision
+
+This project was built not just as a finance app, but as a modular financial engine, focusing on:
+
+Data integrity
+
+UX clarity
+
+Financial correctness
+
+Real-world usability
+
+📌 Version
+
+Current Version: 1.9.2 (Build 22)
