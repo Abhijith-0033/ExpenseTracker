@@ -3,7 +3,6 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { Delete, Check, X } from 'lucide-react-native';
 import { Colors, Layout } from '../../constants/Theme';
-import * as Haptics from 'expo-haptics';
 
 interface KeypadProps {
     onPress: (val: string) => void;
@@ -11,19 +10,27 @@ interface KeypadProps {
     onSubmit: () => void;
     onClear: () => void;
     disabled?: boolean;
+    submitColor?: string;
+    submitLabel?: string;
 }
 
-export const Keypad: React.FC<KeypadProps> = ({ onPress, onDelete, onSubmit, onClear, disabled }) => {
+export const Keypad: React.FC<KeypadProps> = ({
+    onPress,
+    onDelete,
+    onSubmit,
+    onClear,
+    disabled,
+    submitColor,
+    submitLabel = "Save Expense"
+}) => {
     const keys = [
         '7', '8', '9', '/',
         '4', '5', '6', '*',
         '1', '2', '3', '-',
         '.', '0', 'C', '+'
     ];
-    // Replaced '=' with 'C' in grid, handled submission via large button or distinct action
 
     const handlePress = (key: string) => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         if (key === 'C') {
             onClear();
         } else {
@@ -32,12 +39,10 @@ export const Keypad: React.FC<KeypadProps> = ({ onPress, onDelete, onSubmit, onC
     };
 
     const handleDelete = () => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         onDelete();
     };
 
     const handleSubmit = () => {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         onSubmit();
     };
 
@@ -69,11 +74,16 @@ export const Keypad: React.FC<KeypadProps> = ({ onPress, onDelete, onSubmit, onC
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                    style={[styles.actionKey, styles.submitKey, disabled && styles.disabledKey]}
+                    style={[
+                        styles.actionKey,
+                        styles.submitKey,
+                        { backgroundColor: submitColor || Colors.primary[600] },
+                        disabled && styles.disabledKey
+                    ]}
                     onPress={handleSubmit}
                     disabled={disabled}
                 >
-                    <Text style={styles.submitText}>Save Expense</Text>
+                    <Text style={styles.submitText}>{submitLabel}</Text>
                     <Check size={20} color={Colors.white} />
                 </TouchableOpacity>
             </View>

@@ -3,15 +3,16 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Modal, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { ArrowLeft, Plus, X, Search, Filter } from 'lucide-react-native';
-import { Colors, Layout } from '../../constants/Theme';
+import { Colors, Layout, Typography } from '../../constants/Theme';
 import { getBooks, addBook, ExpenseBook } from '../../services/books';
 import { BookCard } from '../../components/BookCard';
 import { formatCurrency } from '../../utils/currency';
+import { PressableScale } from '../../components/ui/PressableScale';
 
 export default function BooksScreen() {
     const router = useRouter();
-    const [books, setBooks] = useState<(ExpenseBook & { total_spent: number; item_count: number })[]>([]);
-    const [filteredBooks, setFilteredBooks] = useState<(ExpenseBook & { total_spent: number; item_count: number })[]>([]);
+    const [books, setBooks] = useState<(ExpenseBook & { total_spent: number; total_income: number; item_count: number })[]>([]);
+    const [filteredBooks, setFilteredBooks] = useState<(ExpenseBook & { total_spent: number; total_income: number; item_count: number })[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -76,9 +77,9 @@ export default function BooksScreen() {
         <View style={styles.container}>
             {/* Header */}
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+                <PressableScale onPress={() => router.back()} style={styles.backBtn}>
                     <ArrowLeft size={24} color={Colors.gray[900]} />
-                </TouchableOpacity>
+                </PressableScale>
                 <Text style={styles.headerTitle}>Expense Books</Text>
                 <View style={{ width: 24 }} />
             </View>
@@ -205,7 +206,7 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.white,
     },
     backBtn: { padding: 4, marginLeft: -4 },
-    headerTitle: { fontSize: 20, fontWeight: '700', color: Colors.gray[900] },
+    headerTitle: { fontSize: Typography.size.xl, fontFamily: Typography.family.bold, color: Colors.gray[900] },
     searchContainer: {
         paddingHorizontal: 20,
         paddingBottom: 16,
@@ -223,7 +224,8 @@ const styles = StyleSheet.create({
     },
     searchInput: {
         flex: 1,
-        fontSize: 16,
+        fontSize: Typography.size.md,
+        fontFamily: Typography.family.medium,
         color: Colors.gray[900],
     },
     scrollContent: { padding: 20 },
@@ -235,18 +237,18 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     summaryLabel: {
-        fontSize: 12,
+        fontSize: Typography.size.xs,
         color: Colors.gray[500],
         marginBottom: 4,
-        fontWeight: '600',
+        fontFamily: Typography.family.bold,
     },
     summaryValue: {
-        fontSize: 24,
-        fontWeight: '800',
+        fontSize: Typography.size.xxl,
+        fontFamily: Typography.family.bold,
         color: Colors.gray[900],
     },
     emptyState: { alignItems: 'center', marginTop: 60 },
-    emptyText: { textAlign: 'center', color: Colors.gray[500], lineHeight: 24 },
+    emptyText: { textAlign: 'center', color: Colors.gray[500], lineHeight: 24, fontFamily: Typography.family.medium },
     fab: {
         position: 'absolute',
         bottom: 30,
@@ -280,14 +282,17 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: 24,
     },
-    modalTitle: { fontSize: 20, fontWeight: 'bold' },
-    label: { fontSize: 14, fontWeight: '600', marginBottom: 8, color: Colors.gray[700] },
+    modalTitle: { fontSize: Typography.size.xl, fontFamily: Typography.family.bold },
+    label: { fontSize: Typography.size.sm, fontFamily: Typography.family.bold, marginBottom: 8, color: Colors.gray[700] },
     input: {
-        backgroundColor: Colors.gray[100],
+        backgroundColor: Colors.gray[50],
         padding: 16,
-        borderRadius: 12,
+        borderRadius: Layout.radius.lg,
         marginBottom: 20,
-        fontSize: 16,
+        fontSize: Typography.size.md,
+        fontFamily: Typography.family.medium,
+        borderWidth: 1,
+        borderColor: Colors.gray[100],
     },
     saveBtn: {
         backgroundColor: Colors.primary[600],
@@ -296,5 +301,5 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginTop: 8,
     },
-    saveBtnText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
+    saveBtnText: { color: 'white', fontSize: Typography.size.md, fontFamily: Typography.family.bold },
 });

@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, StatusBar, Alert, TextInput, Modal } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, TrendingUp, TrendingDown, Check, Clock, Wallet } from 'lucide-react-native';
-import { Colors, Layout } from '../../constants/Theme';
+import { Colors, Layout, Typography } from '../../constants/Theme';
 import { getDebtById, getDebtHistory, updateDebtAmount, getAccounts, Debt, DebtHistory, Account } from '../../services/database';
+import { useApp } from '../../context/AppContext';
 import { formatCurrency } from '../../utils/currency';
 import { format } from 'date-fns';
 
@@ -21,6 +22,7 @@ export default function DebtDetailScreen() {
     const [amount, setAmount] = useState('');
     const [notes, setNotes] = useState('');
     const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
+    const { refreshData } = useApp();
 
     const fetchData = async () => {
         if (!id) return;
@@ -32,7 +34,8 @@ export default function DebtDetailScreen() {
             setDebt(d);
             setHistory(h);
             setAccounts(accs);
-            if (accs.length > 0) setSelectedAccountId(accs[0].id); // Default to first account
+            // v2.0.0: Default to null — user must explicitly choose an account
+            setSelectedAccountId(null);
         } catch (e) {
             console.error(e);
         } finally {
@@ -60,8 +63,13 @@ export default function DebtDetailScreen() {
             setAmount('');
             setNotes('');
             fetchData();
-        } catch (e) {
-            Alert.alert('Error', 'Update failed. Check database logs.');
+            await refreshData(); // v2.0.0: refresh global account balances
+        } catch (e: any) {
+            if (e?.message === 'INSUFFICIENT_BALANCE') {
+                Alert.alert('Insufficient Balance', 'The selected account does not have enough balance for this transaction.');
+            } else {
+                Alert.alert('Error', 'Update failed. Please try again.');
+            }
         }
     };
 
@@ -77,13 +85,15 @@ export default function DebtDetailScreen() {
         ? (isDebt ? 'Borrow More' : 'Lend More')
         : (isDebt ? 'Repay Debt' : 'Receive Payment');
 
-    const previewText = actionType === 'increase'
-        ? (isDebt
-            ? `Balance takes: +${formatCurrency(Number(amount) || 0)}`
-            : `Balance takes: -${formatCurrency(Number(amount) || 0)}`)
-        : (isDebt
-            ? `Balance takes: -${formatCurrency(Number(amount) || 0)}`
-            : `Balance takes: +${formatCurrency(Number(amount) || 0)}`);
+    const previewText = selectedAccountId === null
+        ? 'No account will be affected'
+        : actionType === 'increase'
+            ? (isDebt
+                ? `Balance takes: +${formatCurrency(Number(amount) || 0)}`
+                : `Balance takes: -${formatCurrency(Number(amount) || 0)}`)
+            : (isDebt
+                ? `Balance takes: -${formatCurrency(Number(amount) || 0)}`
+                : `Balance takes: +${formatCurrency(Number(amount) || 0)}`);
 
     return (
         <View style={styles.container}>
@@ -168,6 +178,19 @@ export default function DebtDetailScreen() {
                         {/* Account Selector */}
                         <Text style={styles.label}>Select Account</Text>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.accountSelector}>
+                            {/* v2.0.0: Add "No Account" option */}
+                            <TouchableOpacity
+                                style={[
+                                    styles.accountOption,
+                                    selectedAccountId === null && { backgroundColor: Colors.gray[300], borderColor: Colors.gray[400] }
+                                ]}
+                                onPress={() => setSelectedAccountId(null)}
+                            >
+                                <Text style={[
+                                    styles.accountOptionText,
+                                    selectedAccountId === null && { color: Colors.gray[900] }
+                                ]}>No Account</Text>
+                            </TouchableOpacity>
                             {accounts.map(acc => (
                                 <TouchableOpacity
                                     key={acc.id}
@@ -228,34 +251,34 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: Colors.white },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     header: { padding: 20, paddingTop: 60, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    headerTitle: { fontSize: 18, fontWeight: '700' },
+    headerTitle: { fontSize: Typography.size.lg, fontFamily: Typography.family.bold },
     backBtn: { padding: 4 },
     hero: { padding: 30, alignItems: 'center', borderBottomLeftRadius: 30, borderBottomRightRadius: 30 },
-    heroLabel: { fontSize: 14, fontWeight: '700', letterSpacing: 1, marginBottom: 8 },
-    heroAmount: { fontSize: 40, fontWeight: '800', marginBottom: 16 },
-    heroNotes: { fontSize: 14, color: Colors.gray[600], marginBottom: 8 },
-    lastUpdated: { fontSize: 12, color: Colors.gray[500] },
+    heroLabel: { fontSize: Typography.size.sm, fontFamily: Typography.family.bold, letterSpacing: 1, marginBottom: 8 },
+    heroAmount: { fontSize: 40, fontFamily: Typography.family.bold, marginBottom: 16 },
+    heroNotes: { fontSize: Typography.size.sm, fontFamily: Typography.family.medium, color: Colors.gray[600], marginBottom: 8 },
+    lastUpdated: { fontSize: Typography.size.xs, fontFamily: Typography.family.regular, color: Colors.gray[500] },
     actions: { flexDirection: 'row', padding: 20, gap: 16 },
     actionBtn: { flex: 1, padding: 16, borderRadius: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
-    actionLabel: { fontWeight: '700' },
+    actionLabel: { fontFamily: Typography.family.bold },
     historySection: { padding: 20 },
-    sectionTitle: { fontSize: 18, fontWeight: '700', marginBottom: 20 },
+    sectionTitle: { fontSize: Typography.size.lg, fontFamily: Typography.family.bold, marginBottom: 20 },
     historyItem: { flexDirection: 'row', marginBottom: 24, position: 'relative' },
     timelineLine: { position: 'absolute', left: 16, top: 0, bottom: -24, width: 2, backgroundColor: Colors.gray[100], zIndex: -1 },
     historyIcon: { width: 34, height: 34, borderRadius: 17, justifyContent: 'center', alignItems: 'center', marginRight: 16, backgroundColor: Colors.gray[100] },
     historyContent: { flex: 1 },
     historyRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
-    historyAction: { fontWeight: '600', color: Colors.gray[800] },
-    historyAmount: { fontWeight: '700' },
-    historyDate: { fontSize: 12, color: Colors.gray[500] },
+    historyAction: { fontFamily: Typography.family.bold, color: Colors.gray[800] },
+    historyAmount: { fontFamily: Typography.family.bold },
+    historyDate: { fontSize: Typography.size.xs, fontFamily: Typography.family.regular, color: Colors.gray[500] },
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 24 },
     modalContent: { backgroundColor: 'white', padding: 24, borderRadius: 24 },
-    modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 16 },
-    input: { backgroundColor: Colors.gray[100], padding: 16, borderRadius: 12, marginBottom: 12, fontSize: 16 },
+    modalTitle: { fontSize: Typography.size.lg, fontFamily: Typography.family.bold, marginBottom: 16 },
+    input: { backgroundColor: Colors.gray[50], padding: 16, borderRadius: Layout.radius.lg, marginBottom: 12, fontSize: Typography.size.md, fontFamily: Typography.family.medium, borderWidth: 1, borderColor: Colors.gray[100] },
     modalButtons: { flexDirection: 'row', justifyContent: 'flex-end', gap: 16, marginTop: 8 },
     cancelBtn: { padding: 12 },
     confirmBtn: { padding: 12, paddingHorizontal: 24, borderRadius: 12 },
-    label: { fontSize: 12, fontWeight: '600', color: Colors.gray[500], marginBottom: 8, marginTop: 4 },
+    label: { fontSize: Typography.size.xs, fontFamily: Typography.family.bold, color: Colors.gray[500], marginBottom: 8, marginTop: 4 },
     accountSelector: { flexDirection: 'row', marginBottom: 16, maxHeight: 50 },
     accountOption: {
         paddingVertical: 8,
@@ -266,6 +289,6 @@ const styles = StyleSheet.create({
         marginRight: 8,
         backgroundColor: Colors.white,
     },
-    accountOptionText: { fontSize: 12, fontWeight: '600', color: Colors.gray[700] },
-    previewText: { fontSize: 12, fontStyle: 'italic', marginBottom: 16, textAlign: 'right' },
+    accountOptionText: { fontSize: Typography.size.xs, fontFamily: Typography.family.bold, color: Colors.gray[700] },
+    previewText: { fontSize: Typography.size.xs, fontFamily: Typography.family.regular, fontStyle: 'italic', marginBottom: 16, textAlign: 'right' },
 });

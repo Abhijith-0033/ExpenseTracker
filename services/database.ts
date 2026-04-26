@@ -12,6 +12,7 @@ export interface Transaction {
   date: string; // ISO string
   description: string;
   created_at: number;
+  type?: 'expense' | 'income' | 'transfer';
 }
 
 export interface Account {
@@ -321,7 +322,11 @@ export const addTransaction = async (tx: Omit<Transaction, 'id' | 'created_at'>)
 export const getTransactions = async (): Promise<Transaction[]> => {
   await initDatabase();
   const db = getDatabase();
-  return await db.getAllAsync<Transaction>('SELECT * FROM transactions ORDER BY date DESC');
+  const txs = await db.getAllAsync<Transaction>('SELECT * FROM transactions ORDER BY date DESC');
+  return txs.map(t => ({
+      ...t,
+      type: t.category === 'Income' ? 'income' : (t.category === 'Transfer' ? 'transfer' : 'expense')
+  }));
 };
 
 export const updateTransaction = async (id: number, updated: Omit<Transaction, 'id' | 'created_at'>): Promise<void> => {
@@ -367,6 +372,36 @@ export const updateTransaction = async (id: number, updated: Omit<Transaction, '
     console.error("Update Transaction Error", e);
     throw e;
   }
+};
+
+export const addTransfer = async (
+    amount: number,
+    fromAccountId: number,
+    toAccountId: number,
+    date: string,
+    description: string
+) => {
+    await initDatabase();
+    const db = getDatabase();
+    await db.withTransactionAsync(async () => {
+        const fromAcc = await db.getFirstAsync<{balance: number}>('SELECT balance FROM accounts WHERE id = ?', [fromAccountId]);
+        if (!fromAcc || fromAcc.balance < amount) {
+            throw new Error('INSUFFICIENT_BALANCE');
+        }
+        
+        await db.runAsync('UPDATE accounts SET balance = balance - ? WHERE id = ?', [amount, fromAccountId]);
+        await db.runAsync('UPDATE accounts SET balance = balance + ? WHERE id = ?', [amount, toAccountId]);
+        
+        const timestamp = Date.now();
+        await db.runAsync(
+            'INSERT INTO transactions (amount, category, subcategory, account_id, date, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [amount, 'Transfer', 'Transfer Out', fromAccountId, date, description, timestamp]
+        );
+        await db.runAsync(
+            'INSERT INTO transactions (amount, category, subcategory, account_id, date, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [amount, 'Transfer', 'Transfer In', toAccountId, date, description, timestamp]
+        );
+    });
 };
 
 export const deleteTransaction = async (id: number, accountId: number, amount: number, category: string) => {
@@ -651,6 +686,36 @@ export const deleteRechargeByExpenseId = async (expenseId: number) => {
   const meta = await db.getFirstAsync<{ notification_id: string }>('SELECT notification_id FROM recharge_meta WHERE expense_id = ?', [expenseId]);
   await db.runAsync('DELETE FROM recharge_meta WHERE expense_id = ?', [expenseId]);
   return meta?.notification_id;
+};
+
+export const deleteRechargeMeta = async (id: number) => {
+  await initDatabase();
+  const db = getDatabase();
+  const meta = await db.getFirstAsync<{ notification_id: string }>('SELECT notification_id FROM recharge_meta WHERE id = ?', [id]);
+  await db.runAsync('DELETE FROM recharge_meta WHERE id = ?', [id]);
+  return meta?.notification_id;
+};
+
+export const updateRechargeMeta = async (id: number, updates: Partial<RechargeMeta>) => {
+  await initDatabase();
+  const db = getDatabase();
+  const fields = [];
+  const values = [];
+  if (updates.validity_days !== undefined) { fields.push('validity_days = ?'); values.push(updates.validity_days); }
+  if (updates.expiry_date !== undefined) { fields.push('expiry_date = ?'); values.push(updates.expiry_date); }
+  if (updates.reminder_date !== undefined) { fields.push('reminder_date = ?'); values.push(updates.reminder_date); }
+  if (updates.notification_id !== undefined) { fields.push('notification_id = ?'); values.push(updates.notification_id); }
+  
+  if (fields.length === 0) return;
+  values.push(id);
+  
+  await db.runAsync(`UPDATE recharge_meta SET ${fields.join(', ')} WHERE id = ?`, values);
+};
+
+export const updateBillTransaction = async (expenseId: number, updates: {amount: number, description: string}) => {
+  await initDatabase();
+  const db = getDatabase();
+  await db.runAsync('UPDATE transactions SET amount = ?, description = ? WHERE id = ?', [updates.amount, updates.description, expenseId]);
 };
 
 export const updateCategories = async (categories: CategoryNode[]) => {

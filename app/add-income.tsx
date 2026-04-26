@@ -1,21 +1,27 @@
 
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, StatusBar, Dimensions, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useApp } from '../context/AppContext';
 import { addTransaction, getCategories, getIncomeSources } from '../services/database';
+import { playIncomeSound } from '../services/SoundService';
 import { Keypad } from '../components/ui/Keypad';
-import { Calendar as CalendarIcon, Wallet as WalletIcon, Tag as TagIcon, X, Briefcase, TrendingUp, Gift, DollarSign, Home, Globe, User } from 'lucide-react-native';
+import { Calendar as CalendarIcon, Wallet as WalletIcon, Tag as TagIcon, X, Briefcase, TrendingUp, Gift, DollarSign, Home, Globe, User, ChevronDown } from 'lucide-react-native';
 import { format } from 'date-fns';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Colors, Layout } from '../constants/Theme';
+import { Colors, Layout, Typography } from '../constants/Theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatCurrency } from '../utils/currency';
+import { PressableScale } from '../components/ui/PressableScale';
+import Animated, { FadeInDown, FadeInUp, FadeIn } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect } from 'expo-router';
+import { SuccessAnimation } from '../components/SuccessAnimation';
 
 export default function AddIncomeScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const { accounts, refreshData } = useApp();
+    const { accounts, refreshData, soundEnabled } = useApp();
 
     const [display, setDisplay] = useState('0');
     const [description, setDescription] = useState('');
@@ -29,6 +35,7 @@ export default function AddIncomeScreen() {
 
     const [showSourcePicker, setShowSourcePicker] = useState(false);
     const [showDatePicker, setShowDatePicker] = useState(false);
+    const [showSuccess, setShowSuccess] = useState(false);
 
     useEffect(() => {
         if (accounts.length > 0 && !selectedAccount) {
@@ -36,6 +43,14 @@ export default function AddIncomeScreen() {
         }
         loadIncomeSources();
     }, [accounts, selectedAccount]);
+
+    useFocusEffect(
+        React.useCallback(() => {
+            setShowSuccess(false);
+            setDisplay('0');
+            setDescription('');
+        }, [])
+    );
 
     const loadIncomeSources = async () => {
         try {
@@ -72,6 +87,9 @@ export default function AddIncomeScreen() {
 
     const handleClear = () => setDisplay('0');
 
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const isSubmittingRef = React.useRef(false);
+
     const handleSave = async () => {
         let finalAmount = 0;
         try {
@@ -93,7 +111,12 @@ export default function AddIncomeScreen() {
             return;
         }
 
+        if (isSubmittingRef.current) return;
+
         try {
+            setIsSubmitting(true);
+            isSubmittingRef.current = true;
+
             await addTransaction({
                 amount: finalAmount,
                 category: 'Income',
@@ -103,9 +126,16 @@ export default function AddIncomeScreen() {
                 description
             });
             await refreshData();
-            router.back();
+
+            // Sound Feedback
+            playIncomeSound(soundEnabled);
+
+            setShowSuccess(true);
         } catch (e) {
             Alert.alert('Error', 'Failed to save income.');
+        } finally {
+            setIsSubmitting(false);
+            isSubmittingRef.current = false;
         }
     };
 
@@ -126,78 +156,118 @@ export default function AddIncomeScreen() {
         setSelectedSourceIcon(nextSource.icon);
     }
 
+
     return (
-        <View style={[styles.container, { paddingTop: insets.top }]}>
+        <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom + 16 }]}>
             <StatusBar barStyle="dark-content" />
 
+            <LinearGradient
+                colors={['rgba(34, 197, 94, 0.08)', 'rgba(255, 255, 255, 0)']}
+                style={StyleSheet.absoluteFill}
+            />
+
             {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
-                    <X size={24} color={Colors.gray[600]} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Add Income</Text>
-                <View style={{ width: 24 }} />
-            </View>
-
-            {/* Main Display - Green for Income */}
-            <View style={styles.displayContainer}>
-                <Text style={[styles.currencySymbol, { color: Colors.success[500] }]}>₹</Text>
-                <Text style={[styles.amountDisplay, { color: Colors.success.text }]} numberOfLines={1} adjustsFontSizeToFit>{display}</Text>
-            </View>
-
-            <View style={styles.formContainer}>
-                {/* Row 1: Date & Account */}
-                <View style={styles.selectorsRow}>
-                    <TouchableOpacity style={styles.pill} onPress={() => setShowDatePicker(true)}>
-                        <CalendarIcon size={18} color={Colors.success[500]} />
-                        <Text style={styles.pillText}>{format(date, 'MMM dd, yyyy')}</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity style={styles.pill} onPress={cycleAccount}>
-                        <WalletIcon size={18} color={Colors.success[500]} />
-                        <Text style={styles.pillText}>
-                            {selectedAccount ? selectedAccount.name : 'Select Account'}
-                        </Text>
-                    </TouchableOpacity>
+            <Animated.View entering={FadeIn.duration(400)} style={styles.header}>
+                <PressableScale onPress={() => router.back()} style={styles.closeBtn}>
+                    <X size={24} color={Colors.gray[800]} />
+                </PressableScale>
+                <View style={styles.headerTitleContainer}>
+                    <Text style={styles.headerSubtitle}>Adding Money</Text>
+                    <Text style={styles.headerTitle}>New Income</Text>
                 </View>
+                <View style={{ width: 44 }} />
+            </Animated.View>
 
-                {/* Source Selection (Simple Toggle for now, mirroring category style) */}
-                <TouchableOpacity style={[styles.pill, styles.widePill]} onPress={cycleSource}>
-                    {/* Simple dynamic icon render */}
-                    {selectedSourceIcon === 'Briefcase' && <Briefcase size={20} color={Colors.success[500]} />}
-                    {selectedSourceIcon === 'Tag' && <TagIcon size={20} color={Colors.success[500]} />}
-                    {selectedSourceIcon === 'TrendingUp' && <TrendingUp size={20} color={Colors.success[500]} />}
-                    {selectedSourceIcon === 'Gift' && <Gift size={20} color={Colors.success[500]} />}
-                    {selectedSourceIcon === 'DollarSign' && <DollarSign size={20} color={Colors.success[500]} />}
-                    {selectedSourceIcon === 'Home' && <Home size={20} color={Colors.success[500]} />}
-                    {selectedSourceIcon === 'Globe' && <Globe size={20} color={Colors.success[500]} />}
-                    {selectedSourceIcon === 'User' && <User size={20} color={Colors.success[500]} />}
-                    {/* Fallback */}
-                    {!['Briefcase', 'Tag', 'TrendingUp', 'Gift', 'DollarSign', 'Home', 'Globe', 'User'].includes(selectedSourceIcon) && <DollarSign size={20} color={Colors.success[500]} />}
-                    <Text style={styles.pillText}>
-                        Source: {subcategory}
-                    </Text>
-                    <Text style={styles.hint}>(Tap to change)</Text>
-                </TouchableOpacity>
+            <ScrollView
+                style={styles.mainScroll}
+                contentContainerStyle={styles.scrollContent}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+            >
+                {/* Main Display - Special focus on the number */}
+                <Animated.View entering={FadeInDown.delay(100).duration(600)} style={styles.displayContainer}>
+                    <View style={styles.amountWrapper}>
+                        <Text style={[styles.currencySymbol, { color: Colors.success[600] }]}>₹</Text>
+                        <Text style={styles.amountDisplay} numberOfLines={1} adjustsFontSizeToFit>{display}</Text>
+                    </View>
+                    <View style={styles.incomeBadge}>
+                        <TrendingUp size={14} color={Colors.success[700]} />
+                        <Text style={styles.incomeBadgeText}>Income Entry</Text>
+                    </View>
+                </Animated.View>
+
+                {/* Row 1: Date & Account */}
+                <Animated.View entering={FadeInDown.delay(200).duration(600)} style={styles.selectorsRow}>
+                    <PressableScale style={[styles.pill, { flex: 1 }]} onPress={() => setShowDatePicker(true)}>
+                        <View style={styles.pillIconContainer}>
+                            <CalendarIcon size={20} color={Colors.success[600]} />
+                        </View>
+                        <View style={styles.pillContent}>
+                            <Text style={styles.pillLabel}>Date</Text>
+                            <Text style={styles.pillValue}>{format(date, 'MMM dd, yyyy')}</Text>
+                        </View>
+                    </PressableScale>
+
+                    <PressableScale style={[styles.pill, { flex: 1 }]} onPress={cycleAccount}>
+                        <View style={styles.pillIconContainer}>
+                            <WalletIcon size={20} color={Colors.success[600]} />
+                        </View>
+                        <View style={styles.pillContent}>
+                            <Text style={styles.pillLabel}>Account</Text>
+                            <Text style={styles.pillValue} numberOfLines={1}>
+                                {selectedAccount ? selectedAccount.name : 'Select'}
+                            </Text>
+                        </View>
+                    </PressableScale>
+                </Animated.View>
+
+                {/* Source Selection */}
+                <Animated.View entering={FadeInDown.delay(300).duration(600)}>
+                    <PressableScale style={[styles.pill, styles.widePill]} onPress={cycleSource}>
+                        <View style={styles.pillIconContainer}>
+                            {/* Simple dynamic icon render */}
+                            {selectedSourceIcon === 'Briefcase' && <Briefcase size={24} color={Colors.success[600]} />}
+                            {selectedSourceIcon === 'Tag' && <TagIcon size={24} color={Colors.success[600]} />}
+                            {selectedSourceIcon === 'TrendingUp' && <TrendingUp size={24} color={Colors.success[600]} />}
+                            {selectedSourceIcon === 'Gift' && <Gift size={24} color={Colors.success[600]} />}
+                            {selectedSourceIcon === 'DollarSign' && <DollarSign size={24} color={Colors.success[600]} />}
+                            {selectedSourceIcon === 'Home' && <Home size={24} color={Colors.success[600]} />}
+                            {selectedSourceIcon === 'Globe' && <Globe size={24} color={Colors.success[600]} />}
+                            {selectedSourceIcon === 'User' && <User size={24} color={Colors.success[600]} />}
+                            {!['Briefcase', 'Tag', 'TrendingUp', 'Gift', 'DollarSign', 'Home', 'Globe', 'User'].includes(selectedSourceIcon) && <DollarSign size={24} color={Colors.success[600]} />}
+                        </View>
+                        <View style={styles.pillContent}>
+                            <Text style={styles.pillLabel}>Income Source</Text>
+                            <Text style={styles.pillValue}>{subcategory}</Text>
+                        </View>
+                        <View style={styles.cycleIcon}>
+                            <ChevronDown size={14} color={Colors.gray[400]} />
+                        </View>
+                    </PressableScale>
+                </Animated.View>
 
                 {/* Note Input */}
-                <TextInput
-                    placeholder="Add a note (optional)"
-                    placeholderTextColor={Colors.gray[400]}
-                    value={description}
-                    onChangeText={setDescription}
-                    style={styles.input}
+                <Animated.View entering={FadeInDown.delay(400).duration(600)} style={styles.noteWrapper}>
+                    <TextInput
+                        placeholder="Add a remark for this entry..."
+                        placeholderTextColor={Colors.gray[400]}
+                        value={description}
+                        onChangeText={setDescription}
+                        style={styles.input}
+                    />
+                </Animated.View>
+            </ScrollView>
+
+            <Animated.View entering={FadeInUp.delay(500).duration(600)}>
+                <Keypad
+                    onPress={handleKeyPress}
+                    onDelete={handleDelete}
+                    onClear={handleClear}
+                    onSubmit={handleSave}
+                    submitColor={Colors.success[600]}
+                    submitLabel="Save Income"
                 />
-            </View>
-
-            <View style={{ flex: 1 }} />
-
-            <Keypad
-                onPress={handleKeyPress}
-                onDelete={handleDelete}
-                onClear={handleClear}
-                onSubmit={handleSave}
-            />
+            </Animated.View>
 
             {/* Date Picker Modal */}
             {showDatePicker && (
@@ -211,6 +281,15 @@ export default function AddIncomeScreen() {
                     }}
                 />
             )}
+
+            <SuccessAnimation 
+                visible={showSuccess} 
+                onAnimationFinish={() => {
+                    setShowSuccess(false);
+                    router.back();
+                }} 
+                message="Income Saved!"
+            />
         </View>
     );
 }
@@ -218,84 +297,138 @@ export default function AddIncomeScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: Colors.success.bg, // Light green background
+        backgroundColor: Colors.gray[50],
     },
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: Layout.spacing.md,
-        paddingBottom: Layout.spacing.sm,
+        paddingHorizontal: 20,
+        marginBottom: 20,
     },
     closeBtn: {
-        padding: 8,
-        backgroundColor: Colors.white,
-        borderRadius: Layout.radius.full,
-        ...Layout.shadows.sm,
+        padding: 10,
+        backgroundColor: Colors.gray[100],
+        borderRadius: 14,
+    },
+    headerTitleContainer: {
+        alignItems: 'center',
+    },
+    headerSubtitle: {
+        fontSize: Typography.size.xs,
+        fontFamily: Typography.family.bold,
+        color: Colors.gray[400],
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+        marginBottom: 2,
     },
     headerTitle: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: Colors.gray[800],
+        fontSize: Typography.size.lg,
+        fontFamily: Typography.family.bold,
+        color: Colors.gray[900],
     },
     displayContainer: {
-        height: 140,
+        height: 160,
         justifyContent: 'center',
         alignItems: 'center',
+        marginBottom: 10,
+    },
+    amountWrapper: {
         flexDirection: 'row',
-        marginBottom: Layout.spacing.md,
+        alignItems: 'center',
     },
     currencySymbol: {
-        fontSize: 32,
-        marginRight: 8,
-        fontWeight: '500',
+        fontSize: Typography.size.xxxl,
+        marginRight: 6,
+        fontFamily: Typography.family.bold,
     },
     amountDisplay: {
-        fontSize: 64,
-        fontWeight: '700',
-        maxWidth: '80%',
+        fontSize: 72,
+        fontFamily: Typography.family.bold,
+        color: Colors.gray[900],
+        maxWidth: Dimensions.get('window').width * 0.8,
     },
-    formContainer: {
-        paddingHorizontal: Layout.spacing.lg,
+    incomeBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: Colors.success[50],
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        borderRadius: 20,
+        marginTop: 12,
+        gap: 6,
+    },
+    incomeBadgeText: {
+        fontSize: Typography.size.xs,
+        fontFamily: Typography.family.bold,
+        color: Colors.success[700],
+        textTransform: 'uppercase',
+    },
+    mainScroll: {
+        flex: 1,
+    },
+    scrollContent: {
+        paddingHorizontal: 16,
+        paddingBottom: 24,
     },
     selectorsRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginBottom: 16,
+        marginBottom: 12,
+        gap: 12,
     },
     pill: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: Colors.white,
         paddingHorizontal: 16,
-        paddingVertical: 14,
-        borderRadius: Layout.radius.lg,
-        flex: 0.48,
+        paddingVertical: 18,
+        borderRadius: 24,
+        borderWidth: 1,
+        borderColor: Colors.gray[100],
         ...Layout.shadows.sm,
+    },
+    pillIconContainer: {
+        width: 48,
+        height: 48,
+        borderRadius: 14,
+        backgroundColor: Colors.success[50],
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 14,
+    },
+    pillContent: {
+        flex: 1,
+    },
+    pillLabel: {
+        fontSize: Typography.size.xs,
+        color: Colors.gray[400],
+        fontFamily: Typography.family.bold,
+        textTransform: 'uppercase',
+        marginBottom: 2,
+    },
+    pillValue: {
+        fontSize: Typography.size.lg,
+        color: Colors.gray[900],
+        fontFamily: Typography.family.bold,
     },
     widePill: {
-        flex: 0,
         width: '100%',
         marginBottom: 16,
-        justifyContent: 'flex-start',
     },
-    pillText: {
-        marginLeft: 10,
-        fontSize: 15,
-        color: Colors.gray[800],
-        fontWeight: '600',
-    },
-    hint: {
+    cycleIcon: {
         marginLeft: 'auto',
-        fontSize: 12,
-        color: Colors.gray[400],
+    },
+    noteWrapper: {
+        backgroundColor: Colors.gray[50],
+        borderRadius: 20,
+        padding: 4,
     },
     input: {
-        backgroundColor: Colors.white,
         padding: 16,
-        borderRadius: Layout.radius.lg,
-        fontSize: 16,
+        fontSize: Typography.size.md,
         color: Colors.gray[800],
-        ...Layout.shadows.sm,
+        fontFamily: Typography.family.medium,
     },
 });
+

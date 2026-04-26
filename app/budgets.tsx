@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { Colors, Layout } from '../constants/Theme';
+import { Colors, Layout, Typography } from '../constants/Theme';
 import { BudgetStatus, getBudgetStatus, getBudgets, setBudget, deleteBudget, Budget } from '../services/budgets';
 import { getCategories, CategoryNode } from '../services/database';
 import { BudgetCard } from '../components/BudgetCard';
@@ -183,8 +183,8 @@ const styles = StyleSheet.create({
         padding: 4,
     },
     headerTitle: {
-        fontSize: 20,
-        fontWeight: '700',
+        fontSize: Typography.size.xl,
+        fontFamily: Typography.family.bold,
         color: Colors.gray[900],
     },
     monthSelector: {
@@ -197,8 +197,8 @@ const styles = StyleSheet.create({
         borderBottomColor: Colors.gray[100],
     },
     monthText: {
-        fontSize: 16,
-        fontWeight: '600',
+        fontSize: Typography.size.md,
+        fontFamily: Typography.family.bold,
         width: 150,
         textAlign: 'center',
         color: Colors.gray[800],
@@ -238,13 +238,13 @@ const styles = StyleSheet.create({
         marginBottom: 24,
     },
     modalTitle: {
-        fontSize: 20,
-        fontWeight: '700',
+        fontSize: Typography.size.xl,
+        fontFamily: Typography.family.bold,
         color: Colors.gray[900],
     },
     label: {
-        fontSize: 14,
-        fontWeight: '600',
+        fontSize: Typography.size.sm,
+        fontFamily: Typography.family.bold,
         color: Colors.gray[700],
         marginBottom: 8,
     },
@@ -266,19 +266,20 @@ const styles = StyleSheet.create({
         borderColor: Colors.primary[500],
     },
     catText: {
-        fontSize: 14,
+        fontSize: Typography.size.sm,
+        fontFamily: Typography.family.medium,
         color: Colors.gray[700],
     },
     catTextActive: {
         color: Colors.primary[700],
-        fontWeight: '600',
+        fontFamily: Typography.family.bold,
     },
     input: {
         backgroundColor: Colors.gray[50],
         borderRadius: 12,
         padding: 16,
-        fontSize: 24,
-        fontWeight: '700',
+        fontSize: Typography.size.xxl,
+        fontFamily: Typography.family.bold,
         color: Colors.gray[900],
         marginBottom: 24,
     },
@@ -290,20 +291,22 @@ const styles = StyleSheet.create({
     },
     saveBtnText: {
         color: Colors.white,
-        fontSize: 16,
-        fontWeight: '700',
+        fontSize: Typography.size.md,
+        fontFamily: Typography.family.bold,
     },
     emptyContainer: {
         alignItems: 'center',
         marginTop: 60,
     },
     emptyText: {
-        fontSize: 16,
+        fontSize: Typography.size.md,
+        fontFamily: Typography.family.bold,
         color: Colors.gray[600],
         marginBottom: 8,
     },
     emptySub: {
-        fontSize: 14,
+        fontSize: Typography.size.sm,
+        fontFamily: Typography.family.medium,
         color: Colors.gray[400],
     }
 });

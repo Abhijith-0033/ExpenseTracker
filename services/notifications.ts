@@ -6,34 +6,39 @@ const REMINDER_KEY = 'daily_reminder_enabled';
 const NOTIFICATION_ID = 'daily-expense-reminder';
 
 export const initNotifications = async () => {
-    // Configure foreground behavior
-    Notifications.setNotificationHandler({
-        handleNotification: async () => ({
-            shouldShowBanner: true,
-            shouldShowList: true,
-            shouldPlaySound: true,
-            shouldSetBadge: false,
-        }),
-    });
-
-    // Create channel for Android
-    if (Platform.OS === 'android') {
-        await Notifications.setNotificationChannelAsync('expense-reminders', {
-            name: 'Expense Reminders',
-            importance: Notifications.AndroidImportance.HIGH,
-            vibrationPattern: [0, 250, 250, 250],
-            lightColor: '#2563eb',
+    try {
+        // Configure foreground behavior
+        Notifications.setNotificationHandler({
+            handleNotification: async () => ({
+                shouldShowBanner: true,
+                shouldShowList: true,
+                shouldPlaySound: true,
+                shouldSetBadge: false,
+            }),
         });
-    }
 
-    // Restore scheduling if it was enabled but maybe cleared by system or update
-    const enabled = await AsyncStorage.getItem(REMINDER_KEY);
-    if (enabled === 'true') {
-        const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-        const exists = scheduled.find(n => n.identifier === NOTIFICATION_ID);
-        if (!exists) {
-            await scheduleDailyReminder(true);
+        // Create channel for Android
+        if (Platform.OS === 'android') {
+            await Notifications.setNotificationChannelAsync('expense-reminders', {
+                name: 'Expense Reminders',
+                importance: Notifications.AndroidImportance.HIGH,
+                vibrationPattern: [0, 250, 250, 250],
+                lightColor: '#2563eb',
+            });
         }
+
+        // Restore scheduling if it was enabled but maybe cleared by system or update
+        const enabled = await AsyncStorage.getItem(REMINDER_KEY);
+        if (enabled === 'true') {
+            const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+            const exists = scheduled.find(n => n.identifier === NOTIFICATION_ID);
+            if (!exists) {
+                await scheduleDailyReminder(true);
+            }
+        }
+    } catch (e) {
+        // Gracefully handle Expo Go limitations (push notifications unavailable in Expo Go SDK 53+)
+        console.warn('Notifications init skipped (likely running in Expo Go):', e);
     }
 };
 

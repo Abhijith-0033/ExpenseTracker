@@ -70,14 +70,25 @@ export const IncomeExpenseLineChart: React.FC<{ data: MonthlyComparison[], width
 };
 
 // --- Trend Line Chart ---
-export const TrendLineChart: React.FC<{ data: any[], type: 'daily' | 'monthly', width?: number }> = ({ data, type, width = screenWidth - 60 }) => {
+export const TrendLineChart: React.FC<{ data: any[], type: 'daily' | 'monthly', width?: number, predictedData?: { total: number, label: string } }> = ({ data, type, width = screenWidth - 60, predictedData }) => {
     if (!data || data.length === 0) return <Text style={styles.noData}>No trend data available</Text>;
 
-    const chartData = data.map(item => ({
+    const chartData = data.map((item, index) => ({
         value: item.total,
         label: type === 'daily' ? format(new Date(item.date), 'd') : format(new Date(item.month + '-01'), 'MMM'),
         dataPointText: formatCurrency(Math.round(item.total)),
     }));
+
+    if (predictedData) {
+        chartData.push({
+            value: predictedData.total,
+            label: predictedData.label,
+            dataPointText: formatCurrency(Math.round(predictedData.total)),
+            dataPointColor: Colors.primary[300],
+            textColor: Colors.primary[400],
+            textShiftY: -10,
+        } as any);
+    }
 
     return (
         <View style={styles.chartContainer}>

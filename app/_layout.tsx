@@ -1,8 +1,8 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { useFonts } from 'expo-font';
+import { useFonts, DMSans_400Regular, DMSans_500Medium, DMSans_700Bold } from '@expo-google-fonts/dm-sans';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import 'react-native-reanimated';
 import { useColorScheme, View } from 'react-native';
 import { AppProvider } from '../context/AppContext';
@@ -20,6 +20,12 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   const router = useRouter();
 
+  const [fontsLoaded] = useFonts({
+    DMSans_400Regular,
+    DMSans_500Medium,
+    DMSans_700Bold,
+  });
+
   useEffect(() => {
     const prepare = async () => {
       try {
@@ -29,11 +35,15 @@ export default function RootLayout() {
         console.warn(e);
       } finally {
         // Hide native splash screen and show our custom landing
-        await SplashScreen.hideAsync();
+        if (fontsLoaded) {
+          await SplashScreen.hideAsync();
+        }
       }
     };
 
-    prepare();
+    if (fontsLoaded) {
+      prepare();
+    }
 
     // Handle notification click
     const subscription = Notifications.addNotificationResponseReceivedListener(response => {
@@ -45,17 +55,23 @@ export default function RootLayout() {
     });
 
     return () => subscription.remove();
-  }, []);
+  }, [fontsLoaded]);
+
+  if (!fontsLoaded) {
+    return null;
+  }
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AppProvider>
         <SafeAreaProvider>
-          <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+          {/* Force DefaultTheme per absolute rules (light theme only) */}
+          <ThemeProvider value={DefaultTheme}>
             <View style={{ flex: 1 }}>
               <Stack>
                 <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
                 <Stack.Screen name="budgets" options={{ headerShown: false }} />
+                <Stack.Screen name="add-transfer" options={{ headerShown: false }} />
                 <Stack.Screen name="+not-found" />
               </Stack>
             </View>

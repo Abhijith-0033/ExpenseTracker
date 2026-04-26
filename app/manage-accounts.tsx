@@ -5,6 +5,7 @@ import { useApp } from '../context/AppContext';
 import { addAccount, updateAccount, Account } from '../services/database';
 import { Plus, X, Pencil } from 'lucide-react-native';
 import { formatCurrency } from '../utils/currency';
+import { Colors, Layout, Typography } from '../constants/Theme';
 
 export default function ManageAccountsScreen() {
     const { accounts, refreshData } = useApp();
@@ -126,7 +127,7 @@ export default function ManageAccountsScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#fff',
+        backgroundColor: Colors.gray[50],
     },
     header: {
         flexDirection: 'row',
@@ -134,16 +135,17 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         padding: 16,
         paddingTop: 60,
-        backgroundColor: '#fff',
+        backgroundColor: Colors.white,
         borderBottomWidth: 1,
-        borderBottomColor: '#f3f4f6',
+        borderBottomColor: Colors.gray[100],
     },
     title: {
-        fontSize: 24,
-        fontWeight: 'bold',
+        fontSize: Typography.size.xxl,
+        fontFamily: Typography.family.bold,
+        color: Colors.gray[900],
     },
     addBtn: {
-        backgroundColor: '#2563eb',
+        backgroundColor: Colors.primary[600],
         borderRadius: 20,
         padding: 8,
     },
@@ -151,23 +153,26 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         padding: 16,
-        backgroundColor: '#f9fafb',
-        borderRadius: 12,
+        backgroundColor: Colors.white,
+        borderRadius: Layout.radius.lg,
         marginBottom: 12,
+        ...Layout.shadows.sm,
     },
     accName: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#1f2937',
+        fontSize: Typography.size.md,
+        fontFamily: Typography.family.bold,
+        color: Colors.gray[900],
     },
     accType: {
-        fontSize: 12,
-        color: '#6b7280',
+        fontSize: Typography.size.xs,
+        fontFamily: Typography.family.regular,
+        color: Colors.gray[500],
+        marginTop: 4,
     },
     accBalance: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#1f2937',
+        fontSize: Typography.size.md,
+        fontFamily: Typography.family.bold,
+        color: Colors.gray[900],
     },
     modalOverlay: {
         flex: 1,
@@ -176,9 +181,10 @@ const styles = StyleSheet.create({
         padding: 20,
     },
     modalContent: {
-        backgroundColor: '#fff',
-        borderRadius: 16,
-        padding: 20,
+        backgroundColor: Colors.white,
+        borderRadius: Layout.radius.xl,
+        padding: 24,
+        ...Layout.shadows.lg,
     },
     modalHeader: {
         flexDirection: 'row',
@@ -187,26 +193,32 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     modalTitle: {
-        fontSize: 20,
-        fontWeight: 'bold',
+        fontSize: Typography.size.xl,
+        fontFamily: Typography.family.bold,
+        color: Colors.gray[900],
     },
     input: {
-        backgroundColor: '#f3f4f6',
-        padding: 14,
-        borderRadius: 8,
-        marginBottom: 12,
-        fontSize: 16,
+        backgroundColor: Colors.gray[50],
+        padding: 16,
+        borderRadius: Layout.radius.lg,
+        marginBottom: 16,
+        fontSize: Typography.size.md,
+        fontFamily: Typography.family.medium,
+        color: Colors.gray[900],
+        borderWidth: 1,
+        borderColor: Colors.gray[100],
     },
     saveBtn: {
-        backgroundColor: '#2563eb',
+        backgroundColor: Colors.primary[600],
         padding: 16,
-        borderRadius: 8,
+        borderRadius: Layout.radius.lg,
         alignItems: 'center',
         marginTop: 8,
+        ...Layout.shadows.sm,
     },
     saveText: {
-        color: '#fff',
-        fontWeight: 'bold',
-        fontSize: 16,
+        color: Colors.white,
+        fontFamily: Typography.family.bold,
+        fontSize: Typography.size.md,
     },
 });

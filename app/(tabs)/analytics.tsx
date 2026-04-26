@@ -1,8 +1,10 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions, StatusBar, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Dimensions, StatusBar, TouchableOpacity, ActivityIndicator, Modal } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { Colors, Layout } from '../../constants/Theme';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+
+import { Colors, Layout, Typography } from '../../constants/Theme';
 import { Card } from '../../components/ui/Card';
 import {
     CategoryTotal,
@@ -20,20 +22,23 @@ import {
     getMonthlyIncomeVsExpense,
     MonthlyComparison
 } from '../../services/analysis';
+import { predictNextMonthExpenses, ForecastResult } from '../../services/ml';
 import {
     TrendLineChart,
     ExpenseHistogram,
     CategoryDrillDown,
     MonthlyStackedBarChart,
     WeeklyBarChart,
-    IncomeExpenseLineChart
+    IncomeExpenseLineChart,
+    getValueColor
 } from '../../components/AnalysisCharts';
-import { format, startOfMonth, addMonths, subMonths, isSameMonth } from 'date-fns';
-import { ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { format, startOfMonth, addMonths, subMonths, isSameMonth, startOfDay, endOfDay } from 'date-fns';
+import { ChevronLeft, ChevronRight, Calendar, Filter, Sparkles, TrendingUp, Info, X } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { formatCurrency } from '../../utils/currency';
 import { CategoryBreakdownList } from '../../components/CategoryBreakdownList';
 import { MonthlyTrendSection } from '../../components/MonthlyTrendSection';
-import { MonthlyExpensePieChart } from '../../components/MonthlyExpensePieChart';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -43,8 +48,14 @@ export default function AnalyticsScreen() {
     const router = useRouter();
     const [loading, setLoading] = useState(true);
     const [loadingSubcats, setLoadingSubcats] = useState(false);
-    const [viewMode, setViewMode] = useState<'month' | 'all'>('month');
+    const [viewMode, setViewMode] = useState<'month' | 'all' | 'custom'>('month');
     const [selectedMonth, setSelectedMonth] = useState(new Date());
+    const [customRange, setCustomRange] = useState({
+        start: startOfMonth(new Date()),
+        end: new Date()
+    });
+    const [showStartPicker, setShowStartPicker] = useState(false);
+    const [showEndPicker, setShowEndPicker] = useState(false);
 
     // Data States
     const [categoryTotals, setCategoryTotals] = useState<CategoryTotal[]>([]);
@@ -58,38 +69,52 @@ export default function AnalyticsScreen() {
     const [distribution, setDistribution] = useState<ExpenseDistribution[]>([]);
     const [stackedData, setStackedData] = useState<MonthlyCategoryTotal[]>([]);
     const [comparisonData, setComparisonData] = useState<MonthlyComparison[]>([]);
+    const [forecast, setForecast] = useState<ForecastResult | null>(null);
 
     const [activeChart, setActiveChart] = useState<'trend' | 'distribution' | 'stacked'>('trend');
+    const [showForecastModal, setShowForecastModal] = useState(false);
 
     const loadData = async () => {
         setLoading(true);
         try {
-            const dateFilter = viewMode === 'month' ? selectedMonth : undefined;
+            // v2.0.0: Flexible date filter
+            let dateFilter: Date | { start: Date, end: Date } | undefined;
+            
+            if (viewMode === 'month') {
+                dateFilter = selectedMonth;
+            } else if (viewMode === 'custom') {
+                dateFilter = customRange;
+            } else {
+                dateFilter = undefined; // All time
+            }
 
             // 1. Fetch Totals
             const cats = await getCategoryTotals(dateFilter);
             setCategoryTotals(cats);
 
             // 2. Fetch specific chart data
-            const daily = await getDailySpendingTrend(selectedMonth);
+            const dailyAnchor = viewMode === 'custom' ? customRange.start : selectedMonth;
+            const daily = await getDailySpendingTrend(dailyAnchor);
             setDailyTrend(daily);
 
-            const weekly = await getWeeklySpendingTrend(selectedMonth);
+            const weekly = await getWeeklySpendingTrend(dailyAnchor);
             setWeeklyTrend(weekly);
 
-            if (viewMode === 'all') {
-                const monthly = await getMonthlySpendingTrend(selectedMonth.getFullYear());
-                setMonthlyTrend(monthly);
-            }
+            const monthly = await getMonthlySpendingTrend(dailyAnchor.getFullYear());
+            setMonthlyTrend(monthly);
 
             const dist = await getExpenseDistribution(dateFilter);
             setDistribution(dist);
 
-            const stacked = await getMonthlyCategoryTrend(selectedMonth.getFullYear());
+            const stacked = await getMonthlyCategoryTrend(dailyAnchor.getFullYear());
             setStackedData(stacked);
 
-            const comparison = await getMonthlyIncomeVsExpense(selectedMonth.getFullYear());
+            const comparison = await getMonthlyIncomeVsExpense(dailyAnchor.getFullYear());
             setComparisonData(comparison);
+
+            // 3. Fetch Forecast
+            const fcast = await predictNextMonthExpenses();
+            setForecast(fcast);
 
             // Reset subcategory selection when filter changes
             setSelectedCategory(null);
@@ -105,7 +130,7 @@ export default function AnalyticsScreen() {
     useFocusEffect(
         useCallback(() => {
             loadData();
-        }, [viewMode, selectedMonth])
+        }, [viewMode, selectedMonth, customRange])
     );
 
     const handleCategorySelect = async (category: string) => {
@@ -144,13 +169,19 @@ export default function AnalyticsScreen() {
                         style={[styles.toggleBtn, viewMode === 'month' && styles.toggleBtnActive]}
                         onPress={() => setViewMode('month')}
                     >
-                        <Text style={[styles.toggleText, viewMode === 'month' && styles.toggleTextActive]}>Monthly</Text>
+                        <Text style={[styles.toggleText, viewMode === 'month' && styles.toggleTextActive]}>Month</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.toggleBtn, viewMode === 'custom' && styles.toggleBtnActive]}
+                        onPress={() => setViewMode('custom')}
+                    >
+                        <Text style={[styles.toggleText, viewMode === 'custom' && styles.toggleTextActive]}>Custom</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={[styles.toggleBtn, viewMode === 'all' && styles.toggleBtnActive]}
                         onPress={() => setViewMode('all')}
                     >
-                        <Text style={[styles.toggleText, viewMode === 'all' && styles.toggleTextActive]}>All Time</Text>
+                        <Text style={[styles.toggleText, viewMode === 'all' && styles.toggleTextActive]}>All</Text>
                     </TouchableOpacity>
                 </View>
 
@@ -165,7 +196,41 @@ export default function AnalyticsScreen() {
                         </TouchableOpacity>
                     </View>
                 )}
+
+                {viewMode === 'custom' && (
+                    <View style={styles.customRangeSelector}>
+                        <TouchableOpacity onPress={() => setShowStartPicker(true)} style={styles.rangePart}>
+                            <Text style={styles.rangeText}>{format(customRange.start, 'MMM dd')}</Text>
+                        </TouchableOpacity>
+                        <Text style={styles.rangeDivider}>-</Text>
+                        <TouchableOpacity onPress={() => setShowEndPicker(true)} style={styles.rangePart}>
+                            <Text style={styles.rangeText}>{format(customRange.end, 'MMM dd')}</Text>
+                        </TouchableOpacity>
+                        <Filter size={14} color={Colors.primary[600]} style={{ marginLeft: 6 }} />
+                    </View>
+                )}
             </View>
+
+            {showStartPicker && (
+                <DateTimePicker
+                    value={customRange.start}
+                    mode="date"
+                    onChange={(e, date) => {
+                        setShowStartPicker(false);
+                        if (date) setCustomRange(prev => ({ ...prev, start: date }));
+                    }}
+                />
+            )}
+            {showEndPicker && (
+                <DateTimePicker
+                    value={customRange.end}
+                    mode="date"
+                    onChange={(e, date) => {
+                        setShowEndPicker(false);
+                        if (date) setCustomRange(prev => ({ ...prev, end: date }));
+                    }}
+                />
+            )}
         </View>
     );
 
@@ -211,10 +276,56 @@ export default function AnalyticsScreen() {
             {/* Total Summary Card */}
             <Card style={styles.summaryCard}>
                 <Text style={styles.summaryLabel}>
-                    {viewMode === 'month' ? `Total Expense (${format(selectedMonth, 'MMM yyyy')})` : 'All Time Total Expense'}
+                    {viewMode === 'month' ? `Total Expense (${format(selectedMonth, 'MMM yyyy')})` : 
+                     viewMode === 'custom' ? `Total (${format(customRange.start, 'MMM dd')} - ${format(customRange.end, 'MMM dd')})` :
+                     'All Time Total Expense'}
                 </Text>
                 <Text style={styles.summaryValue}>{formatCurrency(totalExpense)}</Text>
             </Card>
+
+            {/* Premium Forecast Section */}
+            {forecast && viewMode === 'month' && (
+                <Animated.View entering={FadeInDown.delay(200).duration(800)}>
+                    <TouchableOpacity activeOpacity={0.9} onPress={() => setShowForecastModal(true)}>
+                    <LinearGradient
+                        colors={[Colors.primary[500], Colors.accent.peach]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.forecastCard}
+                    >
+                        <View style={styles.forecastHeader}>
+                            <View style={styles.sparkleContainer}>
+                                <Sparkles size={16} color="white" />
+                            </View>
+                            <Text style={styles.forecastTitle}>AI Forecast</Text>
+                            <View style={styles.confidenceBadge}>
+                                <Text style={styles.confidenceText}>{forecast.confidence.toUpperCase()} CONFIDENCE</Text>
+                            </View>
+                        </View>
+                        
+                        <View style={styles.forecastMain}>
+                            <View>
+                                <Text style={styles.forecastLabel}>Predicted for {forecast.nextMonthName}</Text>
+                                <Text style={styles.forecastAmount}>{formatCurrency(forecast.predictedTotal)}</Text>
+                            </View>
+                            <TrendingUp size={32} color="rgba(255,255,255,0.3)" />
+                        </View>
+
+                        <View style={styles.forecastDivider} />
+                        
+                        <Text style={styles.forecastBreakdownTitle}>Top Expected Categories:</Text>
+                        <View style={styles.forecastCats}>
+                            {forecast.topCategories.map((c: any, i: number) => (
+                                <View key={i} style={styles.forecastCatRow}>
+                                    <Text style={styles.forecastCatName}>{c.category}</Text>
+                                    <Text style={styles.forecastCatAmount}>{formatCurrency(c.predicted)}</Text>
+                                </View>
+                            ))}
+                        </View>
+                    </LinearGradient>
+                    </TouchableOpacity>
+                </Animated.View>
+            )}
 
             {/* Category Breakdown Section */}
             <View style={styles.sectionContainer}>
@@ -290,10 +401,68 @@ export default function AnalyticsScreen() {
                 />
             </Card>
 
-            {/* Monthly Expense Pie Chart (Interactive) */}
-            <MonthlyExpensePieChart initialMonth={selectedMonth} />
-
             <View style={{ height: 80 }} />
+
+            {/* Forecast Modal */}
+            <Modal visible={showForecastModal} transparent animationType="slide">
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>AI Forecast Analysis</Text>
+                            <TouchableOpacity onPress={() => setShowForecastModal(false)}>
+                                <X size={24} color={Colors.gray[500]} />
+                            </TouchableOpacity>
+                        </View>
+                        
+                        {forecast && (
+                            <ScrollView showsVerticalScrollIndicator={false}>
+                                <View style={styles.forecastModalTop}>
+                                    <Text style={styles.forecastModalLabel}>Predicted for {forecast.nextMonthName}</Text>
+                                    <Text style={styles.forecastModalAmount}>{formatCurrency(forecast.predictedTotal)}</Text>
+                                    <View style={[styles.confidenceBadge, { alignSelf: 'flex-start', marginTop: 8, backgroundColor: Colors.primary[100] }]}>
+                                        <Text style={[styles.confidenceText, { color: Colors.primary[700] }]}>{forecast.confidence.toUpperCase()} CONFIDENCE</Text>
+                                    </View>
+                                </View>
+
+                                <View style={styles.forecastModalSection}>
+                                    <Text style={styles.forecastModalSectionTitle}>Historical Trend</Text>
+                                    <Text style={styles.chartSubtitle}>Past months vs prediction</Text>
+                                    <View style={{ alignItems: 'center', marginVertical: 10 }}>
+                                        <TrendLineChart 
+                                            data={monthlyTrend} 
+                                            type="monthly" 
+                                            width={screenWidth - 100} 
+                                            predictedData={{ total: forecast.predictedTotal, label: forecast.nextMonthName.substring(0, 3) }}
+                                        />
+                                    </View>
+                                </View>
+
+                                <View style={styles.forecastModalSection}>
+                                    <Text style={styles.forecastModalSectionTitle}>Expected Categories</Text>
+                                    {forecast.topCategories.map((c: any, i: number) => (
+                                        <View key={i} style={styles.forecastModalCatRow}>
+                                            <View style={styles.forecastModalCatLeft}>
+                                                <View style={[styles.catColorDot, { backgroundColor: getValueColor(i) }]} />
+                                                <Text style={styles.forecastModalCatName}>{c.category}</Text>
+                                            </View>
+                                            <Text style={styles.forecastModalCatAmount}>{formatCurrency(c.predicted)}</Text>
+                                        </View>
+                                    ))}
+                                </View>
+                                
+                                <View style={styles.forecastModalInfo}>
+                                    <Info size={16} color={Colors.gray[500]} style={{ marginTop: 2 }} />
+                                    <Text style={styles.forecastModalInfoText}>
+                                        Predictions are based on your past spending habits. The more you use the app, the better the AI gets.
+                                    </Text>
+                                </View>
+                                
+                                <View style={{ height: 40 }} />
+                            </ScrollView>
+                        )}
+                    </View>
+                </View>
+            </Modal>
         </ScrollView>
     );
 }
@@ -311,8 +480,8 @@ const styles = StyleSheet.create({
         marginBottom: Layout.spacing.md,
     },
     headerTitle: {
-        fontSize: 28,
-        fontWeight: '800',
+        fontSize: Typography.size.xxxl,
+        fontFamily: Typography.family.bold,
         color: Colors.gray[900],
     },
     controlsRow: {
@@ -340,8 +509,8 @@ const styles = StyleSheet.create({
         elevation: 2,
     },
     toggleText: {
-        fontSize: 13,
-        fontWeight: '600',
+        fontSize: Typography.size.xs,
+        fontFamily: Typography.family.bold,
         color: Colors.gray[500],
     },
     toggleTextActive: {
@@ -360,12 +529,35 @@ const styles = StyleSheet.create({
         padding: 4,
     },
     monthTitle: {
-        fontSize: 14,
-        fontWeight: '600',
+        fontSize: Typography.size.sm,
+        fontFamily: Typography.family.bold,
         color: Colors.gray[800],
         marginHorizontal: 8,
         minWidth: 70,
         textAlign: 'center',
+    },
+    customRangeSelector: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: Colors.white,
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: Colors.gray[200],
+    },
+    rangePart: {
+        paddingHorizontal: 4,
+    },
+    rangeText: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: Colors.primary[600],
+    },
+    rangeDivider: {
+        fontSize: 13,
+        color: Colors.gray[400],
+        marginHorizontal: 2,
     },
     sectionCard: {
         padding: Layout.spacing.lg,
@@ -386,16 +578,16 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     summaryValue: {
-        fontSize: 32,
-        fontWeight: '800',
+        fontSize: Typography.size.xxxl,
+        fontFamily: Typography.family.bold,
         color: Colors.primary[900],
     },
     sectionContainer: {
         marginBottom: Layout.spacing.lg,
     },
     sectionTitle: {
-        fontSize: 18,
-        fontWeight: '700',
+        fontSize: Typography.size.lg,
+        fontFamily: Typography.family.bold,
         marginBottom: Layout.spacing.md,
         color: Colors.gray[900],
     },
@@ -422,8 +614,8 @@ const styles = StyleSheet.create({
         ...Layout.shadows.sm,
     },
     tabText: {
-        fontSize: 12,
-        fontWeight: '600',
+        fontSize: Typography.size.xs,
+        fontFamily: Typography.family.bold,
         color: Colors.gray[500],
     },
     activeTabText: {
@@ -433,7 +625,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     chartSubtitle: {
-        fontSize: 14,
+        fontSize: Typography.size.sm,
+        fontFamily: Typography.family.regular,
         color: Colors.gray[500],
         marginBottom: 10,
         alignSelf: 'flex-start',
@@ -452,7 +645,184 @@ const styles = StyleSheet.create({
     },
     budgetBtnText: {
         color: Colors.primary[700],
+        fontFamily: Typography.family.bold,
+        fontSize: Typography.size.sm,
+    },
+    // Forecast Styles
+    forecastCard: {
+        padding: 20,
+        borderRadius: 24,
+        marginBottom: Layout.spacing.lg,
+        ...Layout.shadows.md,
+    },
+    forecastHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    sparkleContainer: {
+        padding: 6,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        borderRadius: 8,
+        marginRight: 10,
+    },
+    forecastTitle: {
+        fontSize: Typography.size.md,
+        fontFamily: Typography.family.bold,
+        color: 'white',
+        flex: 1,
+    },
+    confidenceBadge: {
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        paddingVertical: 4,
+        paddingHorizontal: 8,
+        borderRadius: 6,
+    },
+    confidenceText: {
+        fontSize: 9,
+        fontWeight: '900',
+        color: 'white',
+    },
+    forecastMain: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    forecastLabel: {
+        fontSize: 13,
+        color: 'rgba(255,255,255,0.8)',
         fontWeight: '600',
+    },
+    forecastAmount: {
+        fontSize: Typography.size.xxxl,
+        fontFamily: Typography.family.bold,
+        color: 'white',
+    },
+    forecastDivider: {
+        height: 1,
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        marginBottom: 16,
+    },
+    forecastBreakdownTitle: {
+        fontSize: 12,
+        color: 'rgba(255,255,255,0.7)',
+        fontWeight: '700',
+        textTransform: 'uppercase',
+        marginBottom: 10,
+        letterSpacing: 0.5,
+    },
+    forecastCats: {
+        gap: 8,
+    },
+    forecastCatRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    forecastCatName: {
         fontSize: 14,
+        color: 'white',
+        fontWeight: '600',
+    },
+    forecastCatAmount: {
+        fontSize: 14,
+        color: 'white',
+        fontWeight: '700',
+    },
+    // Modal Styles
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'flex-end',
+    },
+    modalContent: {
+        backgroundColor: Colors.white,
+        borderTopLeftRadius: 32,
+        borderTopRightRadius: 32,
+        padding: 24,
+        paddingBottom: 40,
+        maxHeight: '90%',
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 24,
+    },
+    modalTitle: {
+        fontSize: Typography.size.xl,
+        fontFamily: Typography.family.bold,
+        color: Colors.gray[900],
+    },
+    forecastModalTop: {
+        backgroundColor: Colors.primary[50],
+        padding: 20,
+        borderRadius: 20,
+        marginBottom: 24,
+        borderWidth: 1,
+        borderColor: Colors.primary[100],
+    },
+    forecastModalLabel: {
+        fontSize: 14,
+        color: Colors.primary[700],
+        fontWeight: '600',
+        marginBottom: 4,
+    },
+    forecastModalAmount: {
+        fontSize: Typography.size.display,
+        fontFamily: Typography.family.bold,
+        color: Colors.primary[900],
+    },
+    forecastModalSection: {
+        marginBottom: 24,
+    },
+    forecastModalSectionTitle: {
+        fontSize: Typography.size.md,
+        fontFamily: Typography.family.bold,
+        color: Colors.gray[900],
+        marginBottom: 16,
+    },
+    forecastModalCatRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: Colors.gray[100],
+    },
+    forecastModalCatLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    catColorDot: {
+        width: 12,
+        height: 12,
+        borderRadius: 6,
+        marginRight: 12,
+    },
+    forecastModalCatName: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: Colors.gray[800],
+    },
+    forecastModalCatAmount: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: Colors.gray[900],
+    },
+    forecastModalInfo: {
+        flexDirection: 'row',
+        backgroundColor: Colors.gray[50],
+        padding: 16,
+        borderRadius: 16,
+        alignItems: 'flex-start',
+        gap: 12,
+    },
+    forecastModalInfoText: {
+        flex: 1,
+        fontSize: 13,
+        color: Colors.gray[600],
+        lineHeight: 20,
     },
 });

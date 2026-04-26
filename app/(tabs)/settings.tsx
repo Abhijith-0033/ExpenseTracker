@@ -3,9 +3,10 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Switch } f
 import { useRouter, Link } from 'expo-router';
 import { ChevronRight, Wallet, Tag, Trash2, Database, Bell, FileUp, FileDown, FileText, Info, Calendar, Users } from 'lucide-react-native';
 import { useApp } from '../../context/AppContext';
-import { Colors } from '../../constants/Theme';
+import { Colors, Typography, Layout } from '../../constants/Theme';
 import { checkReminderStatus, scheduleDailyReminder } from '../../services/notifications';
 import { exportData, exportCSV, restoreData } from '../../services/backup';
+import { UpcomingExpenses } from '../../components/UpcomingExpenses';
 
 export default function SettingsScreen() {
     const router = useRouter();
@@ -34,6 +35,10 @@ export default function SettingsScreen() {
     return (
         <ScrollView style={styles.container}>
             <Text style={styles.headerTitle}>Settings</Text>
+
+            <View style={{ marginBottom: 20 }}>
+                <UpcomingExpenses />
+            </View>
 
             <View style={styles.section}>
                 <Text style={styles.sectionTitle}>General</Text>
@@ -132,7 +137,7 @@ export default function SettingsScreen() {
                     </View>
                     <View style={{ flex: 1 }}>
                         <Text style={styles.rowText}>Backup Data (JSON)</Text>
-                        <Text style={{ fontSize: 12, color: '#6b7280' }}>Full backup of all your data</Text>
+                        <Text style={{ fontSize: Typography.size.xs, color: Colors.gray[500], fontFamily: Typography.family.regular }}>Full backup of all your data</Text>
                     </View>
                     <FileDown size={20} color={Colors.gray[400]} />
                 </TouchableOpacity>
@@ -143,7 +148,7 @@ export default function SettingsScreen() {
                     </View>
                     <View style={{ flex: 1 }}>
                         <Text style={styles.rowText}>Export to CSV</Text>
-                        <Text style={{ fontSize: 12, color: '#6b7280' }}>Transactions for Excel</Text>
+                        <Text style={{ fontSize: Typography.size.xs, color: Colors.gray[500], fontFamily: Typography.family.regular }}>Transactions for Excel</Text>
                     </View>
                     <FileDown size={20} color={Colors.gray[400]} />
                 </TouchableOpacity>
@@ -154,7 +159,7 @@ export default function SettingsScreen() {
                     </View>
                     <View style={{ flex: 1 }}>
                         <Text style={[styles.rowText, { color: Colors.danger[600] }]}>Restore from Backup</Text>
-                        <Text style={{ fontSize: 12, color: '#6b7280' }}>Replace current data</Text>
+                        <Text style={{ fontSize: Typography.size.xs, color: Colors.gray[500], fontFamily: Typography.family.regular }}>Replace current data</Text>
                     </View>
                 </TouchableOpacity>
             </View>
@@ -167,7 +172,7 @@ export default function SettingsScreen() {
                     </View>
                     <View style={{ flex: 1 }}>
                         <Text style={styles.rowText}>Version</Text>
-                        <Text style={{ fontSize: 12, color: '#6b7280' }}>1.9.2 (Build 22)</Text>
+                        <Text style={{ fontSize: Typography.size.xs, color: Colors.gray[500], fontFamily: Typography.family.regular }}>2.0.0 (Build 30)</Text>
                     </View>
                 </View>
             </View>
@@ -179,50 +184,53 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f9fafb',
+        backgroundColor: Colors.gray[50],
         padding: 16,
         paddingTop: 60,
     },
     headerTitle: {
-        fontSize: 28,
-        fontWeight: 'bold',
+        fontSize: Typography.size.xxxl,
+        fontFamily: Typography.family.bold,
         marginBottom: 20,
-        color: '#111827',
+        color: Colors.gray[900],
     },
     section: {
         marginBottom: 24,
-        backgroundColor: '#fff',
-        borderRadius: 12,
+        backgroundColor: Colors.white,
+        borderRadius: Layout.radius.lg,
         overflow: 'hidden',
+        ...Layout.shadows.sm,
     },
     sectionTitle: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#6b7280',
+        fontSize: Typography.size.sm,
+        fontFamily: Typography.family.bold,
+        color: Colors.gray[500],
         marginLeft: 16,
         marginTop: 16,
         marginBottom: 8,
         textTransform: 'uppercase',
+        letterSpacing: 1,
     },
     row: {
         flexDirection: 'row',
         alignItems: 'center',
         padding: 16,
         borderBottomWidth: 1,
-        borderBottomColor: '#f3f4f6',
+        borderBottomColor: Colors.gray[100],
     },
     rowIcon: {
-        width: 32,
-        height: 32,
-        borderRadius: 8,
-        backgroundColor: '#eff6ff',
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: Colors.primary[50],
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 12,
+        marginRight: 16,
     },
     rowText: {
-        fontSize: 16,
-        color: '#1f2937',
+        fontSize: Typography.size.md,
+        fontFamily: Typography.family.medium,
+        color: Colors.gray[800],
         flex: 1,
     },
 });

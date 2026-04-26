@@ -1,6 +1,7 @@
 
+
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useApp } from '../context/AppContext';
 import { updateTransaction, deleteTransaction } from '../services/database';
@@ -8,9 +9,13 @@ import { Keypad } from '../components/ui/Keypad';
 import { CategoryPicker } from '../components/CategoryPicker';
 import { Calendar as CalendarIcon, Wallet as WalletIcon, Tag as TagIcon, Trash2 } from 'lucide-react-native';
 import { format } from 'date-fns';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Colors, Typography, Layout } from '../constants/Theme';
 
 export default function EditTransactionScreen() {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const { id } = useLocalSearchParams();
     const { transactions, accounts, refreshData } = useApp();
 
@@ -26,6 +31,7 @@ export default function EditTransactionScreen() {
     const [date, setDate] = useState(new Date());
 
     const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+    const [showDatePicker, setShowDatePicker] = useState(false);
 
     useEffect(() => {
         if (id && transactions.length > 0) {
@@ -92,72 +98,76 @@ export default function EditTransactionScreen() {
     if (loading) return <ActivityIndicator style={{ marginTop: 50 }} />;
 
     return (
-        <View style={styles.container}>
-            <View style={styles.header}>
-                <Text style={styles.title}>Edit Expense</Text>
-                <TouchableOpacity onPress={handleDeleteTx}>
-                    <Trash2 size={24} color="#ef4444" />
-                </TouchableOpacity>
-            </View>
+        <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
+            <KeyboardAvoidingView
+                style={{ flex: 1 }}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            >
+                <ScrollView
+                    contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 20) + 100 }}
+                    showsVerticalScrollIndicator={false}
+                >
+                    <View style={[styles.header, { paddingTop: insets.top || 16 }]}>
+                        <Text style={styles.title}>Edit Expense</Text>
+                        <TouchableOpacity onPress={handleDeleteTx}>
+                            <Trash2 size={24} color="#ef4444" />
+                        </TouchableOpacity>
+                    </View>
 
-            <View style={styles.display}>
-                <Text style={styles.currency}>₹</Text>
-                <Text style={styles.amount}>{amount}</Text>
-            </View>
+                    <View style={styles.display}>
+                        <Text style={styles.currency}>₹</Text>
+                        <Text style={styles.amount}>{amount}</Text>
+                    </View>
 
-            <View style={styles.formContainer}>
-                {/* Date Row */}
-                <View style={styles.row}>
-                    <TouchableOpacity style={styles.selector}>
-                        <CalendarIcon size={20} color="#6b7280" />
-                        <Text style={styles.selectorText}>{format(date, 'MMM dd, yyyy')}</Text>
-                    </TouchableOpacity>
-                </View>
-                {/* Category Row */}
-                <View style={styles.row}>
-                    <TouchableOpacity style={[styles.selector, { flex: 1 }]} onPress={() => setShowCategoryPicker(true)}>
-                        <TagIcon size={20} color="#6b7280" />
-                        <Text style={styles.selectorText}>
-                            {category ? `${category} - ${subcategory}` : 'Select Category'}
-                        </Text>
-                    </TouchableOpacity>
-                </View>
-                {/* Account Row */}
-                <View style={styles.row}>
-                    <TouchableOpacity
-                        style={[styles.selector, { flex: 1 }]}
-                        onPress={() => {
-                            if (accounts.length > 0) {
-                                const idx = accounts.findIndex(a => a.id === selectedAccount?.id);
-                                const next = accounts[(idx + 1) % accounts.length];
-                                setSelectedAccount(next);
-                            }
-                        }}
-                    >
-                        <WalletIcon size={20} color="#6b7280" />
-                        <Text style={styles.selectorText}>
-                            {selectedAccount ? selectedAccount.name : 'Select Account'}
-                        </Text>
-                    </TouchableOpacity>
-                </View>
-                {/* Note Row */}
-                <View style={styles.row}>
-                    <TextInput
-                        placeholder="Add a note (optional)"
-                        value={description}
-                        onChangeText={setDescription}
-                        style={styles.input}
-                    />
-                </View>
-            </View>
+                    <View style={styles.formContainer}>
+                        {/* Date Row */}
+                        <View style={styles.row}>
+                            <TouchableOpacity style={styles.selector} onPress={() => setShowDatePicker(true)}>
+                                <CalendarIcon size={20} color="#6b7280" />
+                                <Text style={styles.selectorText}>{format(date, 'MMM dd, yyyy')}</Text>
+                            </TouchableOpacity>
+                        </View>
+                        {/* Category Row */}
+                        <View style={styles.row}>
+                            <TouchableOpacity style={[styles.selector, { flex: 1 }]} onPress={() => setShowCategoryPicker(true)}>
+                                <TagIcon size={20} color="#6b7280" />
+                                <Text style={styles.selectorText}>
+                                    {category ? (subcategory ? `${category} - ${subcategory}` : category) : 'Select Category'}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                        {/* Account Row */}
+                        <View style={styles.row}>
+                            <TouchableOpacity
+                                style={[styles.selector, { flex: 1 }]}
+                                onPress={() => {
+                                    if (accounts.length > 0) {
+                                        const idx = accounts.findIndex(a => a.id === selectedAccount?.id);
+                                        const next = accounts[(idx + 1) % accounts.length];
+                                        setSelectedAccount(next);
+                                    }
+                                }}
+                            >
+                                <WalletIcon size={20} color="#6b7280" />
+                                <Text style={styles.selectorText}>
+                                    {selectedAccount ? selectedAccount.name : 'Select Account'}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                        {/* Note Row */}
+                        <View style={styles.row}>
+                            <TextInput
+                                placeholder="Add a note (optional)"
+                                value={description}
+                                onChangeText={setDescription}
+                                style={styles.input}
+                            />
+                        </View>
+                    </View>
 
-            <View style={{ flex: 1 }} />
-
-            <Keypad onPress={handleKeyPress} onDelete={handleDeleteKey} onClear={() => setAmount('0')} onSubmit={handleSave} />
-
-            <TouchableOpacity style={styles.submitBtn} onPress={handleSave}>
-                <Text style={styles.submitText}>Update Transaction</Text>
-            </TouchableOpacity>
+                    <Keypad onPress={handleKeyPress} onDelete={handleDeleteKey} onClear={() => setAmount('0')} onSubmit={handleSave} />
+                </ScrollView>
+            </KeyboardAvoidingView>
 
             <CategoryPicker
                 visible={showCategoryPicker}
@@ -167,37 +177,49 @@ export default function EditTransactionScreen() {
                     setSubcategory(sub);
                 }}
             />
-        </View>
+
+            {/* Date Picker Modal */}
+            {showDatePicker && (
+                <DateTimePicker
+                    value={date}
+                    mode="date"
+                    display="default"
+                    onChange={(event, selectedDate) => {
+                        setShowDatePicker(false);
+                        if (selectedDate) setDate(selectedDate);
+                    }}
+                />
+            )}
+        </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#fff', paddingTop: 0 },
+    container: { flex: 1, backgroundColor: Colors.gray[50] },
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         padding: 16,
-        paddingTop: 60,
-        backgroundColor: '#fff',
+        paddingBottom: 20,
     },
-    title: { fontSize: 20, fontWeight: 'bold' },
+    title: { fontSize: Typography.size.xl, fontFamily: Typography.family.bold, color: Colors.gray[900] },
     display: {
         height: 100,
         justifyContent: 'center',
         alignItems: 'center',
         flexDirection: 'row',
     },
-    currency: { fontSize: 32, color: '#9ca3af', marginRight: 4 },
-    amount: { fontSize: 48, fontWeight: 'bold', color: '#1f2937' },
+    currency: { fontSize: Typography.size.xxxl, color: Colors.gray[400], marginRight: 4, fontFamily: Typography.family.bold },
+    amount: { fontSize: 48, fontFamily: Typography.family.bold, color: Colors.gray[900] },
     formContainer: { padding: 16 },
     row: { marginBottom: 12, flexDirection: 'row' },
     selector: {
         flexDirection: 'row', alignItems: 'center',
-        backgroundColor: '#f3f4f6', padding: 12, borderRadius: 8, marginRight: 8,
+        backgroundColor: Colors.white, padding: 16, borderRadius: Layout.radius.lg, marginRight: 8,
+        ...Layout.shadows.sm,
     },
-    selectorText: { marginLeft: 8, fontSize: 16, color: '#1f2937' },
-    input: { flex: 1, backgroundColor: '#f3f4f6', padding: 12, borderRadius: 8, fontSize: 16 },
-    submitBtn: { backgroundColor: '#2563eb', padding: 16, alignItems: 'center', justifyContent: 'center' },
-    submitText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
+    selectorText: { marginLeft: 12, fontSize: Typography.size.md, fontFamily: Typography.family.bold, color: Colors.gray[800] },
+    input: { flex: 1, backgroundColor: Colors.white, padding: 16, borderRadius: Layout.radius.lg, fontSize: Typography.size.md, fontFamily: Typography.family.medium, ...Layout.shadows.sm },
 });
+

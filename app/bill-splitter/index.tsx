@@ -3,8 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator, Image } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { ArrowLeft, Plus, Search } from 'lucide-react-native';
-import { Colors, Layout } from '../../constants/Theme';
-import { getGroups, BillGroup } from '../../services/billSplitter';
+import { Colors, Layout, Typography } from '../../constants/Theme';
+import { getGroups, getGroupMembers, getGroupExpenses, BillGroup } from '../../services/billSplitter';
 import { BillGroupCard } from '../../components/BillGroupCard';
 
 export default function BillSplitterScreen() {
@@ -31,23 +31,16 @@ export default function BillSplitterScreen() {
             // I'll make a quick "enriched" fetch here or just show basic info first.
             // Let's assume I'll update billSplitter.ts to return enriched data or do it here.
 
-            // Actually, let's do it client-side here for now to keep it simple and safe.
             const enriched = await Promise.all(data.map(async (g) => {
-                // We need to import these functions... or just pass partial data.
-                // Re-reading billSplitter.ts: getGroups returns simple BillGroup.
-                // I should probably update billSplitter.ts to include `getGroupListWithStats` or similar.
-                // But for now, let's just show the cards with 0/0 placeholder or fetch details.
+                const members = await getGroupMembers(g.id);
+                const expenses = await getGroupExpenses(g.id);
+                const total = expenses.reduce((sum: number, exp: any) => sum + exp.amount, 0);
 
-                // Let's stick to the plan: simpler first.
-                // I'll import helpers if needed, but for now let's just render the list.
-                // "member_count", "expense_count", "total_expenses" are needed for the card.
-                // I'll update billSplitter.ts in next step to support this efficiently if needed.
-                // For now, let's mock the stats to 0 to verify UI, then wire up.
                 return {
                     ...g,
-                    member_count: 0,
-                    expense_count: 0,
-                    total_expenses: 0
+                    member_count: members.length,
+                    expense_count: expenses.length,
+                    total_expenses: total
                 };
             }));
 
@@ -136,21 +129,22 @@ const styles = StyleSheet.create({
         borderBottomColor: Colors.gray[100],
     },
     backBtn: { padding: 4, marginLeft: -4 },
-    headerTitle: { fontSize: 20, fontWeight: '700', color: Colors.gray[900] },
+    headerTitle: { fontSize: Typography.size.xl, fontFamily: Typography.family.bold, color: Colors.gray[900] },
     scrollContent: { padding: 20 },
     banner: {
         marginBottom: 24,
     },
     bannerTitle: {
-        fontSize: 24,
-        fontWeight: '800',
+        fontSize: Typography.size.xxl,
+        fontFamily: Typography.family.bold,
         color: Colors.gray[900],
         marginBottom: 4,
     },
     bannerText: {
-        fontSize: 14,
+        fontSize: Typography.size.sm,
         color: Colors.gray[500],
         lineHeight: 20,
+        fontFamily: Typography.family.regular,
     },
     emptyState: {
         alignItems: 'center',
@@ -162,8 +156,8 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     emptyTitle: {
-        fontSize: 18,
-        fontWeight: '700',
+        fontSize: Typography.size.lg,
+        fontFamily: Typography.family.bold,
         color: Colors.gray[900],
         marginBottom: 8,
     },
@@ -171,7 +165,8 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         color: Colors.gray[500],
         lineHeight: 24,
-        fontSize: 14,
+        fontSize: Typography.size.sm,
+        fontFamily: Typography.family.regular,
     },
     fab: {
         position: 'absolute',

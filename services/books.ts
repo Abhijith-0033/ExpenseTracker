@@ -21,7 +21,7 @@ export interface BookItem {
     income_source_id?: number | null;
 }
 
-export const getBooks = async (): Promise<(ExpenseBook & { total_spent: number; item_count: number })[]> => {
+export const getBooks = async (): Promise<(ExpenseBook & { total_spent: number; total_income: number; item_count: number })[]> => {
     await initDatabase();
     const db = getDatabase();
     // Get books
@@ -30,13 +30,14 @@ export const getBooks = async (): Promise<(ExpenseBook & { total_spent: number; 
     // Enrich with totals (doing this in app layer or subquery)
     // Using a loop for simplicity and safety or subquery if supported well
     const enriched = await Promise.all(books.map(async (book) => {
-        const res = await db.getFirstAsync<{ total: number; count: number }>(
-            'SELECT SUM(amount) as total, COUNT(*) as count FROM expense_book_items WHERE book_id = ?',
+        const res = await db.getFirstAsync<{ total_spent: number; total_income: number; count: number }>(
+            'SELECT SUM(CASE WHEN type = "expense" THEN amount ELSE 0 END) as total_spent, SUM(CASE WHEN type = "income" THEN amount ELSE 0 END) as total_income, COUNT(*) as count FROM expense_book_items WHERE book_id = ?',
             [book.id]
         );
         return {
             ...book,
-            total_spent: res?.total || 0,
+            total_spent: res?.total_spent || 0,
+            total_income: res?.total_income || 0,
             item_count: res?.count || 0
         };
     }));

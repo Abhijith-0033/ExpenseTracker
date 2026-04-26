@@ -4,6 +4,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Alert, M
 import { useApp } from '../context/AppContext';
 import { saveCategories, CategoryNode } from '../services/database';
 import { Plus, X, Trash2 } from 'lucide-react-native';
+import { Colors, Layout, Typography } from '../constants/Theme';
 
 export default function ManageCategoriesScreen() {
     const { categories, refreshData } = useApp();
@@ -146,7 +147,7 @@ export default function ManageCategoriesScreen() {
                                     setParentCat(null);
                                     setModalVisible(true);
                                 }} style={{ marginRight: 16 }}>
-                                    <Text style={{ color: '#2563eb', fontWeight: 'bold' }}>Edit</Text>
+                                    <Text style={{ color: Colors.primary[600], fontFamily: Typography.family.bold, fontSize: Typography.size.sm }}>Edit</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity onPress={() => handleDelete(item.name)}>
                                     <Trash2 size={20} color="#ef4444" />
@@ -168,7 +169,7 @@ export default function ManageCategoriesScreen() {
                                                 setDefaultValidity(subSetting?.default_validity?.toString() || '28');
                                                 setModalVisible(true);
                                             }} style={{ marginRight: 12 }}>
-                                                <Text style={{ color: '#2563eb', fontSize: 12 }}>Edit</Text>
+                                                <Text style={{ color: Colors.primary[600], fontFamily: Typography.family.medium, fontSize: Typography.size.xs }}>Edit</Text>
                                             </TouchableOpacity>
                                             <TouchableOpacity onPress={() => handleDelete(item.name, sub)}>
                                                 <X size={16} color="#9ca3af" />
@@ -260,7 +261,7 @@ export default function ManageCategoriesScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#fff',
+        backgroundColor: Colors.gray[50],
     },
     header: {
         flexDirection: 'row',
@@ -268,29 +269,31 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         padding: 16,
         paddingTop: 60,
-        backgroundColor: '#fff',
+        backgroundColor: Colors.white,
         borderBottomWidth: 1,
-        borderBottomColor: '#f3f4f6',
+        borderBottomColor: Colors.gray[100],
     },
     title: {
-        fontSize: 24,
-        fontWeight: 'bold',
+        fontSize: Typography.size.xxl,
+        fontFamily: Typography.family.bold,
+        color: Colors.gray[900],
     },
     addBtn: {
-        backgroundColor: '#eff6ff',
+        backgroundColor: Colors.primary[50],
         paddingHorizontal: 12,
         paddingVertical: 6,
-        borderRadius: 8,
+        borderRadius: Layout.radius.md,
     },
     addBtnText: {
-        color: '#2563eb',
-        fontWeight: '600',
+        color: Colors.primary[600],
+        fontFamily: Typography.family.bold,
     },
     catCard: {
         marginBottom: 20,
-        backgroundColor: '#f9fafb',
-        borderRadius: 12,
+        backgroundColor: Colors.white,
+        borderRadius: Layout.radius.lg,
         padding: 12,
+        ...Layout.shadows.sm,
     },
     catHeader: {
         flexDirection: 'row',
@@ -299,9 +302,9 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     catTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#1f2937',
+        fontSize: Typography.size.lg,
+        fontFamily: Typography.family.bold,
+        color: Colors.gray[900],
     },
     subRow: {
         flexDirection: 'row',
@@ -309,11 +312,12 @@ const styles = StyleSheet.create({
         paddingVertical: 8,
         paddingLeft: 12,
         borderTopWidth: 1,
-        borderTopColor: '#e5e7eb',
+        borderTopColor: Colors.gray[100],
     },
     subText: {
-        fontSize: 15,
-        color: '#4b5563',
+        fontSize: Typography.size.sm,
+        color: Colors.gray[600],
+        fontFamily: Typography.family.medium,
     },
     modalOverlay: {
         flex: 1,
@@ -322,9 +326,10 @@ const styles = StyleSheet.create({
         padding: 20,
     },
     modalContent: {
-        backgroundColor: '#fff',
-        borderRadius: 16,
-        padding: 20,
+        backgroundColor: Colors.white,
+        borderRadius: Layout.radius.xl,
+        padding: 24,
+        ...Layout.shadows.lg,
     },
     modalHeader: {
         flexDirection: 'row',
@@ -333,27 +338,33 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     modalTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
+        fontSize: Typography.size.xl,
+        fontFamily: Typography.family.bold,
+        color: Colors.gray[900],
     },
     input: {
-        backgroundColor: '#f3f4f6',
-        padding: 14,
-        borderRadius: 8,
-        marginBottom: 12,
-        fontSize: 16,
+        backgroundColor: Colors.gray[50],
+        padding: 16,
+        borderRadius: Layout.radius.lg,
+        marginBottom: 16,
+        fontSize: Typography.size.md,
+        fontFamily: Typography.family.medium,
+        color: Colors.gray[900],
+        borderWidth: 1,
+        borderColor: Colors.gray[100],
     },
     saveBtn: {
-        backgroundColor: '#2563eb',
+        backgroundColor: Colors.primary[600],
         padding: 16,
-        borderRadius: 8,
+        borderRadius: Layout.radius.lg,
         alignItems: 'center',
         marginTop: 8,
+        ...Layout.shadows.sm,
     },
     saveText: {
-        color: '#fff',
-        fontWeight: 'bold',
-        fontSize: 16,
+        color: Colors.white,
+        fontFamily: Typography.family.bold,
+        fontSize: Typography.size.md,
     },
     switchRow: {
         flexDirection: 'row',
@@ -363,8 +374,9 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     switchLabel: {
-        fontSize: 16,
-        color: '#4b5563',
+        fontSize: Typography.size.md,
+        color: Colors.gray[600],
+        fontFamily: Typography.family.medium,
     },
     validityInputRow: {
         flexDirection: 'row',
@@ -373,38 +385,43 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     validityLabel: {
-        fontSize: 14,
-        color: '#6b7280',
+        fontSize: Typography.size.sm,
+        color: Colors.gray[500],
+        fontFamily: Typography.family.medium,
     },
     smallInput: {
-        backgroundColor: '#f3f4f6',
-        padding: 10,
-        borderRadius: 8,
+        backgroundColor: Colors.gray[50],
+        padding: 12,
+        borderRadius: Layout.radius.lg,
         width: 80,
         textAlign: 'center',
-        fontSize: 16,
+        fontSize: Typography.size.md,
+        fontFamily: Typography.family.bold,
+        color: Colors.gray[900],
+        borderWidth: 1,
+        borderColor: Colors.gray[100],
     },
     badgeRow: {
         paddingTop: 8,
         borderTopWidth: 1,
-        borderTopColor: '#e5e7eb',
+        borderTopColor: Colors.gray[100],
         marginTop: 4,
     },
     repetitiveBadge: {
-        backgroundColor: '#ebf5ff',
+        backgroundColor: Colors.primary[50],
         paddingHorizontal: 10,
         paddingVertical: 4,
-        borderRadius: 6,
+        borderRadius: Layout.radius.sm,
         alignSelf: 'flex-start',
     },
     badgeText: {
-        color: '#2563eb',
-        fontSize: 12,
-        fontWeight: '700',
+        color: Colors.primary[600],
+        fontSize: Typography.size.xs,
+        fontFamily: Typography.family.bold,
     },
     subCol: {
         borderTopWidth: 1,
-        borderTopColor: '#e5e7eb',
+        borderTopColor: Colors.gray[100],
     },
     subBadgeRow: {
         paddingLeft: 12,

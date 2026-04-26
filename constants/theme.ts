@@ -1,92 +1,115 @@
-
-// Design System Constants
+// Premium Design System Constants v2.0.0
 
 export const Colors = {
   primary: {
-    50: '#eff6ff',
-    100: '#dbeafe',
-    200: '#bfdbfe',
-    300: '#93c5fd',
-    400: '#60a5fa',
-    500: '#3b82f6', // Brand color
-    600: '#2563eb', // Default interactive
-    700: '#1d4ed8', // Pressed / Darker
-    800: '#1e40af',
-    900: '#1e3a8a',
+    50: '#FDECE7',
+    100: '#FCD8CE',
+    200: '#F8B19C',
+    300: '#F38A6B',
+    400: '#F0704C',
+    500: '#E8917A', // Warm coral - Brand color
+    600: '#D66A4E', // Default interactive
+    700: '#B04E35', // Pressed / Darker
+    800: '#8C3D29',
+    900: '#692C1D',
+  },
+  accent: {
+    peach: '#FDDCCC',    // Tinted card background
+    mint: '#D6F0E0',     // Success tinted card
+    lavender: '#EDE7F6', // Analytics tinted card
+    rose: '#FCE4EC',     // Additional tint
   },
   gray: {
-    50: '#f9fafb', // Background
-    100: '#f3f4f6', // Surface / Input bg
-    200: '#e5e7eb', // Borders
-    300: '#d1d5db', // Disabled text
-    400: '#9ca3af', // Secondary text
-    500: '#6b7280', // Icon default
-    600: '#4b5563', // Body text
-    700: '#374151',
-    800: '#1f2937', // Titles
-    900: '#111827', // Headings
+    50: '#FAFAF8', // Warm white - Main Background
+    100: '#F4F4F2', // Surface / Input bg
+    200: '#EAEAE7', // Borders
+    300: '#D5D5D1', // Disabled text
+    400: '#A3A3A0', // Secondary text
+    500: '#737370', // Icon default
+    600: '#52524F', // Body text
+    700: '#383836',
+    800: '#262624', // Titles
+    900: '#1A1A2E', // Headings - Deep navy
   },
   success: {
-    50: '#ecfdf5',
-    100: '#d1fae5',
-    200: '#a7f3d0',
-    300: '#6ee7b7',
-    400: '#34d399',
-    500: '#10b981',
-    600: '#059669',
-    700: '#047857',
-    800: '#065f46',
-    900: '#064e3b',
-    bg: '#ecfdf5',
-    text: '#047857',
+    50: '#EBF7F0',
+    100: '#D6F0E0',
+    200: '#ADDDC0',
+    300: '#83CAA1',
+    400: '#6BAF8D', // Sage - Success color
+    500: '#4D966F',
+    600: '#377A55',
+    700: '#265E3F',
+    800: '#18422A',
+    900: '#0C2618',
+    bg: '#EBF7F0',
+    text: '#265E3F',
   },
   danger: {
-    50: '#fef2f2',
-    100: '#fee2e2',
-    200: '#fecaca',
-    300: '#fca5a5',
-    400: '#f87171',
-    500: '#ef4444',
-    600: '#dc2626',
-    700: '#b91c1c',
-    800: '#991b1b',
-    900: '#7f1d1d',
-    bg: '#fef2f2',
-    text: '#b91c1c',
+    50: '#FDF1F1',
+    100: '#FAE1E1',
+    200: '#F2BEBE',
+    300: '#EA9999',
+    400: '#E07070', // Soft red - Danger color
+    500: '#D44D4D',
+    600: '#B53737',
+    700: '#8F2626',
+    800: '#691818',
+    900: '#420C0C',
+    bg: '#FDF1F1',
+    text: '#8F2626',
   },
   warning: {
-    50: '#fffbeb',
-    100: '#fef3c7',
-    200: '#fde68a',
-    300: '#fcd34d',
-    400: '#fbbf24',
-    500: '#f59e0b',
-    600: '#d97706',
-    700: '#b45309',
-    800: '#92400e',
-    900: '#78350f',
-    bg: '#fffbeb',
-    text: '#b45309',
+    50: '#FDF8EC',
+    100: '#FCEFCC',
+    200: '#F8DB99',
+    300: '#F4C666',
+    400: '#E4A853', // Warm amber - Warning color
+    500: '#CF8D32',
+    600: '#A66E24',
+    700: '#7D5117',
+    800: '#54340A',
+    900: '#2E1B04',
+    bg: '#FDF8EC',
+    text: '#7D5117',
   },
   white: '#ffffff',
   black: '#000000',
   transparent: 'transparent',
-  // Legacy support for template components
+  // Legacy support
   light: {
-    text: '#111827',
-    background: '#fff',
-    tint: '#3b82f6',
-    icon: '#6b7280',
-    tabIconDefault: '#9ca3af',
-    tabIconSelected: '#3b82f6',
+    text: '#1A1A2E',
+    background: '#FAFAF8',
+    tint: '#E8917A',
+    icon: '#737370',
+    tabIconDefault: '#A3A3A0',
+    tabIconSelected: '#E8917A',
   },
   dark: {
-    text: '#fff',
-    background: '#111827',
-    tint: '#fff',
-    icon: '#9ca3af',
-    tabIconDefault: '#9ca3af',
-    tabIconSelected: '#fff',
+    text: '#ffffff',
+    background: '#1A1A2E',
+    tint: '#E8917A',
+    icon: '#A3A3A0',
+    tabIconDefault: '#737370',
+    tabIconSelected: '#ffffff',
+  }
+};
+
+export const Typography = {
+  family: {
+    regular: 'DMSans_400Regular',
+    medium: 'DMSans_500Medium',
+    bold: 'DMSans_700Bold',
+  },
+  size: {
+    xs: 12,
+    sm: 14,
+    md: 16,
+    lg: 18,
+    xl: 20,
+    xxl: 24,
+    xxxl: 32,
+    display: 40,
   }
 };
 
@@ -108,25 +131,32 @@ export const Layout = {
   },
   shadows: {
     sm: {
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.05,
-      shadowRadius: 2,
+      shadowColor: '#1A1A2E',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.03,
+      shadowRadius: 8,
       elevation: 2,
     },
     md: {
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 4, // Android
+      shadowColor: '#1A1A2E',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.06,
+      shadowRadius: 16,
+      elevation: 4,
     },
     lg: {
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.1,
-      shadowRadius: 8,
+      shadowColor: '#1A1A2E',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.08,
+      shadowRadius: 24,
       elevation: 8,
+    },
+    xl: {
+      shadowColor: '#E8917A', // Tinted shadow for primary elements
+      shadowOffset: { width: 0, height: 12 },
+      shadowOpacity: 0.15,
+      shadowRadius: 32,
+      elevation: 12,
     },
   },
 };

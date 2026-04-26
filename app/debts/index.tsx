@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Modal,
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { ArrowLeft, Plus, X, Search } from 'lucide-react-native';
-import { Colors, Layout } from '../../constants/Theme';
+import { Colors, Layout, Typography } from '../../constants/Theme';
 import { getDebts, addDebtPerson, deleteDebtPerson, updateDebtAmount, Debt } from '../../services/database';
 import { getDebtSummary, getTopDebtors, getDebtTrend } from '../../services/debts';
 import { DebtCard } from '../../components/DebtCard';
@@ -224,7 +224,7 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.white,
     },
     backBtn: { padding: 8, marginLeft: -8 },
-    headerTitle: { fontSize: 20, fontWeight: '700', color: Colors.gray[900] },
+    headerTitle: { fontSize: Typography.size.xl, fontFamily: Typography.family.bold, color: Colors.gray[900] },
     tabs: {
         flexDirection: 'row',
         padding: 4,
@@ -246,7 +246,8 @@ const styles = StyleSheet.create({
         elevation: 2,
     },
     tabText: {
-        fontWeight: '600',
+        fontFamily: Typography.family.bold,
+        fontSize: Typography.size.sm,
         color: Colors.gray[500],
     },
     activeTabText: {
@@ -259,11 +260,11 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         alignItems: 'center',
     },
-    summaryLabel: { fontSize: 14, color: Colors.gray[600], marginBottom: 8 },
-    summaryValue: { fontSize: 32, fontWeight: '800' },
-    sectionTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 12, marginTop: 8 },
+    summaryLabel: { fontSize: Typography.size.sm, fontFamily: Typography.family.bold, color: Colors.gray[600], marginBottom: 8 },
+    summaryValue: { fontSize: Typography.size.xxxl, fontFamily: Typography.family.bold },
+    sectionTitle: { fontSize: Typography.size.lg, fontFamily: Typography.family.bold, marginBottom: 12, marginTop: 8 },
     emptyState: { alignItems: 'center', marginTop: 40 },
-    emptyText: { color: Colors.gray[500] },
+    emptyText: { color: Colors.gray[500], fontFamily: Typography.family.medium },
     fab: {
         position: 'absolute',
         bottom: 30,
@@ -297,14 +298,17 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: 24,
     },
-    modalTitle: { fontSize: 20, fontWeight: 'bold' },
-    label: { fontSize: 14, fontWeight: '600', marginBottom: 8, color: Colors.gray[700] },
+    modalTitle: { fontSize: Typography.size.xl, fontFamily: Typography.family.bold },
+    label: { fontSize: Typography.size.sm, fontFamily: Typography.family.bold, marginBottom: 8, color: Colors.gray[700] },
     input: {
-        backgroundColor: Colors.gray[100],
+        backgroundColor: Colors.gray[50],
         padding: 16,
-        borderRadius: 12,
+        borderRadius: Layout.radius.lg,
         marginBottom: 16,
-        fontSize: 16,
+        fontSize: Typography.size.md,
+        fontFamily: Typography.family.medium,
+        borderWidth: 1,
+        borderColor: Colors.gray[100],
     },
     saveBtn: {
         backgroundColor: Colors.primary[600],
@@ -313,5 +317,5 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginTop: 16,
     },
-    saveBtnText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
+    saveBtnText: { color: 'white', fontSize: Typography.size.md, fontFamily: Typography.family.bold },
 });

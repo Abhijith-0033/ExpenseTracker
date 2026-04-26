@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Alert, M
 import { useRouter } from 'expo-router';
 import { getIncomeSources, addIncomeSource, updateIncomeSource, deleteIncomeSource, IncomeSource } from '../services/database';
 import { Plus, X, Pencil, Trash2, Briefcase, Tag, TrendingUp, Gift, DollarSign, Home, Globe, User } from 'lucide-react-native';
-import { Colors, Layout } from '../constants/Theme';
+import { Colors, Layout, Typography } from '../constants/Theme';
 import { IconSymbol } from '../components/ui/icon-symbol';
 
 const AVAILABLE_ICONS = ['Briefcase', 'Tag', 'TrendingUp', 'Gift', 'DollarSign', 'Home', 'Globe', 'User'];
@@ -193,8 +193,8 @@ const styles = StyleSheet.create({
         padding: 4,
     },
     headerTitle: {
-        fontSize: 20,
-        fontWeight: '700',
+        fontSize: Typography.size.xl,
+        fontFamily: Typography.family.bold,
         color: Colors.gray[900],
     },
     addBtn: {
@@ -229,8 +229,8 @@ const styles = StyleSheet.create({
         marginRight: 12,
     },
     sourceName: {
-        fontSize: 16,
-        fontWeight: '600',
+        fontSize: Typography.size.md,
+        fontFamily: Typography.family.bold,
         color: Colors.gray[800],
     },
     actionBtn: {
@@ -240,6 +240,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         marginTop: 40,
         color: Colors.gray[500],
+        fontFamily: Typography.family.regular,
         fontStyle: 'italic',
     },
     modalOverlay: {
@@ -261,23 +262,26 @@ const styles = StyleSheet.create({
         marginBottom: 24,
     },
     modalTitle: {
-        fontSize: 20,
-        fontWeight: 'bold',
+        fontSize: Typography.size.xl,
+        fontFamily: Typography.family.bold,
         color: Colors.gray[900],
     },
     label: {
-        fontSize: 14,
-        fontWeight: '600',
+        fontSize: Typography.size.sm,
+        fontFamily: Typography.family.bold,
         color: Colors.gray[600],
         marginBottom: 8,
     },
     input: {
-        backgroundColor: Colors.gray[100],
+        backgroundColor: Colors.gray[50],
         padding: 16,
-        borderRadius: 12,
-        fontSize: 16,
+        borderRadius: Layout.radius.lg,
+        fontSize: Typography.size.md,
+        fontFamily: Typography.family.medium,
         color: Colors.gray[900],
         marginBottom: 20,
+        borderWidth: 1,
+        borderColor: Colors.gray[100],
     },
     iconGrid: {
         flexDirection: 'row',
@@ -307,7 +311,7 @@ const styles = StyleSheet.create({
     },
     saveText: {
         color: Colors.white,
-        fontWeight: 'bold',
-        fontSize: 16,
+        fontFamily: Typography.family.bold,
+        fontSize: Typography.size.md,
     },
 });

@@ -32,14 +32,22 @@ const ensureDb = async () => {
     return db;
 };
 
-export const getCategoryTotals = async (month?: Date): Promise<CategoryTotal[]> => {
+export type DateFilter = Date | { start: Date, end: Date } | undefined;
+
+export const getCategoryTotals = async (month?: DateFilter): Promise<CategoryTotal[]> => {
     const db = await ensureDb();
-    let query = `SELECT category, SUM(amount) as total FROM transactions WHERE category != 'Income'`;
+    let query = `SELECT category, SUM(amount) as total FROM transactions WHERE category != 'Income' AND category != 'Transfer'`;
     const params: any[] = [];
 
     if (month) {
-        const start = startOfMonth(month).toISOString();
-        const end = endOfMonth(month).toISOString();
+        let start, end;
+        if (month instanceof Date) {
+            start = startOfMonth(month).toISOString();
+            end = endOfMonth(month).toISOString();
+        } else {
+            start = startOfDay(month.start).toISOString();
+            end = endOfDay(month.end).toISOString();
+        }
         query += ` AND date >= ? AND date <= ?`;
         params.push(start, end);
     }
@@ -151,14 +159,20 @@ export const getMonthlySpendingTrend = async (year: number): Promise<{ month: st
     return await db.getAllAsync<{ month: string, total: number }>(query, [start, end]);
 };
 
-export const getExpenseDistribution = async (month?: Date): Promise<ExpenseDistribution[]> => {
+export const getExpenseDistribution = async (month?: DateFilter): Promise<ExpenseDistribution[]> => {
     const db = await ensureDb();
-    let query = `SELECT amount FROM transactions WHERE category != 'Income'`;
+    let query = `SELECT amount FROM transactions WHERE category != 'Income' AND category != 'Transfer'`;
     const params: any[] = [];
 
     if (month) {
-        const start = startOfMonth(month).toISOString();
-        const end = endOfMonth(month).toISOString();
+        let start, end;
+        if (month instanceof Date) {
+            start = startOfMonth(month).toISOString();
+            end = endOfMonth(month).toISOString();
+        } else {
+            start = startOfDay(month.start).toISOString();
+            end = endOfDay(month.end).toISOString();
+        }
         query += ` AND date >= ? AND date <= ?`;
         params.push(start, end);
     }
@@ -276,4 +290,98 @@ export const getMonthlyIncomeVsExpense = async (year: number): Promise<MonthlyCo
     }
 
     return result;
+};
+
+export const getDailyIncomeExpense = async (date: Date): Promise<{ income: number, expense: number }> => {
+    const db = await ensureDb();
+    const start = startOfDay(date).toISOString();
+    const end = endOfDay(date).toISOString();
+
+    const query = `
+        SELECT category, SUM(amount) as total
+        FROM transactions
+        WHERE date >= ? AND date <= ? AND category != 'Transfer'
+        GROUP BY CASE WHEN category = 'Income' THEN 'income' ELSE 'expense' END
+    `;
+    const results = await db.getAllAsync<{ category: string, total: number }>(query, [start, end]);
+    let income = 0;
+    let expense = 0;
+    // Note: The GROUP BY produces 'Income' vs original categories, but actually we grouped by the CASE result.
+    // However, SQLite might return the original category column if we select it. 
+    // To be safe, let's just do a simpler approach or sum manually from the transactions for accuracy without complex CASE.
+    
+    const safeQuery = `
+        SELECT amount, category FROM transactions
+        WHERE date >= ? AND date <= ? AND category != 'Transfer'
+    `;
+    const safeResults = await db.getAllAsync<{ amount: number, category: string }>(safeQuery, [start, end]);
+    safeResults.forEach(r => {
+        if (r.category === 'Income') income += r.amount;
+        else expense += r.amount;
+    });
+    return { income, expense };
+};
+
+export const getWeeklyIncomeExpense = async (date: Date): Promise<{ income: number, expense: number }> => {
+    const db = await ensureDb();
+    // Monday to Sunday logic
+    const dt = new Date(date);
+    const day = dt.getDay();
+    const diff = dt.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
+    const monday = new Date(dt.setDate(diff));
+    const sunday = new Date(dt.setDate(diff + 6));
+    
+    const start = startOfDay(monday).toISOString();
+    const end = endOfDay(sunday).toISOString();
+
+    const safeQuery = `
+        SELECT amount, category FROM transactions
+        WHERE date >= ? AND date <= ? AND category != 'Transfer'
+    `;
+    const safeResults = await db.getAllAsync<{ amount: number, category: string }>(safeQuery, [start, end]);
+    let income = 0;
+    let expense = 0;
+    safeResults.forEach(r => {
+        if (r.category === 'Income') income += r.amount;
+        else expense += r.amount;
+    });
+    return { income, expense };
+};
+
+export const getMonthlyIncomeExpense = async (date: Date): Promise<{ income: number, expense: number }> => {
+    const db = await ensureDb();
+    const start = startOfMonth(date).toISOString();
+    const end = endOfMonth(date).toISOString();
+
+    const safeQuery = `
+        SELECT amount, category FROM transactions
+        WHERE date >= ? AND date <= ? AND category != 'Transfer'
+    `;
+    const safeResults = await db.getAllAsync<{ amount: number, category: string }>(safeQuery, [start, end]);
+    let income = 0;
+    let expense = 0;
+    safeResults.forEach(r => {
+        if (r.category === 'Income') income += r.amount;
+        else expense += r.amount;
+    });
+    return { income, expense };
+};
+
+export const getYearlyIncomeExpense = async (year: number): Promise<{ income: number, expense: number }> => {
+    const db = await ensureDb();
+    const start = `${year}-01-01T00:00:00.000Z`;
+    const end = `${year}-12-31T23:59:59.999Z`;
+
+    const safeQuery = `
+        SELECT amount, category FROM transactions
+        WHERE date >= ? AND date <= ? AND category != 'Transfer'
+    `;
+    const safeResults = await db.getAllAsync<{ amount: number, category: string }>(safeQuery, [start, end]);
+    let income = 0;
+    let expense = 0;
+    safeResults.forEach(r => {
+        if (r.category === 'Income') income += r.amount;
+        else expense += r.amount;
+    });
+    return { income, expense };
 };

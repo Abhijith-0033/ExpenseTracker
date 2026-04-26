@@ -23,16 +23,27 @@ export const CategoryPicker: React.FC<CategoryPickerProps> = ({ visible, onClose
         }
     };
 
-    const renderItem = ({ item }: { item: CategoryNode }) => (
-        <TouchableOpacity
-            style={styles.item}
-            onPress={() => setSelectedParent(item)}
-        >
-            <View style={styles.iconPlaceholder} />
-            <Text style={styles.itemText}>{item.name}</Text>
-            <ChevronRight size={20} color="#9ca3af" />
-        </TouchableOpacity>
-    );
+    const renderItem = ({ item }: { item: CategoryNode }) => {
+        const hasSubcategories = item.subcategories && item.subcategories.length > 0;
+
+        return (
+            <TouchableOpacity
+                style={styles.item}
+                onPress={() => {
+                    if (hasSubcategories) {
+                        setSelectedParent(item);
+                    } else {
+                        onSelect(item.name, '');
+                        onClose();
+                    }
+                }}
+            >
+                <View style={styles.iconPlaceholder} />
+                <Text style={styles.itemText}>{item.name}</Text>
+                {hasSubcategories && <ChevronRight size={20} color="#9ca3af" />}
+            </TouchableOpacity>
+        );
+    };
 
     const renderSubItem = ({ item }: { item: string }) => (
         <TouchableOpacity
