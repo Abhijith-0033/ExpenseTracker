@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, StatusBar, ScrollView, Dimensions, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, StatusBar, ScrollView, Dimensions, Modal, DeviceEventEmitter } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useApp } from '../../context/AppContext';
 import { addTransaction, addRechargeMeta, CategoryNode } from '../../services/database';
@@ -174,6 +174,7 @@ export default function AddTransactionScreen() {
             }
 
             await refreshData();
+            DeviceEventEmitter.emit('RECOMPUTE_SATISFACTION');
 
             // Sound Feedback
             if (category === 'Income') {

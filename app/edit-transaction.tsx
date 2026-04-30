@@ -1,7 +1,7 @@
 
 
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform, DeviceEventEmitter } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useApp } from '../context/AppContext';
 import { updateTransaction, deleteTransaction } from '../services/database';
@@ -75,6 +75,7 @@ export default function EditTransactionScreen() {
             });
 
             await refreshData();
+            DeviceEventEmitter.emit('RECOMPUTE_SATISFACTION');
             router.back();
         } catch (e) {
             Alert.alert('Error', 'Failed to update transaction');
@@ -89,6 +90,7 @@ export default function EditTransactionScreen() {
                     // Include category to ensure proper balance reversal
                     await deleteTransaction(originalTx.id, originalTx.account_id, originalTx.amount, originalTx.category);
                     await refreshData();
+                    DeviceEventEmitter.emit('RECOMPUTE_SATISFACTION');
                     router.back();
                 }
             }

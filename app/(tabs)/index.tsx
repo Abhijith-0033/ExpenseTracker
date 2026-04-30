@@ -20,6 +20,7 @@ import { runOnJS } from 'react-native-reanimated';
 import { PressableScale } from '../../components/ui/PressableScale';
 import { CalendarDays, CalendarRange, Calendar, BarChart3, PieChart as PieChartIcon, X } from 'lucide-react-native';
 import { Modal } from 'react-native';
+import SatisfactionCard from '../../satisfaction/SatisfactionCard';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -212,6 +213,10 @@ export default function Dashboard() {
                 <Text style={styles.metricGridLabel}>This Year (Exp)</Text>
                 <Text style={[styles.metricGridValue, { color: Colors.danger[700] }]} numberOfLines={1}>{formatCurrency(yearlyStats.expense)}</Text>
               </View>
+            </View>
+
+            <View style={{ marginBottom: 4 }}>
+               <SatisfactionCard />
             </View>
 
             <PressableScale style={[styles.metricCardFull, { backgroundColor: Colors.accent.lavender }]} onPress={() => {}}>

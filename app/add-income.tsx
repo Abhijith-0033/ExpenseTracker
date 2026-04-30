@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, StatusBar, Dimensions, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, StatusBar, Dimensions, ScrollView, DeviceEventEmitter } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useApp } from '../context/AppContext';
 import { addTransaction, getCategories, getIncomeSources } from '../services/database';
@@ -126,6 +126,7 @@ export default function AddIncomeScreen() {
                 description
             });
             await refreshData();
+            DeviceEventEmitter.emit('RECOMPUTE_SATISFACTION');
 
             // Sound Feedback
             playIncomeSound(soundEnabled);

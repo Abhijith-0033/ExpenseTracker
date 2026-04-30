@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput,
-  Alert, StatusBar, ScrollView, Dimensions
+  Alert, StatusBar, ScrollView, Dimensions, DeviceEventEmitter
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useApp } from '../context/AppContext';
@@ -130,6 +130,7 @@ export default function AddTransferScreen() {
                 description || 'Account Transfer'
             );
             await refreshData();
+            DeviceEventEmitter.emit('RECOMPUTE_SATISFACTION');
             setShowSuccess(true);
         } catch (e: any) {
             if (e?.message === 'INSUFFICIENT_BALANCE') {
