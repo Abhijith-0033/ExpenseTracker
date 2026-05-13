@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
 import { LineChart, BarChart, PieChart } from 'react-native-gifted-charts';
-import { Colors, Layout } from '../constants/Theme';
+import { Colors, Layout, Typography } from '../constants/Theme';
 import { CategoryTotal, SubcategoryTotal, DailySpending, ExpenseDistribution, MonthlyCategoryTotal, MonthlyComparison } from '../services/analysis';
 import { format } from 'date-fns';
 import { formatCurrency } from '../utils/currency';
@@ -17,18 +17,20 @@ export const IncomeExpenseLineChart: React.FC<{ data: MonthlyComparison[], width
         label: format(new Date(item.month + '-01'), 'MMM'),
         dataPointText: item.income > 0 ? formatCurrency(Math.round(item.income)) : '',
         dataPointColor: Colors.success[500],
-        textColor: Colors.success[500],
+        textColor: Colors.success[700],
         textShiftY: -10,
-        textFontSize: 10
+        textFontSize: 11,
+        fontFamily: Typography.family.bold
     }));
 
     const expenseData = data.map(item => ({
         value: item.expense,
         dataPointText: item.expense > 0 ? formatCurrency(Math.round(item.expense)) : '',
         dataPointColor: Colors.danger[500],
-        textColor: Colors.danger[500],
+        textColor: Colors.danger[700],
         textShiftY: 5,
-        textFontSize: 10
+        textFontSize: 11,
+        fontFamily: Typography.family.bold
     }));
 
     return (
@@ -108,8 +110,8 @@ export const TrendLineChart: React.FC<{ data: any[], type: 'daily' | 'monthly', 
                 yAxisThickness={0}
                 rulesType="solid"
                 rulesColor={Colors.gray[200]}
-                yAxisTextStyle={{ color: Colors.gray[500] }}
-                xAxisLabelTextStyle={{ color: Colors.gray[500], fontSize: 10 }}
+                yAxisTextStyle={{ color: Colors.gray[600], fontSize: 10, fontFamily: Typography.family.medium }}
+                xAxisLabelTextStyle={{ color: Colors.gray[600], fontSize: 11, fontFamily: Typography.family.bold }}
                 isAnimated
                 curved
             />
@@ -134,7 +136,7 @@ export const WeeklyBarChart: React.FC<{ data: { week: string, total: number }[],
         value: item.total,
         label: item.week,
         frontColor: Colors.primary[600],
-        topLabelComponent: () => <Text style={{ color: Colors.gray[500], fontSize: 9, marginBottom: 2 }}>{formatCurrency(Math.round(item.total))}</Text>,
+        topLabelComponent: () => <Text style={{ color: Colors.gray[800], fontSize: 10, fontWeight: '700', marginBottom: 2 }}>{formatCurrency(Math.round(item.total))}</Text>,
     }));
 
     return (
@@ -345,8 +347,9 @@ const styles = StyleSheet.create({
         fontStyle: 'italic',
     },
     topLabel: {
-        color: Colors.gray[600],
-        fontSize: 9,
+        color: Colors.gray[800],
+        fontSize: 10,
+        fontWeight: '700',
         marginBottom: 4,
     },
     legendContainer: {

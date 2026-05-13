@@ -11,6 +11,7 @@ interface Props {
     onSelectCategory: (category: string) => void;
     subcategoryData: SubcategoryTotal[];
     loadingSubcategories: boolean;
+    totalAmount?: number;
 }
 
 export const CategoryBreakdownList: React.FC<Props> = ({
@@ -18,7 +19,8 @@ export const CategoryBreakdownList: React.FC<Props> = ({
     selectedCategory,
     onSelectCategory,
     subcategoryData,
-    loadingSubcategories
+    loadingSubcategories,
+    totalAmount
 }) => {
 
     return (
@@ -55,8 +57,17 @@ export const CategoryBreakdownList: React.FC<Props> = ({
                                 ) : subcategoryData.length > 0 ? (
                                     subcategoryData.map((sub, index) => (
                                         <View key={index} style={styles.subRow}>
-                                            <Text style={styles.subName}>{sub.subcategory}</Text>
-                                            <Text style={styles.subTotal}>{formatCurrency(sub.total)}</Text>
+                                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                                                <Text style={styles.subName}>{sub.subcategory}</Text>
+                                                <Text style={styles.subTotal}>{formatCurrency(sub.total)}</Text>
+                                            </View>
+                                            {sub.grandTotal !== undefined && (
+                                                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                                    <Text style={styles.subDetailLabel}>Grand Total: {formatCurrency(sub.grandTotal)}</Text>
+                                                    <Text style={styles.subDetailLabel}>Avg/Mo: {formatCurrency(sub.monthlyAvg || 0)}</Text>
+                                                    <Text style={styles.subDetailLabel}>Avg/Tx: {formatCurrency(sub.avgPerTx || 0)}</Text>
+                                                </View>
+                                            )}
                                         </View>
                                     ))
                                 ) : (
@@ -67,6 +78,13 @@ export const CategoryBreakdownList: React.FC<Props> = ({
                     </View>
                 );
             })}
+
+            {totalAmount !== undefined && categoryData.length > 0 && (
+                <View style={styles.totalRow}>
+                    <Text style={styles.totalLabel}>Total Insights Amount</Text>
+                    <Text style={styles.totalValue}>{formatCurrency(totalAmount)}</Text>
+                </View>
+            )}
         </View>
     );
 };
@@ -123,8 +141,6 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.gray[50],
     },
     subRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
         paddingVertical: 8,
         borderBottomWidth: 1,
         borderBottomColor: Colors.gray[200],
@@ -138,10 +154,35 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: Colors.gray[800],
     },
+    subDetailLabel: {
+        fontSize: 11,
+        color: Colors.gray[500],
+    },
     noData: {
         textAlign: 'center',
         color: Colors.gray[400],
         fontStyle: 'italic',
         padding: 10,
+    },
+    totalRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 20,
+        backgroundColor: Colors.primary[50],
+        borderRadius: Layout.radius.md,
+        marginTop: 8,
+        borderWidth: 1,
+        borderColor: Colors.primary[100],
+    },
+    totalLabel: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: Colors.primary[700],
+    },
+    totalValue: {
+        fontSize: 18,
+        fontWeight: '800',
+        color: Colors.primary[800],
     },
 });

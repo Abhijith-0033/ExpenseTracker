@@ -11,6 +11,8 @@ import { addMonths, subMonths, format } from 'date-fns';
 import { getBooks } from '../../services/books';
 import { getDebtSummary, DebtSummary } from '../../services/debts';
 import { getDailyIncomeExpense, getWeeklyIncomeExpense, getMonthlyIncomeExpense, getYearlyIncomeExpense } from '../../services/analysis';
+import { getBudgetStatus, BudgetStatus } from '../../services/budgets';
+import { getEMISummary } from '../../services/emitracker/EMIEngine';
 import { AnimatedBalance } from '../../components/AnimatedBalance';
 import { MonthlyExpensePieChart } from '../../components/MonthlyExpensePieChart';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,8 +23,19 @@ import { PressableScale } from '../../components/ui/PressableScale';
 import { CalendarDays, CalendarRange, Calendar, BarChart3, PieChart as PieChartIcon, X } from 'lucide-react-native';
 import { Modal } from 'react-native';
 import SatisfactionCard from '../../satisfaction/SatisfactionCard';
+import { formatAmount } from '../../utils/formatAmount';
+import { FlippableBalanceCard } from '../../components/FlippableBalanceCard';
+import { SidePanel } from '../../components/SidePanel';
+import { Grid } from 'lucide-react-native';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+const getGreeting = () => {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good Morning';
+  if (hour < 18) return 'Good Afternoon';
+  return 'Good Evening';
+};
 
 export default function Dashboard() {
   const router = useRouter();
@@ -33,6 +46,7 @@ export default function Dashboard() {
   // Dashboard Summaries State
   const [bookSummary, setBookSummary] = useState({ count: 0, total: 0 });
   const [debtSummary, setDebtSummary] = useState<DebtSummary>({ totalDebt: 0, totalReceivable: 0, netPosition: 0 });
+  const [emiSummary, setEMISummary] = useState({ total_active: 0, total_paid: 0, total_pending: 0, total_overdue: 0, total_emi_amount: 0, total_paid_amount: 0 });
   
   // New metrics states
   const [dailyStats, setDailyStats] = useState({ income: 0, expense: 0 });
@@ -40,6 +54,8 @@ export default function Dashboard() {
   const [monthlyStats, setMonthlyStats] = useState({ income: 0, expense: 0 });
   const [yearlyStats, setYearlyStats] = useState({ income: 0, expense: 0 });
   const [showPieModal, setShowPieModal] = useState(false);
+  const [showSidePanel, setShowSidePanel] = useState(false);
+  const [budgetStatuses, setBudgetStatuses] = useState<BudgetStatus[]>([]);
 
   const fetchSummaries = async () => {
     try {
@@ -50,19 +66,26 @@ export default function Dashboard() {
       const debts = await getDebtSummary();
       setDebtSummary(debts);
 
+      const emiSum = await getEMISummary();
+      setEMISummary(emiSum);
+
       // Fetch new metrics
       const now = new Date();
-      const [dStats, wStats, mStats, yStats] = await Promise.all([
+      const [dStats, wStats, mStats, yStats, bStatus] = await Promise.all([
         getDailyIncomeExpense(now),
         getWeeklyIncomeExpense(now),
         getMonthlyIncomeExpense(now),
-        getYearlyIncomeExpense(now.getFullYear())
+        getYearlyIncomeExpense(now.getFullYear()),
+        getBudgetStatus(now)
       ]);
       
       setDailyStats(dStats);
       setWeeklyStats(wStats);
       setMonthlyStats(mStats);
       setYearlyStats(yStats);
+
+      bStatus.sort((a, b) => b.percentage - a.percentage);
+      setBudgetStatuses(bStatus.slice(0, 6));
     } catch (e) {
       console.error("Failed to fetch dashboard summaries", e);
     }
@@ -101,39 +124,33 @@ export default function Dashboard() {
         >
           <Animated.View entering={FadeInDown.duration(600)} style={styles.header}>
             <View>
-              <Text style={styles.greeting}>Overview</Text>
+              <Text style={styles.greeting}>{getGreeting()}</Text>
               <Text style={styles.date}>{format(new Date(), 'EEEE, do MMMM')}</Text>
             </View>
-            <TouchableOpacity
-              activeOpacity={0.7}
-              style={styles.profilePlaceholder}
-              onPress={() => { }}
-            >
-              <Text style={styles.profileInitials}>ME</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                style={styles.profilePlaceholder}
+                onPress={() => { }}
+              >
+                <Text style={styles.profileInitials}>ME</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                style={styles.gridBtn}
+                onPress={() => setShowSidePanel(true)}
+              >
+                <Grid size={20} color={Colors.primary[600]} />
+              </TouchableOpacity>
+            </View>
           </Animated.View>
 
           {/* Main Balance Card */}
           <Animated.View entering={FadeInDown.delay(100).duration(600)}>
-            <LinearGradient
-              colors={[Colors.primary[500], Colors.primary[400]]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.balanceGradient}
-            >
-              <View style={styles.decCircle1} />
-              <View style={styles.decCircle2} />
-
-              <View style={styles.balanceContent}>
-                <View>
-                  <Text style={styles.balanceLabel}>Total Balance</Text>
-                  <AnimatedBalance value={totalBalance} style={styles.balanceValue} />
-                </View>
-                <View style={styles.balanceRight}>
-                  <Wallet size={36} color="rgba(255,255,255,0.25)" />
-                </View>
-              </View>
-            </LinearGradient>
+            <FlippableBalanceCard 
+              totalBalance={totalBalance}
+              accounts={accounts}
+            />
           </Animated.View>
 
           {/* Dashboard Metrics Grid */}
@@ -143,15 +160,19 @@ export default function Dashboard() {
                 <View style={[styles.metricCardIcon, { backgroundColor: Colors.accent.mint }]}>
                   <CalendarDays size={18} color={Colors.success[600]} />
                 </View>
-                <Text style={styles.metricGridLabel}>Today's Income</Text>
-                <Text style={[styles.metricGridValue, { color: Colors.success[700] }]} numberOfLines={1}>{formatCurrency(dailyStats.income)}</Text>
+                <Text style={styles.metricGridLabel}>{"Today's Income"}</Text>
+                <Text style={[styles.metricGridValue, { color: Colors.success[700] }]} numberOfLines={1}>
+                  {formatAmount(dailyStats.income, 'income').text}
+                </Text>
               </View>
               <View style={styles.metricCardHalf}>
                 <View style={[styles.metricCardIcon, { backgroundColor: Colors.accent.rose }]}>
                   <CalendarDays size={18} color={Colors.danger[600]} />
                 </View>
-                <Text style={styles.metricGridLabel}>Today's Expense</Text>
-                <Text style={[styles.metricGridValue, { color: Colors.danger[700] }]} numberOfLines={1}>{formatCurrency(dailyStats.expense)}</Text>
+                <Text style={styles.metricGridLabel}>{"Today's Expense"}</Text>
+                <Text style={[styles.metricGridValue, { color: Colors.danger[700] }]} numberOfLines={1}>
+                  {formatAmount(dailyStats.expense, 'expense').text}
+                </Text>
               </View>
             </View>
 
@@ -161,14 +182,18 @@ export default function Dashboard() {
                   <CalendarRange size={18} color={Colors.success[600]} />
                 </View>
                 <Text style={styles.metricGridLabel}>This Week (Inc)</Text>
-                <Text style={[styles.metricGridValue, { color: Colors.success[700] }]} numberOfLines={1}>{formatCurrency(weeklyStats.income)}</Text>
+                <Text style={[styles.metricGridValue, { color: Colors.success[700] }]} numberOfLines={1}>
+                  {formatAmount(weeklyStats.income, 'income').text}
+                </Text>
               </View>
               <View style={styles.metricCardHalf}>
                 <View style={[styles.metricCardIcon, { backgroundColor: Colors.accent.rose }]}>
                   <CalendarRange size={18} color={Colors.danger[600]} />
                 </View>
                 <Text style={styles.metricGridLabel}>This Week (Exp)</Text>
-                <Text style={[styles.metricGridValue, { color: Colors.danger[700] }]} numberOfLines={1}>{formatCurrency(weeklyStats.expense)}</Text>
+                <Text style={[styles.metricGridValue, { color: Colors.danger[700] }]} numberOfLines={1}>
+                  {formatAmount(weeklyStats.expense, 'expense').text}
+                </Text>
               </View>
             </View>
 
@@ -178,17 +203,21 @@ export default function Dashboard() {
                onPress={() => setShowPieModal(true)}
             >
                <View style={{ flex: 1 }}>
-                   <Text style={[styles.metricGridLabel, { fontSize: Typography.size.sm }]}>This Month's Spending</Text>
+                   <Text style={[styles.metricGridLabel, { fontSize: Typography.size.sm }]}>{"This Month's Spending"}</Text>
                    <Text style={{ fontSize: 10, color: Colors.gray[500], marginTop: 2 }}>Tap to view breakdown</Text>
                    
                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 16, gap: 16 }}>
                        <View>
                            <Text style={{ fontSize: 10, color: Colors.gray[500], marginBottom: 2 }}>Income</Text>
-                           <Text style={[styles.metricGridValue, { color: Colors.success[700], fontSize: 16 }]}>{formatCurrency(monthlyStats.income)}</Text>
+                           <Text style={[styles.metricGridValue, { color: Colors.success[700], fontSize: 16 }]}>
+                             {formatAmount(monthlyStats.income, 'income').text}
+                           </Text>
                        </View>
                        <View>
                            <Text style={{ fontSize: 10, color: Colors.gray[500], marginBottom: 2 }}>Expense</Text>
-                           <Text style={[styles.metricGridValue, { color: Colors.danger[700], fontSize: 16 }]}>{formatCurrency(monthlyStats.expense)}</Text>
+                           <Text style={[styles.metricGridValue, { color: Colors.danger[700], fontSize: 16 }]}>
+                             {formatAmount(monthlyStats.expense, 'expense').text}
+                           </Text>
                        </View>
                    </View>
                </View>
@@ -230,8 +259,69 @@ export default function Dashboard() {
                 <Text style={[styles.metricValue, { color: Colors.primary[700] }]}>{formatCurrency(monthlyStats.income - monthlyStats.expense)}</Text>
               </View>
             </PressableScale>
+
+            <PressableScale style={[styles.metricCardFull, { backgroundColor: 'rgba(156, 39, 176, 0.1)' }]} onPress={() => router.push('/emi-tracker' as any)}>
+              <View style={styles.metricCardIconRow}>
+                <View style={[styles.metricCardIcon, { backgroundColor: 'rgba(156, 39, 176, 0.2)' }]}>
+                  <Calendar size={20} color="#9C27B0" />
+                </View>
+                {emiSummary.total_overdue > 0 && (
+                  <View style={[styles.badge, { backgroundColor: Colors.danger[500] }]}>
+                    <Text style={styles.badgeText}>{emiSummary.total_overdue}</Text>
+                  </View>
+                )}
+              </View>
+              <View style={{ flex: 1, marginLeft: 16 }}>
+                <Text style={styles.metricTitle}>EMI Tracker</Text>
+                <Text style={[styles.metricValue, { color: '#9C27B0' }]}>{emiSummary.total_active} Active</Text>
+                <Text style={styles.metricSubtitle}>{emiSummary.total_pending} pending • {formatCurrency(emiSummary.total_emi_amount)}/month</Text>
+              </View>
+              <ArrowRight size={20} color={Colors.gray[400]} />
+            </PressableScale>
           </Animated.View>
 
+          {/* Budget Progress */}
+          {budgetStatuses.length > 0 && (
+            <Animated.View entering={FadeInDown.delay(200).duration(600)} style={{ marginBottom: 32 }}>
+              <View style={[styles.header, { marginBottom: 16, paddingHorizontal: Layout.spacing.lg }]}>
+                <Text style={styles.sectionHeaderTitle}>Budget Progress</Text>
+                <TouchableOpacity onPress={() => router.push('/budgets')}>
+                  <Text style={{ fontSize: Typography.size.sm, fontFamily: Typography.family.bold, color: Colors.primary[600] }}>Manage →</Text>
+                </TouchableOpacity>
+              </View>
+              
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: Layout.spacing.lg, gap: 12 }}>
+                {budgetStatuses.map((budget, idx) => {
+                  let progressColor = Colors.success[500];
+                  let statusText = "On Track";
+                  if (budget.percentage >= 100) { progressColor = Colors.danger[500]; statusText = "Over Budget"; }
+                  else if (budget.percentage >= 85) { progressColor = Colors.danger[400]; statusText = "Warning"; }
+                  else if (budget.percentage >= 60) { progressColor = '#F59E0B'; statusText = "Caution"; }
+
+                  return (
+                    <PressableScale 
+                      key={`budget-${idx}`} 
+                      style={styles.miniBudgetCard}
+                      onPress={() => router.push({ pathname: '/category-detail', params: { category_name: budget.category } })}
+                    >
+                      <Text style={styles.miniBudgetCategory} numberOfLines={1}>{budget.category}</Text>
+                      
+                      <View style={styles.miniBudgetNumbers}>
+                        <Text style={styles.miniBudgetSpent}>{formatCurrency(budget.spent)}</Text>
+                        <Text style={styles.miniBudgetLimit}> / {formatCurrency(budget.budget)}</Text>
+                      </View>
+
+                      <View style={styles.miniBudgetBarBg}>
+                        <Animated.View style={[styles.miniBudgetBarFill, { width: `${Math.min(budget.percentage, 100)}%`, backgroundColor: progressColor }]} />
+                      </View>
+                      
+                      <Text style={[styles.miniBudgetStatus, { color: progressColor }]}>{statusText}</Text>
+                    </PressableScale>
+                  );
+                })}
+              </ScrollView>
+            </Animated.View>
+          )}
 
           <Animated.View entering={FadeInDown.delay(300).duration(600)}>
             <Text style={styles.sectionHeaderTitle}>Financial Modules</Text>
@@ -296,30 +386,7 @@ export default function Dashboard() {
             </View>
           </Animated.View>
 
-          {/* Accounts Section */}
-          <Animated.View entering={FadeInDown.delay(500).duration(600)} style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>My Accounts</Text>
-            </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.accountsScroll}>
-              {accounts.length > 0 ? accounts.map((acc, index) => (
-                <Card key={acc.id} style={[styles.accountCard, { marginLeft: index === 0 ? 0 : 16 }]}>
-                  <View style={styles.accountHeader}>
-                    <View style={[styles.accIcon, { backgroundColor: Colors.primary[50] }]}>
-                      <Wallet size={18} color={Colors.primary[500]} />
-                    </View>
-                    <Text style={styles.accountType}>{acc.type}</Text>
-                  </View>
-                  <View>
-                    <Text style={styles.accountName} numberOfLines={1}>{acc.name}</Text>
-                    <Text style={styles.accountBalance}>{formatCurrency(acc.balance)}</Text>
-                  </View>
-                </Card>
-              )) : (
-                <Text style={styles.emptyAccounts}>No accounts added yet</Text>
-              )}
-            </ScrollView>
-          </Animated.View>
+
         </ScrollView>
 
         {/* Pie Chart Detailed Modal */}
@@ -339,6 +406,11 @@ export default function Dashboard() {
             </View>
           </View>
         </Modal>
+        <SidePanel 
+          visible={showSidePanel} 
+          onClose={() => setShowSidePanel(false)} 
+          onNavigate={(route) => router.push(`/${route}` as any)}
+        />
       </SafeAreaView>
     </GestureHandlerRootView>
   );
@@ -383,6 +455,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1.5,
     borderColor: Colors.primary[100],
+  },
+  gridBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 16,
+    backgroundColor: Colors.gray[100],
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...Layout.shadows.sm,
   },
   profileInitials: {
     color: Colors.primary[600],
@@ -574,54 +655,7 @@ const styles = StyleSheet.create({
     fontFamily: Typography.family.bold,
     color: Colors.gray[900],
   },
-  accountsScroll: {
-    paddingRight: 16,
-    paddingBottom: 8,
-  },
-  accountCard: {
-    width: 160,
-    height: 150,
-    padding: 20,
-    justifyContent: 'space-between',
-    backgroundColor: Colors.white,
-    borderRadius: 24,
-    ...Layout.shadows.sm,
-  },
-  accountHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  accIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  accountType: {
-    fontSize: Typography.size.xs,
-    fontFamily: Typography.family.bold,
-    color: Colors.gray[400],
-    textTransform: 'uppercase',
-  },
-  accountName: {
-    fontSize: Typography.size.md,
-    fontFamily: Typography.family.bold,
-    color: Colors.gray[800],
-    marginBottom: 4,
-  },
-  accountBalance: {
-    fontSize: Typography.size.lg,
-    fontFamily: Typography.family.bold,
-    color: Colors.gray[900],
-  },
-  emptyAccounts: {
-    color: Colors.gray[400],
-    fontFamily: Typography.family.regular,
-    fontStyle: 'italic',
-    padding: 20,
-  },
+
   metricsGridContainer: {
     marginHorizontal: 0,
     marginBottom: 32,
@@ -668,6 +702,27 @@ const styles = StyleSheet.create({
     fontFamily: Typography.family.bold,
     fontSize: Typography.size.lg,
   },
+  metricSubtitle: {
+    fontSize: Typography.size.sm,
+    fontFamily: Typography.family.regular,
+    color: Colors.gray[500],
+    marginTop: 2,
+  },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  badgeText: {
+    fontSize: Typography.size.xs,
+    fontFamily: Typography.family.bold,
+    color: Colors.white,
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -696,5 +751,48 @@ const styles = StyleSheet.create({
   closeBtn: {
     padding: 8,
     marginRight: -8,
+  },
+  miniBudgetCard: {
+    width: 160,
+    backgroundColor: Colors.white,
+    borderRadius: 16,
+    padding: 16,
+    ...Layout.shadows.sm,
+  },
+  miniBudgetCategory: {
+    fontSize: Typography.size.md,
+    fontFamily: Typography.family.bold,
+    color: Colors.gray[900],
+    marginBottom: 8,
+  },
+  miniBudgetNumbers: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginBottom: 8,
+  },
+  miniBudgetSpent: {
+    fontSize: Typography.size.sm,
+    fontFamily: Typography.family.bold,
+    color: Colors.gray[900],
+  },
+  miniBudgetLimit: {
+    fontSize: Typography.size.xs,
+    fontFamily: Typography.family.medium,
+    color: Colors.gray[500],
+  },
+  miniBudgetBarBg: {
+    height: 6,
+    backgroundColor: Colors.gray[100],
+    borderRadius: 3,
+    marginBottom: 8,
+    overflow: 'hidden',
+  },
+  miniBudgetBarFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  miniBudgetStatus: {
+    fontSize: Typography.size.xs,
+    fontFamily: Typography.family.bold,
   },
 });

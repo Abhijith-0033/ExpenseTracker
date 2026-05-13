@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Switch } from 'react-native';
 import { useRouter, Link } from 'expo-router';
-import { ChevronRight, Wallet, Tag, Trash2, Database, Bell, FileUp, FileDown, FileText, Info, Calendar, Users } from 'lucide-react-native';
+import { ChevronRight, Wallet, Tag, Database, Bell, FileUp, FileDown, FileText, Info, Calendar, Users, Target, CalendarClock, RefreshCw, FileBarChart } from 'lucide-react-native';
 import { useApp } from '../../context/AppContext';
 import { Colors, Typography, Layout } from '../../constants/Theme';
 import { checkReminderStatus, scheduleDailyReminder } from '../../services/notifications';
@@ -42,6 +42,20 @@ export default function SettingsScreen() {
 
             <View style={styles.section}>
                 <Text style={styles.sectionTitle}>General</Text>
+
+                <TouchableOpacity
+                    style={styles.row}
+                    onPress={() => router.push('/notification-settings' as any)}
+                >
+                    <View style={[styles.rowIcon, { backgroundColor: '#F3E8FF' }]}>
+                        <Bell size={20} color="#7C3AED" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.rowText}>Notifications</Text>
+                        <Text style={styles.rowSubtext}>Manage alerts and reminders</Text>
+                    </View>
+                    <ChevronRight size={20} color="#9ca3af" />
+                </TouchableOpacity>
 
                 <TouchableOpacity
                     style={styles.row}
@@ -95,6 +109,43 @@ export default function SettingsScreen() {
                         <ChevronRight size={20} color={Colors.gray[400]} />
                     </TouchableOpacity>
                 </Link>
+            </View>
+
+            {/* Features Section */}
+            <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Features</Text>
+                
+                <TouchableOpacity style={styles.row} onPress={() => router.push('/savings-goals' as any)}>
+                    <View style={[styles.rowIcon, { backgroundColor: '#F3E8FF' }]}>
+                        <Target size={20} color="#7C3AED" />
+                    </View>
+                    <Text style={styles.rowText}>Savings Goals</Text>
+                    <ChevronRight size={20} color="#9ca3af" />
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.row} onPress={() => router.push('/cash-flow' as any)}>
+                    <View style={[styles.rowIcon, { backgroundColor: '#DBEAFE' }]}>
+                        <CalendarClock size={20} color="#2563EB" />
+                    </View>
+                    <Text style={styles.rowText}>Cash Flow Calendar</Text>
+                    <ChevronRight size={20} color="#9ca3af" />
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.row} onPress={() => router.push('/subscriptions' as any)}>
+                    <View style={[styles.rowIcon, { backgroundColor: '#FCE4EC' }]}>
+                        <RefreshCw size={20} color="#E91E63" />
+                    </View>
+                    <Text style={styles.rowText}>Subscriptions Tracker</Text>
+                    <ChevronRight size={20} color="#9ca3af" />
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.row} onPress={() => router.push('/financial-report' as any)}>
+                    <View style={[styles.rowIcon, { backgroundColor: Colors.accent.mint }]}>
+                        <FileBarChart size={20} color={Colors.success[600]} />
+                    </View>
+                    <Text style={styles.rowText}>Financial Report</Text>
+                    <ChevronRight size={20} color="#9ca3af" />
+                </TouchableOpacity>
             </View>
 
             {/* Notification & Sound Section */}
@@ -172,7 +223,7 @@ export default function SettingsScreen() {
                     </View>
                     <View style={{ flex: 1 }}>
                         <Text style={styles.rowText}>Version</Text>
-                        <Text style={{ fontSize: Typography.size.xs, color: Colors.gray[500], fontFamily: Typography.family.regular }}>2.0.0 (Build 30)</Text>
+                        <Text style={{ fontSize: Typography.size.xs, color: Colors.gray[500], fontFamily: Typography.family.regular }}>2.2.0 (Build 32)</Text>
                     </View>
                 </View>
             </View>
@@ -230,7 +281,12 @@ const styles = StyleSheet.create({
     rowText: {
         fontSize: Typography.size.md,
         fontFamily: Typography.family.medium,
-        color: Colors.gray[800],
+        color: Colors.gray[900],
         flex: 1,
+    },
+    rowSubtext: {
+        fontSize: Typography.size.sm,
+        color: Colors.gray[500],
+        marginTop: 2,
     },
 });

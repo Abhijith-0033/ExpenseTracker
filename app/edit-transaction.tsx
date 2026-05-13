@@ -32,6 +32,7 @@ export default function EditTransactionScreen() {
 
     const [showCategoryPicker, setShowCategoryPicker] = useState(false);
     const [showDatePicker, setShowDatePicker] = useState(false);
+    const [errors, setErrors] = useState<Record<string, string>>({});
 
     useEffect(() => {
         if (id && transactions.length > 0) {
@@ -61,7 +62,16 @@ export default function EditTransactionScreen() {
     const handleDeleteKey = () => setAmount(prev => (prev.length > 1 ? prev.slice(0, -1) : '0'));
 
     const handleSave = async () => {
-        if (!selectedAccount || !category) return;
+        const newErrors: Record<string, string> = {};
+        if (!amount || parseFloat(amount) <= 0) newErrors.amount = 'Valid amount is required';
+        if (!category) newErrors.category = 'Please select a category';
+        if (!selectedAccount) newErrors.account = 'Please select an account';
+
+        if (Object.keys(newErrors).length > 0) {
+            setErrors(newErrors);
+            return;
+        }
+        setErrors({});
 
         try {
             // Use the new atomic updateTransaction service to prevent data loss
@@ -117,8 +127,9 @@ export default function EditTransactionScreen() {
                     </View>
 
                     <View style={styles.display}>
-                        <Text style={styles.currency}>₹</Text>
-                        <Text style={styles.amount}>{amount}</Text>
+                        <Text style={[styles.currency, errors.amount && { color: Colors.danger[400] }]}>₹</Text>
+                        <Text style={[styles.amount, errors.amount && { color: Colors.danger[600] }]}>{amount}</Text>
+                        {errors.amount && <Text style={styles.inlineError}>{errors.amount}</Text>}
                     </View>
 
                     <View style={styles.formContainer}>
@@ -131,31 +142,34 @@ export default function EditTransactionScreen() {
                         </View>
                         {/* Category Row */}
                         <View style={styles.row}>
-                            <TouchableOpacity style={[styles.selector, { flex: 1 }]} onPress={() => setShowCategoryPicker(true)}>
-                                <TagIcon size={20} color="#6b7280" />
-                                <Text style={styles.selectorText}>
+                            <TouchableOpacity style={[styles.selector, { flex: 1 }, errors.category && { borderColor: Colors.danger[300] }]} onPress={() => setShowCategoryPicker(true)}>
+                                <TagIcon size={20} color={errors.category ? Colors.danger[600] : "#6b7280"} />
+                                <Text style={[styles.selectorText, errors.category && { color: Colors.danger[600] }]}>
                                     {category ? (subcategory ? `${category} - ${subcategory}` : category) : 'Select Category'}
                                 </Text>
                             </TouchableOpacity>
                         </View>
+                        {errors.category && <Text style={styles.pillError}>{errors.category}</Text>}
                         {/* Account Row */}
                         <View style={styles.row}>
                             <TouchableOpacity
-                                style={[styles.selector, { flex: 1 }]}
+                                style={[styles.selector, { flex: 1 }, errors.account && { borderColor: Colors.danger[300] }]}
                                 onPress={() => {
                                     if (accounts.length > 0) {
                                         const idx = accounts.findIndex(a => a.id === selectedAccount?.id);
                                         const next = accounts[(idx + 1) % accounts.length];
                                         setSelectedAccount(next);
+                                        setErrors(prev => ({...prev, account: ''}));
                                     }
                                 }}
                             >
-                                <WalletIcon size={20} color="#6b7280" />
-                                <Text style={styles.selectorText}>
+                                <WalletIcon size={20} color={errors.account ? Colors.danger[600] : "#6b7280"} />
+                                <Text style={[styles.selectorText, errors.account && { color: Colors.danger[600] }]}>
                                     {selectedAccount ? selectedAccount.name : 'Select Account'}
                                 </Text>
                             </TouchableOpacity>
                         </View>
+                        {errors.account && <Text style={styles.pillError}>{errors.account}</Text>}
                         {/* Note Row */}
                         <View style={styles.row}>
                             <TextInput
@@ -222,6 +236,20 @@ const styles = StyleSheet.create({
         ...Layout.shadows.sm,
     },
     selectorText: { marginLeft: 12, fontSize: Typography.size.md, fontFamily: Typography.family.bold, color: Colors.gray[800] },
-    input: { flex: 1, backgroundColor: Colors.white, padding: 16, borderRadius: Layout.radius.lg, fontSize: Typography.size.md, fontFamily: Typography.family.medium, ...Layout.shadows.sm },
+    input: { padding: 16, backgroundColor: 'white', borderRadius: 16, fontSize: 16, color: '#1f2937', borderWidth: 1, borderColor: '#e5e7eb' },
+    inlineError: {
+        fontSize: 12,
+        color: Colors.danger[600],
+        fontFamily: Typography.family.medium,
+        marginTop: 4,
+        textAlign: 'center',
+    },
+    pillError: {
+        fontSize: 10,
+        color: Colors.danger[600],
+        fontFamily: Typography.family.bold,
+        marginTop: -8,
+        marginBottom: 12,
+        marginLeft: 16,
+    },
 });
-

@@ -26,7 +26,7 @@ Run:
 ```bash
 eas build:configure
 ```
-*   It will ask `"Would you like into automatically create an EAS project for @your-username/ExpenseTracker?"` -> **Type `yes`**
+*   It will ask `"Would you like into automatically create an EAS project for @your-username/Gastos?"` -> **Type `yes`**
 *   If it asks about platforms, choose **Android**.
 *   (It might detect the `eas.json` file I just created for you, which is good).
 

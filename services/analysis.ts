@@ -9,6 +9,9 @@ export interface CategoryTotal {
 export interface SubcategoryTotal {
     subcategory: string;
     total: number;
+    grandTotal?: number;
+    monthlyAvg?: number;
+    avgPerTx?: number;
 }
 
 export interface DailySpending {
@@ -36,7 +39,7 @@ export type DateFilter = Date | { start: Date, end: Date } | undefined;
 
 export const getCategoryTotals = async (month?: DateFilter): Promise<CategoryTotal[]> => {
     const db = await ensureDb();
-    let query = `SELECT category, SUM(amount) as total FROM transactions WHERE category != 'Income' AND category != 'Transfer'`;
+    let query = `SELECT category, SUM(amount) as total FROM transactions WHERE category != 'Income' AND category != 'Transfer' AND category != 'Debt/Credit'`;
     const params: any[] = [];
 
     if (month) {
@@ -57,21 +60,57 @@ export const getCategoryTotals = async (month?: DateFilter): Promise<CategoryTot
     return await db.getAllAsync<CategoryTotal>(query, params);
 };
 
-export const getSubcategoryTotals = async (category: string, month?: Date): Promise<SubcategoryTotal[]> => {
+export const getSubcategoryTotals = async (category: string, month?: DateFilter): Promise<SubcategoryTotal[]> => {
     const db = await ensureDb();
-    let query = `SELECT subcategory, SUM(amount) as total FROM transactions WHERE category = ?`;
-    const params: any[] = [category];
-
+    
+    // First query: selected period total
+    let query1 = `SELECT subcategory, SUM(amount) as total FROM transactions WHERE category = ?`;
+    const params1: any[] = [category];
     if (month) {
-        const start = startOfMonth(month).toISOString();
-        const end = endOfMonth(month).toISOString();
-        query += ` AND date >= ? AND date <= ?`;
-        params.push(start, end);
+        let start, end;
+        if (month instanceof Date) {
+            start = startOfMonth(month).toISOString();
+            end = endOfMonth(month).toISOString();
+        } else {
+            start = startOfDay(month.start).toISOString();
+            end = endOfDay(month.end).toISOString();
+        }
+        query1 += ` AND date >= ? AND date <= ?`;
+        params1.push(start, end);
     }
-
-    query += ` GROUP BY subcategory ORDER BY total DESC`;
-
-    return await db.getAllAsync<SubcategoryTotal>(query, params);
+    query1 += ` GROUP BY subcategory`;
+    
+    const periodTotals = await db.getAllAsync<{subcategory: string, total: number}>(query1, params1);
+    
+    // Second query: all-time stats
+    const allTimeQuery = `
+        SELECT 
+            subcategory, 
+            SUM(amount) as grandTotal, 
+            COUNT(*) as txCount,
+            COUNT(DISTINCT substr(date, 1, 7)) as monthsActive
+        FROM transactions 
+        WHERE category = ?
+        GROUP BY subcategory
+    `;
+    const allTimeStats = await db.getAllAsync<{subcategory: string, grandTotal: number, txCount: number, monthsActive: number}>(allTimeQuery, [category]);
+    
+    const allTimeMap = new Map(allTimeStats.map(s => [s.subcategory, s]));
+    
+    return periodTotals.map(p => {
+        const stats = allTimeMap.get(p.subcategory);
+        const grandTotal = stats?.grandTotal || p.total;
+        const txCount = stats?.txCount || 1;
+        const monthsActive = stats?.monthsActive || 1;
+        
+        return {
+            subcategory: p.subcategory,
+            total: p.total,
+            grandTotal: grandTotal,
+            monthlyAvg: grandTotal / (monthsActive > 0 ? monthsActive : 1),
+            avgPerTx: grandTotal / (txCount > 0 ? txCount : 1)
+        };
+    }).sort((a, b) => b.total - a.total);
 };
 
 export const getDailySpendingTrend = async (month: Date): Promise<DailySpending[]> => {
@@ -83,7 +122,7 @@ export const getDailySpendingTrend = async (month: Date): Promise<DailySpending[
     const query = `
         SELECT substr(date, 1, 10) as date, SUM(amount) as total 
         FROM transactions 
-        WHERE category != 'Income' AND date >= ? AND date <= ?
+        WHERE category != 'Income' AND category != 'Transfer' AND category != 'Debt/Credit' AND date >= ? AND date <= ?
         GROUP BY substr(date, 1, 10)
         ORDER BY date ASC
     `;
@@ -100,7 +139,7 @@ export const getWeeklySpendingTrend = async (month: Date): Promise<{ week: strin
     const query = `
         SELECT substr(date, 1, 10) as date, SUM(amount) as total 
         FROM transactions 
-        WHERE category != 'Income' AND date >= ? AND date <= ?
+        WHERE category != 'Income' AND category != 'Transfer' AND category != 'Debt/Credit' AND date >= ? AND date <= ?
         GROUP BY substr(date, 1, 10)
         ORDER BY date ASC
     `;
@@ -150,7 +189,7 @@ export const getMonthlySpendingTrend = async (year: number): Promise<{ month: st
     const query = `
         SELECT substr(date, 1, 7) as month, SUM(amount) as total
         FROM transactions
-        WHERE category != 'Income' AND date >= ? AND date <= ?
+        WHERE category != 'Income' AND category != 'Transfer' AND category != 'Debt/Credit' AND date >= ? AND date <= ?
         GROUP BY substr(date, 1, 7)
         ORDER BY month ASC
     `;
@@ -161,7 +200,7 @@ export const getMonthlySpendingTrend = async (year: number): Promise<{ month: st
 
 export const getExpenseDistribution = async (month?: DateFilter): Promise<ExpenseDistribution[]> => {
     const db = await ensureDb();
-    let query = `SELECT amount FROM transactions WHERE category != 'Income' AND category != 'Transfer'`;
+    let query = `SELECT amount FROM transactions WHERE category != 'Income' AND category != 'Transfer' AND category != 'Debt/Credit'`;
     const params: any[] = [];
 
     if (month) {
@@ -221,7 +260,7 @@ export const getMonthlyCategoryTrend = async (year: number): Promise<MonthlyCate
     const query = `
         SELECT substr(date, 1, 7) as month, category, SUM(amount) as total
         FROM transactions
-        WHERE category != 'Income' AND date >= ? AND date <= ?
+        WHERE category != 'Income' AND category != 'Transfer' AND category != 'Debt/Credit' AND date >= ? AND date <= ?
         GROUP BY substr(date, 1, 7), category
         ORDER BY month ASC
     `;
@@ -238,7 +277,7 @@ export const getMonthlyTrendInRange = async (startDate: Date, endDate: Date): Pr
     const query = `
         SELECT substr(date, 1, 7) as month, SUM(amount) as total
         FROM transactions
-        WHERE category != 'Income' AND date >= ? AND date <= ?
+        WHERE category != 'Income' AND category != 'Transfer' AND category != 'Debt/Credit' AND date >= ? AND date <= ?
         GROUP BY substr(date, 1, 7)
         ORDER BY month ASC
     `;
@@ -260,7 +299,7 @@ export const getMonthlyIncomeVsExpense = async (year: number): Promise<MonthlyCo
     const query = `
         SELECT date, amount, category 
         FROM transactions 
-        WHERE date >= ? AND date <= ?
+        WHERE date >= ? AND date <= ? AND category != 'Transfer' AND category != 'Debt/Credit'
     `;
     const transactions = await db.getAllAsync<{ date: string, amount: number, category: string }>(query, [start, end]);
 
@@ -300,7 +339,7 @@ export const getDailyIncomeExpense = async (date: Date): Promise<{ income: numbe
     const query = `
         SELECT category, SUM(amount) as total
         FROM transactions
-        WHERE date >= ? AND date <= ? AND category != 'Transfer'
+        WHERE date >= ? AND date <= ? AND category != 'Transfer' AND category != 'Debt/Credit'
         GROUP BY CASE WHEN category = 'Income' THEN 'income' ELSE 'expense' END
     `;
     const results = await db.getAllAsync<{ category: string, total: number }>(query, [start, end]);
@@ -312,7 +351,7 @@ export const getDailyIncomeExpense = async (date: Date): Promise<{ income: numbe
     
     const safeQuery = `
         SELECT amount, category FROM transactions
-        WHERE date >= ? AND date <= ? AND category != 'Transfer'
+        WHERE date >= ? AND date <= ? AND category != 'Transfer' AND category != 'Debt/Credit'
     `;
     const safeResults = await db.getAllAsync<{ amount: number, category: string }>(safeQuery, [start, end]);
     safeResults.forEach(r => {
@@ -336,7 +375,7 @@ export const getWeeklyIncomeExpense = async (date: Date): Promise<{ income: numb
 
     const safeQuery = `
         SELECT amount, category FROM transactions
-        WHERE date >= ? AND date <= ? AND category != 'Transfer'
+        WHERE date >= ? AND date <= ? AND category != 'Transfer' AND category != 'Debt/Credit'
     `;
     const safeResults = await db.getAllAsync<{ amount: number, category: string }>(safeQuery, [start, end]);
     let income = 0;
@@ -355,7 +394,7 @@ export const getMonthlyIncomeExpense = async (date: Date): Promise<{ income: num
 
     const safeQuery = `
         SELECT amount, category FROM transactions
-        WHERE date >= ? AND date <= ? AND category != 'Transfer'
+        WHERE date >= ? AND date <= ? AND category != 'Transfer' AND category != 'Debt/Credit'
     `;
     const safeResults = await db.getAllAsync<{ amount: number, category: string }>(safeQuery, [start, end]);
     let income = 0;
@@ -374,7 +413,7 @@ export const getYearlyIncomeExpense = async (year: number): Promise<{ income: nu
 
     const safeQuery = `
         SELECT amount, category FROM transactions
-        WHERE date >= ? AND date <= ? AND category != 'Transfer'
+        WHERE date >= ? AND date <= ? AND category != 'Transfer' AND category != 'Debt/Credit'
     `;
     const safeResults = await db.getAllAsync<{ amount: number, category: string }>(safeQuery, [start, end]);
     let income = 0;

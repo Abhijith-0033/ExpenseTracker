@@ -17,6 +17,8 @@ import Animated, { FadeInDown, FadeInUp, FadeIn } from 'react-native-reanimated'
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from 'expo-router';
 import { SuccessAnimation } from '../components/SuccessAnimation';
+import { checkDuplicate } from '../services/duplicateCheck';
+import { DuplicateWarningSheet } from '../components/DuplicateWarningSheet';
 
 export default function AddIncomeScreen() {
     const router = useRouter();
@@ -36,6 +38,12 @@ export default function AddIncomeScreen() {
     const [showSourcePicker, setShowSourcePicker] = useState(false);
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
+    const [errors, setErrors] = useState<Record<string, string>>({});
+
+    // Duplicate Guard State
+    const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
+    const [duplicateTransaction, setDuplicateTransaction] = useState<any>(null);
+    const pendingSaveDataRef = React.useRef<number | null>(null);
 
     useEffect(() => {
         if (accounts.length > 0 && !selectedAccount) {
@@ -92,27 +100,41 @@ export default function AddIncomeScreen() {
 
     const handleSave = async () => {
         let finalAmount = 0;
+        const newErrors: Record<string, string> = {};
         try {
             const sanitized = display.replace(/[^-+*/.0-9]/g, '');
-            // Safer alternative to eval for simple math
-            // eslint-disable-next-line no-new-func
             finalAmount = new Function('return ' + sanitized)();
         } catch (e) {
-            Alert.alert('Invalid', 'Amount is not a valid number');
-            return;
+            finalAmount = 0;
         }
 
-        if (!finalAmount || finalAmount <= 0) {
-            Alert.alert('Invalid Amount', 'Please enter a valid amount');
-            return;
+        if (finalAmount <= 0) {
+            newErrors.amount = 'Please enter a valid amount';
         }
         if (!selectedAccount) {
-            Alert.alert('Account Required', 'Please select an account');
+            newErrors.account = 'Please select an account';
+        }
+
+        if (Object.keys(newErrors).length > 0) {
+            setErrors(newErrors);
             return;
         }
+        setErrors({});
 
         if (isSubmittingRef.current) return;
 
+        const duplicate = await checkDuplicate(finalAmount, category, date.toISOString(), 'income');
+        if (duplicate) {
+            setDuplicateTransaction(duplicate);
+            setShowDuplicateWarning(true);
+            pendingSaveDataRef.current = finalAmount;
+            return;
+        }
+
+        await executeSave(finalAmount);
+    };
+
+    const executeSave = async (finalAmount: number) => {
         try {
             setIsSubmitting(true);
             isSubmittingRef.current = true;
@@ -127,6 +149,14 @@ export default function AddIncomeScreen() {
             });
             await refreshData();
             DeviceEventEmitter.emit('RECOMPUTE_SATISFACTION');
+
+            // Trigger Daily Report Update
+            try {
+                const { scheduleOrUpdateDailyReport } = await import('../services/dailyReportNotification');
+                await scheduleOrUpdateDailyReport();
+            } catch (e) {
+                console.warn("Daily report trigger failed", e);
+            }
 
             // Sound Feedback
             playIncomeSound(soundEnabled);
@@ -185,12 +215,17 @@ export default function AddIncomeScreen() {
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
             >
-                {/* Main Display - Special focus on the number */}
+                {/* Main Display */}
                 <Animated.View entering={FadeInDown.delay(100).duration(600)} style={styles.displayContainer}>
                     <View style={styles.amountWrapper}>
-                        <Text style={[styles.currencySymbol, { color: Colors.success[600] }]}>₹</Text>
-                        <Text style={styles.amountDisplay} numberOfLines={1} adjustsFontSizeToFit>{display}</Text>
+                        <Text style={[styles.currencySymbol, errors.amount && { color: Colors.danger[400] }]}>₹</Text>
+                        <Text style={[styles.amountDisplay, errors.amount && { color: Colors.danger[600] }]} numberOfLines={1} adjustsFontSizeToFit>{display}</Text>
                     </View>
+                    {errors.amount && (
+                        <Animated.Text entering={FadeIn.duration(300)} style={styles.inlineErrorText}>
+                            {errors.amount}
+                        </Animated.Text>
+                    )}
                     <View style={styles.incomeBadge}>
                         <TrendingUp size={14} color={Colors.success[700]} />
                         <Text style={styles.incomeBadgeText}>Income Entry</Text>
@@ -209,17 +244,20 @@ export default function AddIncomeScreen() {
                         </View>
                     </PressableScale>
 
-                    <PressableScale style={[styles.pill, { flex: 1 }]} onPress={cycleAccount}>
-                        <View style={styles.pillIconContainer}>
-                            <WalletIcon size={20} color={Colors.success[600]} />
-                        </View>
-                        <View style={styles.pillContent}>
-                            <Text style={styles.pillLabel}>Account</Text>
-                            <Text style={styles.pillValue} numberOfLines={1}>
-                                {selectedAccount ? selectedAccount.name : 'Select'}
-                            </Text>
-                        </View>
-                    </PressableScale>
+                    <View style={{ flex: 1 }}>
+                        <PressableScale style={[styles.pill, errors.account && { borderColor: Colors.danger[300] }]} onPress={cycleAccount}>
+                            <View style={[styles.pillIconContainer, errors.account && { backgroundColor: Colors.danger[50] }]}>
+                                <WalletIcon size={20} color={errors.account ? Colors.danger[600] : Colors.success[600]} />
+                            </View>
+                            <View style={styles.pillContent}>
+                                <Text style={[styles.pillLabel, errors.account && { color: Colors.danger[400] }]}>Account</Text>
+                                <Text style={[styles.pillValue, errors.account && { color: Colors.danger[600] }]} numberOfLines={1}>
+                                    {selectedAccount ? selectedAccount.name : 'Select'}
+                                </Text>
+                            </View>
+                        </PressableScale>
+                        {errors.account && <Text style={styles.pillErrorText}>{errors.account}</Text>}
+                    </View>
                 </Animated.View>
 
                 {/* Source Selection */}
@@ -291,6 +329,23 @@ export default function AddIncomeScreen() {
                 }} 
                 message="Income Saved!"
             />
+
+            <DuplicateWarningSheet 
+                visible={showDuplicateWarning}
+                existingTransaction={duplicateTransaction}
+                onCancel={() => {
+                    setShowDuplicateWarning(false);
+                    setDuplicateTransaction(null);
+                    pendingSaveDataRef.current = null;
+                }}
+                onSaveAnyway={() => {
+                    setShowDuplicateWarning(false);
+                    if (pendingSaveDataRef.current !== null) {
+                        executeSave(pendingSaveDataRef.current);
+                        pendingSaveDataRef.current = null;
+                    }
+                }}
+            />
         </View>
     );
 }
@@ -348,6 +403,19 @@ const styles = StyleSheet.create({
         fontFamily: Typography.family.bold,
         color: Colors.gray[900],
         maxWidth: Dimensions.get('window').width * 0.8,
+    },
+    inlineErrorText: {
+        fontSize: Typography.size.sm,
+        color: Colors.danger[600],
+        fontFamily: Typography.family.medium,
+        marginTop: 8,
+    },
+    pillErrorText: {
+        fontSize: 10,
+        color: Colors.danger[600],
+        fontFamily: Typography.family.bold,
+        marginTop: 4,
+        marginLeft: 4,
     },
     incomeBadge: {
         flexDirection: 'row',

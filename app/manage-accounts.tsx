@@ -11,6 +11,7 @@ export default function ManageAccountsScreen() {
     const { accounts, refreshData } = useApp();
     const [modalVisible, setModalVisible] = useState(false);
     const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+    const [errors, setErrors] = useState<Record<string, string>>({});
 
     // Form State
     const [name, setName] = useState('');
@@ -22,6 +23,7 @@ export default function ManageAccountsScreen() {
         setName('');
         setBalance('');
         setType('General');
+        setErrors({});
         setModalVisible(true);
     };
 
@@ -30,15 +32,21 @@ export default function ManageAccountsScreen() {
         setName(acc.name);
         setBalance(acc.balance.toString());
         setType(acc.type);
+        setErrors({});
         setModalVisible(true);
     };
 
     const handleSave = async () => {
         const bal = parseFloat(balance);
-        if (!name || isNaN(bal)) {
-            Alert.alert('Invalid Input', 'Name and valid numeric balance required.');
+        const newErrors: Record<string, string> = {};
+        if (!name) newErrors.name = 'Account name is required';
+        if (isNaN(bal)) newErrors.balance = 'Valid balance is required';
+
+        if (Object.keys(newErrors).length > 0) {
+            setErrors(newErrors);
             return;
         }
+        setErrors({});
 
         try {
             if (editingAccount) {
@@ -94,25 +102,37 @@ export default function ManageAccountsScreen() {
                             </TouchableOpacity>
                         </View>
 
-                        <TextInput
-                            placeholder="Account Name (e.g., Bank)"
-                            value={name}
-                            onChangeText={setName}
-                            style={styles.input}
-                        />
-                        <TextInput
-                            placeholder="Current Balance"
-                            value={balance}
-                            onChangeText={setBalance}
-                            keyboardType="numeric"
-                            style={styles.input}
-                        />
-                        <TextInput
-                            placeholder="Type (General, Cash, Savings)"
-                            value={type}
-                            onChangeText={setType}
-                            style={styles.input}
-                        />
+                        <View style={{ gap: 16 }}>
+                            <TextInput
+                                placeholder="Account Name (e.g., Bank)"
+                                value={name}
+                                onChangeText={(val) => {
+                                    setName(val);
+                                    if (errors.name) setErrors(prev => ({...prev, name: ''}));
+                                }}
+                                style={[styles.input, errors.name && { borderColor: Colors.danger[300] }]}
+                            />
+                            {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
+
+                            <TextInput
+                                placeholder="Starting Balance"
+                                value={balance}
+                                onChangeText={(val) => {
+                                    setBalance(val);
+                                    if (errors.balance) setErrors(prev => ({...prev, balance: ''}));
+                                }}
+                                keyboardType="numeric"
+                                style={[styles.input, errors.balance && { borderColor: Colors.danger[300] }]}
+                            />
+                            {errors.balance && <Text style={styles.errorText}>{errors.balance}</Text>}
+
+                            <TextInput
+                                placeholder="Account Type (e.g., Savings)"
+                                value={type}
+                                onChangeText={setType}
+                                style={styles.input}
+                            />
+                        </View>
 
                         <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
                             <Text style={styles.saveText}>Save Account</Text>
@@ -167,7 +187,14 @@ const styles = StyleSheet.create({
         fontSize: Typography.size.xs,
         fontFamily: Typography.family.regular,
         color: Colors.gray[500],
-        marginTop: 4,
+        marginTop: 24,
+    },
+    errorText: {
+        fontSize: 12,
+        color: Colors.danger[600],
+        fontFamily: Typography.family.medium,
+        marginTop: -12,
+        marginLeft: 4,
     },
     accBalance: {
         fontSize: Typography.size.md,

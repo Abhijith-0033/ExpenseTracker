@@ -1,8 +1,7 @@
-
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, Dimensions } from 'react-native';
 import { Transaction } from '../services/database';
-import { format } from 'date-fns';
+import { format, addDays } from 'date-fns';
 import { ArrowUpRight, ArrowDownLeft, ShoppingBag, Coffee, Car, Home, Film, DollarSign, Edit2, Trash2, X } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { Colors, Layout, Typography } from '../constants/Theme';
@@ -11,6 +10,11 @@ import { formatCurrency } from '../utils/currency';
 import { useApp } from '../context/AppContext';
 import { deleteTransaction } from '../services/database';
 import { Alert } from 'react-native';
+import { SwipeableRow } from './SwipeableRow';
+import { RecurringBottomSheet } from './RecurringBottomSheet';
+import { addSubscription } from '../services/subscriptions';
+import { formatAmount } from '../utils/formatAmount';
+import { Snackbar } from './Snackbar';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -37,6 +41,9 @@ export const TransactionList: React.FC<TransactionListProps> = ({
     const router = useRouter();
     const { refreshData, accounts } = useApp();
     const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
+    const [recurringTx, setRecurringTx] = useState<Transaction | null>(null);
+    const [showRecurring, setShowRecurring] = useState(false);
+    const [pendingDeleteTx, setPendingDeleteTx] = useState<Transaction | null>(null);
 
     const getIcon = (category: string) => {
         switch (category) {
@@ -63,70 +70,100 @@ export const TransactionList: React.FC<TransactionListProps> = ({
     };
 
     const handleDelete = (item: Transaction) => {
-        Alert.alert(
-            "Delete Transaction",
-            "Are you sure you want to delete this record?",
-            [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Delete",
-                    style: "destructive",
-                    onPress: async () => {
-                        try {
-                            await deleteTransaction(item.id, item.account_id, item.amount, item.category);
-                            await refreshData();
-                        } catch (e) {
-                            Alert.alert("Error", "Failed to delete transaction");
-                        }
-                    }
-                }
-            ]
+        setPendingDeleteTx(item);
+    };
+
+    const commitDelete = async () => {
+        if (!pendingDeleteTx) return;
+        try {
+            await deleteTransaction(pendingDeleteTx.id, pendingDeleteTx.account_id, pendingDeleteTx.amount, pendingDeleteTx.category);
+            await refreshData();
+        } catch (e) {
+            Alert.alert("Error", "Failed to delete transaction");
+        } finally {
+            setPendingDeleteTx(null);
+        }
+    };
+
+    const handleRecurringSave = async (freq: 'monthly' | 'quarterly' | 'yearly' | 'custom') => {
+        if (!recurringTx) return;
+        try {
+            const daysToAdd = freq === 'quarterly' ? 90 : freq === 'yearly' ? 365 : freq === 'custom' ? 1 : 30;
+            await addSubscription({
+                name: recurringTx.description || recurringTx.subcategory,
+                amount: recurringTx.amount,
+                billing_cycle: freq,
+                next_renewal_date: format(addDays(new Date(), daysToAdd), 'yyyy-MM-dd'),
+                category: recurringTx.category,
+                account_id: recurringTx.account_id,
+                icon: '🔄',
+                color: Colors.primary[500],
+                is_active: 1,
+                notes: 'Created from history',
+                status: 'active',
+                reminder_days_before: 3
+            });
+            setShowRecurring(false);
+            setRecurringTx(null);
+            Alert.alert("Success", "Subscription added!");
+        } catch (e) {
+            Alert.alert("Error", "Failed to add subscription");
+        }
+    };
+
+    const renderItem = ({ item, index }: { item: Transaction, index: number }) => {
+        const amtType = item.category === 'Income' ? 'income' : item.category === 'Transfer' ? 'transfer' : 'expense';
+        const { text: amtText, color: amtColor } = formatAmount(item.amount, amtType as any);
+
+        return (
+            <AnimatedItem index={index}>
+                <SwipeableRow
+                    onDelete={() => handleDelete(item)}
+                    onEdit={() => router.push({ pathname: '/edit-transaction', params: { id: item.id } })}
+                    onDuplicate={() => router.push({ 
+                        pathname: '/(tabs)/add', 
+                        params: { 
+                            prefill_amount: item.amount.toString(), 
+                            prefill_category: item.category, 
+                            prefill_account_id: item.account_id.toString(),
+                            prefill_description: item.description 
+                        } 
+                    })}
+                    onRepeat={() => {
+                        setRecurringTx(item);
+                        setShowRecurring(true);
+                    }}
+                    deleteConfirmTitle="Delete Transaction"
+                    deleteConfirmMessage="Are you sure you want to delete this record?"
+                >
+                    <View style={styles.item}>
+                        <TouchableOpacity
+                            style={styles.itemContent}
+                            activeOpacity={0.7}
+                            onPress={() => setSelectedTx(item)}
+                        >
+                            <View style={[styles.iconContainer, { backgroundColor: getIconBg(item.category) }]}>
+                                {getIcon(item.category)}
+                            </View>
+                            <View style={styles.details}>
+                                <Text style={styles.category}>{item.category}</Text>
+                                <Text style={styles.subcategory}>{item.subcategory}</Text>
+                            </View>
+                            <View style={styles.rightSection}>
+                                <Text style={[styles.amount, { color: amtColor }]}>
+                                    {amtText}
+                                </Text>
+                                <Text style={styles.date}>{format(new Date(item.date), 'MMM dd')}</Text>
+                            </View>
+                        </TouchableOpacity>
+                    </View>
+                </SwipeableRow>
+            </AnimatedItem>
         );
     };
 
-    const renderItem = ({ item, index }: { item: Transaction, index: number }) => (
-        <AnimatedItem index={index}>
-            <View style={styles.item}>
-                <TouchableOpacity
-                    style={styles.itemContent}
-                    activeOpacity={0.7}
-                    onPress={() => setSelectedTx(item)}
-                >
-                    <View style={[styles.iconContainer, { backgroundColor: getIconBg(item.category) }]}>
-                        {getIcon(item.category)}
-                    </View>
-                    <View style={styles.details}>
-                        <Text style={styles.category}>{item.category}</Text>
-                        <Text style={styles.subcategory}>{item.subcategory}</Text>
-                    </View>
-                    <View style={styles.rightSection}>
-                        <Text style={[styles.amount, { color: item.category === 'Income' ? Colors.success.text : Colors.gray[900] }]}>
-                            {item.category === 'Income' ? '+' : '-'} {formatCurrency(item.amount)}
-                        </Text>
-                        <Text style={styles.date}>{format(new Date(item.date), 'MMM dd')}</Text>
-                    </View>
-                </TouchableOpacity>
-
-                {/* Action Buttons */}
-                <View style={styles.actions}>
-                    <TouchableOpacity
-                        style={styles.actionBtn}
-                        onPress={() => router.push({ pathname: '/edit-transaction', params: { id: item.id } })}
-                    >
-                        <Edit2 size={18} color={Colors.gray[500]} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={styles.actionBtn}
-                        onPress={() => handleDelete(item)}
-                    >
-                        <Trash2 size={18} color={Colors.danger[500]} />
-                    </TouchableOpacity>
-                </View>
-            </View>
-        </AnimatedItem>
-    );
-
-    const displayedTransactions = limit ? transactions.slice(0, limit) : transactions;
+    const validTransactions = transactions.filter(t => t.id !== pendingDeleteTx?.id);
+    const displayedTransactions = limit ? validTransactions.slice(0, limit) : validTransactions;
 
     const accountName = selectedTx ? accounts.find(a => a.id === selectedTx.account_id)?.name || 'Default Account' : '';
 
@@ -171,8 +208,8 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                             </View>
                             <View>
                                 <Text style={styles.popupTitle}>{selectedTx?.category}</Text>
-                                <Text style={[styles.popupAmount, selectedTx && { color: selectedTx.category === 'Income' ? Colors.success.text : Colors.gray[900] }]}>
-                                    {selectedTx?.category === 'Income' ? '+' : '-'} {selectedTx && formatCurrency(selectedTx.amount)}
+                                <Text style={[styles.popupAmount, selectedTx && { color: formatAmount(selectedTx.amount, selectedTx.category === 'Income' ? 'income' : 'expense').color }]}>
+                                    {selectedTx && formatAmount(selectedTx.amount, selectedTx.category === 'Income' ? 'income' : 'expense').text}
                                 </Text>
                             </View>
                             <TouchableOpacity style={styles.closeBtn} onPress={() => setSelectedTx(null)}>
@@ -201,6 +238,20 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                     </View>
                 </TouchableOpacity>
             </Modal>
+
+            <RecurringBottomSheet
+                visible={showRecurring}
+                onClose={() => setShowRecurring(false)}
+                transaction={recurringTx}
+                onSave={handleRecurringSave}
+            />
+
+            <Snackbar 
+                visible={!!pendingDeleteTx}
+                message="Transaction deleted"
+                onUndo={() => setPendingDeleteTx(null)}
+                onDismiss={commitDelete}
+            />
         </View>
     );
 };
@@ -217,12 +268,9 @@ const styles = StyleSheet.create({
         marginLeft: Layout.spacing.xs,
     },
     item: {
-        flexDirection: 'row',
-        alignItems: 'center',
         backgroundColor: Colors.white,
         marginBottom: 12,
         borderRadius: 24,
-        ...Layout.shadows.sm,
     },
     itemContent: {
         flex: 1,
@@ -265,16 +313,6 @@ const styles = StyleSheet.create({
         fontFamily: Typography.family.medium,
         color: Colors.gray[400],
         marginTop: 4,
-    },
-    actions: {
-        flexDirection: 'row',
-        paddingRight: 12,
-        gap: 4,
-        alignItems: 'center',
-    },
-    actionBtn: {
-        padding: 8,
-        borderRadius: 8,
     },
     emptyContainer: {
         alignItems: 'center',

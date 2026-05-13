@@ -22,7 +22,9 @@ export const HeatmapCalendar: React.FC<HeatmapCalendarProps> = ({ month, transac
         let max = 0;
 
         transactions.forEach(t => {
-            if (t.category === 'Income') return;
+            const isExpense = t.type === 'expense'
+                || (!t.type && t.category !== 'Income' && t.category !== 'Transfer' && t.category !== 'Debt/Credit');
+            if (!isExpense) return;
             const key = format(new Date(t.date), 'yyyy-MM-dd');
             const newTotal = (map.get(key) || 0) + t.amount;
             map.set(key, newTotal);
@@ -74,7 +76,7 @@ export const HeatmapCalendar: React.FC<HeatmapCalendarProps> = ({ month, transac
                     <View key={`empty-${i}`} style={styles.cell} />
                 ))}
 
-                {days.map((day, i) => (
+                {days.map((day: Date, i: number) => (
                     <TouchableOpacity
                         key={i}
                         style={[

@@ -5,7 +5,8 @@ import {
     updateRechargeMeta, updateBillTransaction, 
     deleteRechargeMeta 
 } from '../services/database';
-import { cancelNotification, scheduleRechargeReminder } from '../services/notifications';
+import { cancelNotification } from '../services/notifications';
+import { schedulePaymentNotifications, cancelPaymentNotifications, reschedulePaymentNotifications } from '../services/paymentNotifications';
 import { Colors, Layout, Typography } from '../constants/Theme';
 import { Smartphone, Clock, Edit2, Trash2, X } from 'lucide-react-native';
 import { format, differenceInDays, parseISO, addDays } from 'date-fns';
@@ -69,27 +70,24 @@ export const UpcomingExpenses = () => {
             const newExpiry = editExpiryDate;
             const newReminder = addDays(newExpiry, -2);
 
-            // 1. Cancel old notification (gracefully)
-            if (editingItem.notification_id) {
-                await cancelNotification(editingItem.notification_id);
-            }
+            // 1. Reschedule notifications using the new multi-tier system
+            await reschedulePaymentNotifications({
+                id: editingItem.id,
+                type: 'recharge',
+                name: editName,
+                amount: parseFloat(editAmount),
+                dueDate: newExpiry.toISOString().split('T')[0],
+            });
 
-            // 2. Schedule new notification
-            const newNotifId = await scheduleRechargeReminder(
-                "Recharge Expiring Soon",
-                `Your ${editName} recharge expires in 2 days.`,
-                newReminder
-            );
-
-            // 3. Update recharge_meta record
+            // 2. Update recharge_meta record (notification_id is now managed in notification_schedules table)
             await updateRechargeMeta(editingItem.id, {
                 validity_days: days,
                 expiry_date: newExpiry.toISOString(),
                 reminder_date: newReminder.toISOString(),
-                notification_id: newNotifId || '',
+                notification_id: 'MULTI_TIER_MANAGED',
             });
 
-            // 4. Update linked transaction
+            // 3. Update linked transaction
             await updateBillTransaction(editingItem.expense_id, {
                 amount: parseFloat(editAmount),
                 description: editName,
@@ -116,13 +114,11 @@ export const UpcomingExpenses = () => {
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            // 1. Delete record and get notification_id
-                            const notifId = await deleteRechargeMeta(item.id);
+                            // 1. Cancel all multi-tier notifications
+                            await cancelPaymentNotifications(item.id, 'recharge');
 
-                            // 2. Cancel notification (gracefully — no crash if missing)
-                            if (notifId) {
-                                await cancelNotification(notifId);
-                            }
+                            // 2. Delete record
+                            await deleteRechargeMeta(item.id);
 
                             // 3. Refresh list
                             await loadUpcoming();

@@ -1,11 +1,11 @@
 
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator, Alert, Share } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator, Alert, Modal, TextInput } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
-import { ArrowLeft, Settings, Plus, Users, Receipt, Share2 } from 'lucide-react-native';
-import { Colors, Layout } from '../../constants/Theme';
+import { ArrowLeft, Settings, Plus, Receipt, Share2, HandCoins, X } from 'lucide-react-native';
+import { Colors, Layout, Typography } from '../../constants/Theme';
 import {
-    getGroupById, getGroupMembers, getGroupExpenses, calculateBalances, calculateSettlements,
+    getGroupById, getGroupMembers, getGroupExpenses, calculateBalances, calculateSettlements, addExpense,
     BillGroup, BillGroupMember, BillExpenseDetails, Balance, SettlementTransaction
 } from '../../services/billSplitter';
 import { SettlementSummary } from '../../components/SettlementSummary';
@@ -26,6 +26,11 @@ export default function GroupDetailsScreen() {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [activeTab, setActiveTab] = useState<'expenses' | 'settlement'>('expenses');
+    const [showMoneyModal, setShowMoneyModal] = useState(false);
+    const [moneyFromId, setMoneyFromId] = useState<number | null>(null);
+    const [moneyToId, setMoneyToId] = useState<number | null>(null);
+    const [moneyAmount, setMoneyAmount] = useState('');
+    const [savingMoney, setSavingMoney] = useState(false);
 
     const fetchData = React.useCallback(async () => {
         try {
@@ -60,6 +65,44 @@ export default function GroupDetailsScreen() {
             fetchData();
         }, [fetchData])
     );
+
+    const openMoneyModal = () => {
+        setMoneyFromId(members[0]?.id || null);
+        setMoneyToId(members[1]?.id || members[0]?.id || null);
+        setMoneyAmount('');
+        setShowMoneyModal(true);
+    };
+
+    const handleSaveMoneyGiven = async () => {
+        const amount = parseFloat(moneyAmount);
+        if (!moneyFromId || !moneyToId || moneyFromId === moneyToId || !amount || amount <= 0) {
+            Alert.alert('Check Details', 'Select two different friends and enter a valid amount.');
+            return;
+        }
+
+        const fromMember = members.find(m => m.id === moneyFromId);
+        const toMember = members.find(m => m.id === moneyToId);
+        if (!fromMember || !toMember) return;
+
+        setSavingMoney(true);
+        try {
+            await addExpense({
+                groupId,
+                title: `Money given to ${toMember.name}`,
+                amount,
+                paidByMemberId: fromMember.id,
+                date: Date.now(),
+                notes: 'Money given directly',
+                splits: [{ memberId: toMember.id, amount }]
+            });
+            setShowMoneyModal(false);
+            fetchData();
+        } catch (e) {
+            Alert.alert('Error', 'Failed to save money given.');
+        } finally {
+            setSavingMoney(false);
+        }
+    };
 
     if (loading || !group) {
         return (
@@ -120,27 +163,33 @@ export default function GroupDetailsScreen() {
                     <>
                         <View style={styles.expensesList}>
                             {expenses.length > 0 ? (
-                                expenses.map(expense => (
-                                    <TouchableOpacity
-                                        key={expense.id}
-                                        style={styles.expenseItem}
-                                        onPress={() => router.push(`/bill-splitter/add-group-expense?groupId=${groupId}&id=${expense.id}`)}
-                                    >
-                                        <View style={styles.expenseDate}>
-                                            <Text style={styles.dateMonth}>{format(new Date(expense.date), 'MMM')}</Text>
-                                            <Text style={styles.dateDay}>{format(new Date(expense.date), 'dd')}</Text>
-                                        </View>
-                                        <View style={styles.expenseDetails}>
-                                            <Text style={styles.expenseTitle}>{expense.title}</Text>
-                                            <Text style={styles.expensePaidBy}>
-                                                {expense.paid_by_name} paid ₹{expense.amount.toLocaleString('en-IN')}
-                                            </Text>
-                                        </View>
-                                        <View style={styles.expenseAmount}>
-                                            <Text style={styles.amountText}>₹{expense.amount}</Text>
-                                        </View>
-                                    </TouchableOpacity>
-                                ))
+                                expenses.map(expense => {
+                                    const isMoneyGiven = expense.title.startsWith('Money given');
+                                    return (
+                                        <TouchableOpacity
+                                            key={expense.id}
+                                            style={[styles.expenseItem, isMoneyGiven && styles.moneyGivenItem]}
+                                            onPress={() => router.push(`/bill-splitter/add-group-expense?groupId=${groupId}&id=${expense.id}`)}
+                                        >
+                                            <View style={[styles.expenseDate, isMoneyGiven && { backgroundColor: Colors.primary[50] }]}>
+                                                <Text style={styles.dateMonth}>{format(new Date(expense.date), 'MMM')}</Text>
+                                                <Text style={styles.dateDay}>{format(new Date(expense.date), 'dd')}</Text>
+                                            </View>
+                                            <View style={styles.expenseDetails}>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                    {isMoneyGiven && <HandCoins size={14} color={Colors.primary[600]} style={{ marginRight: 6 }} />}
+                                                    <Text style={styles.expenseTitle}>{expense.title}</Text>
+                                                </View>
+                                                <Text style={styles.expensePaidBy}>
+                                                    {expense.paid_by_name} paid ₹{expense.amount.toLocaleString('en-IN')}
+                                                </Text>
+                                            </View>
+                                            <View style={styles.expenseAmount}>
+                                                <Text style={[styles.amountText, isMoneyGiven && { color: Colors.primary[600] }]}>₹{expense.amount}</Text>
+                                            </View>
+                                        </TouchableOpacity>
+                                    );
+                                })
                             ) : (
                                 <View style={styles.emptyState}>
                                     <Text style={styles.emptyIcon}>🧾</Text>
@@ -152,7 +201,7 @@ export default function GroupDetailsScreen() {
                     </>
                 ) : (
                     <>
-                        <SettlementSummary settlements={settlements} />
+                        <SettlementSummary settlements={settlements} balances={balances} />
 
                         <View style={styles.settlementNote}>
                             <Text style={styles.noteTitle}>How this works</Text>
@@ -167,13 +216,77 @@ export default function GroupDetailsScreen() {
 
             {/* FAB */}
             {activeTab === 'expenses' && (
-                <TouchableOpacity
-                    style={styles.fab}
-                    onPress={() => router.push(`/bill-splitter/add-group-expense?groupId=${groupId}`)}
-                >
-                    <Plus size={32} color="white" />
-                </TouchableOpacity>
+                <View style={styles.fabStack}>
+                    <TouchableOpacity
+                        style={[styles.fab, styles.secondaryFab]}
+                        onPress={openMoneyModal}
+                    >
+                        <HandCoins size={26} color={Colors.primary[700]} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={styles.fab}
+                        onPress={() => router.push(`/bill-splitter/add-group-expense?groupId=${groupId}`)}
+                    >
+                        <Plus size={32} color="white" />
+                    </TouchableOpacity>
+                </View>
             )}
+
+            <Modal visible={showMoneyModal} transparent animationType="slide">
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Money Given</Text>
+                            <TouchableOpacity onPress={() => setShowMoneyModal(false)} style={styles.modalClose}>
+                                <X size={22} color={Colors.gray[600]} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <Text style={styles.inputLabel}>Who gave money?</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+                            {members.map(member => (
+                                <TouchableOpacity
+                                    key={member.id}
+                                    style={[styles.memberChip, moneyFromId === member.id && styles.memberChipActive]}
+                                    onPress={() => setMoneyFromId(member.id)}
+                                >
+                                    <Text style={[styles.memberChipText, moneyFromId === member.id && styles.memberChipTextActive]}>{member.name}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+
+                        <Text style={styles.inputLabel}>Who received it?</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+                            {members.map(member => (
+                                <TouchableOpacity
+                                    key={member.id}
+                                    style={[styles.memberChip, moneyToId === member.id && styles.memberChipActive]}
+                                    onPress={() => setMoneyToId(member.id)}
+                                >
+                                    <Text style={[styles.memberChipText, moneyToId === member.id && styles.memberChipTextActive]}>{member.name}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+
+                        <Text style={styles.inputLabel}>Amount</Text>
+                        <TextInput
+                            style={styles.input}
+                            keyboardType="numeric"
+                            value={moneyAmount}
+                            onChangeText={setMoneyAmount}
+                            placeholder="₹0"
+                        />
+
+                        <TouchableOpacity
+                            style={[styles.saveMoneyBtn, savingMoney && { opacity: 0.7 }]}
+                            onPress={handleSaveMoneyGiven}
+                            disabled={savingMoney}
+                        >
+                            {savingMoney ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.saveMoneyText}>Save Money Given</Text>}
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -241,6 +354,11 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         ...Layout.shadows.sm,
     },
+    moneyGivenItem: {
+        borderColor: Colors.primary[200],
+        borderWidth: 1,
+        backgroundColor: Colors.primary[50] + '20', // Very light tint
+    },
     expenseDate: {
         alignItems: 'center',
         backgroundColor: Colors.gray[50],
@@ -267,10 +385,14 @@ const styles = StyleSheet.create({
     },
     noteTitle: { fontSize: 14, fontWeight: '700', color: Colors.primary[700], marginBottom: 4 },
     noteText: { fontSize: 13, color: Colors.primary[700], lineHeight: 18 },
-    fab: {
+    fabStack: {
         position: 'absolute',
         bottom: 30,
         right: 30,
+        gap: 12,
+        alignItems: 'center',
+    },
+    fab: {
         width: 60,
         height: 60,
         borderRadius: 30,
@@ -282,4 +404,28 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.4,
         shadowRadius: 10,
     },
+    secondaryFab: {
+        width: 52,
+        height: 52,
+        borderRadius: 26,
+        backgroundColor: Colors.primary[50],
+        borderWidth: 1,
+        borderColor: Colors.primary[100],
+        shadowColor: Colors.gray[400],
+        shadowOpacity: 0.2,
+    },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+    modalContent: { backgroundColor: Colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24 },
+    modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
+    modalTitle: { fontSize: 20, fontWeight: '700', color: Colors.gray[900] },
+    modalClose: { padding: 8 },
+    inputLabel: { fontSize: 13, fontWeight: '700', color: Colors.gray[600], marginBottom: 8, textTransform: 'uppercase' },
+    chipRow: { gap: 8, paddingBottom: 16 },
+    memberChip: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20, backgroundColor: Colors.gray[100] },
+    memberChipActive: { backgroundColor: Colors.primary[600] },
+    memberChipText: { color: Colors.gray[700], fontWeight: '600' },
+    memberChipTextActive: { color: Colors.white },
+    input: { backgroundColor: Colors.gray[100], borderRadius: 12, padding: 16, fontSize: 18, fontWeight: '700', color: Colors.gray[900], marginBottom: 20 },
+    saveMoneyBtn: { backgroundColor: Colors.primary[600], borderRadius: 16, paddingVertical: 16, alignItems: 'center' },
+    saveMoneyText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
 });

@@ -47,6 +47,8 @@ export interface Balance {
     member_id: number;
     member_name: string;
     amount: number; // +ve = receives, -ve = owes
+    total_spent: number;
+    total_share: number;
 }
 
 export interface SettlementTransaction {
@@ -290,35 +292,42 @@ export const calculateBalances = async (groupId: number): Promise<Balance[]> => 
     const members = await getGroupMembers(groupId);
     const expenses = await getGroupExpenses(groupId);
 
-    const balances: Record<number, number> = {};
+    const spent: Record<number, number> = {};
+    const share: Record<number, number> = {};
     const memberNames: Record<number, string> = {};
 
     // Initialize
     members.forEach(m => {
-        balances[m.id] = 0;
+        spent[m.id] = 0;
+        share[m.id] = 0;
         memberNames[m.id] = m.name;
     });
 
     // Process Expenses
     expenses.forEach(exp => {
-        // Payer gets positive balance (money owed TO them)
-        if (balances[exp.paid_by_member_id] !== undefined) {
-            balances[exp.paid_by_member_id] += exp.amount;
+        // Payer's total spent
+        if (spent[exp.paid_by_member_id] !== undefined) {
+            spent[exp.paid_by_member_id] += exp.amount;
         }
 
-        // Splitters get negative balance (money they OWE)
+        // Each splitter's share
         exp.splits.forEach(split => {
-            if (balances[split.member_id] !== undefined) {
-                balances[split.member_id] -= split.amount;
+            if (share[split.member_id] !== undefined) {
+                share[split.member_id] += split.amount;
             }
         });
     });
 
-    return Object.keys(balances).map(id => ({
-        member_id: parseInt(id),
-        member_name: memberNames[parseInt(id)],
-        amount: balances[parseInt(id)]
-    }));
+    return Object.keys(memberNames).map(idStr => {
+        const id = parseInt(idStr);
+        return {
+            member_id: id,
+            member_name: memberNames[id],
+            total_spent: spent[id],
+            total_share: share[id],
+            amount: spent[id] - share[id]
+        };
+    });
 };
 
 // Minimal Transaction Algorithm (Greedy)

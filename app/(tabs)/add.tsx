@@ -4,10 +4,12 @@ import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, StatusBar, 
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useApp } from '../../context/AppContext';
 import { addTransaction, addRechargeMeta, CategoryNode } from '../../services/database';
-import { scheduleRechargeReminder } from '../../services/notifications';
+import { initNotifications } from '../../services/notifications';
+import { schedulePaymentNotifications } from '../../services/paymentNotifications';
 import { Clock, Calendar as CalendarIcon, Wallet as WalletIcon, Tag as TagIcon, X, ChevronDown, CheckCircle2 } from 'lucide-react-native';
 import { format, addDays } from 'date-fns';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useLocalSearchParams } from 'expo-router';
 import { Colors, Layout, Typography } from '../../constants/Theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Keypad } from '../../components/ui/Keypad';
@@ -17,14 +19,18 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SuccessAnimation } from '../../components/SuccessAnimation';
 import { parseBankSMS } from '../../services/smsParser';
 import { playIncomeSound, playExpenseSound } from '../../services/SoundService';
+import { addSubscription } from '../../services/subscriptions';
 import Animated, { FadeIn, FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Sparkles, Clipboard } from 'lucide-react-native';
+import { checkDuplicate } from '../../services/duplicateCheck';
+import { DuplicateWarningSheet } from '../../components/DuplicateWarningSheet';
 
 
 
 export default function AddTransactionScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const params = useLocalSearchParams();
     const { accounts, refreshData, soundEnabled, categories } = useApp();
 
     const [display, setDisplay] = useState('0');
@@ -33,6 +39,11 @@ export default function AddTransactionScreen() {
     const [category, setCategory] = useState('');
     const [subcategory, setSubcategory] = useState('');
     const [date, setDate] = useState(new Date());
+
+    // Duplicate Guard State
+    const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
+    const [duplicateTransaction, setDuplicateTransaction] = useState<any>(null);
+    const pendingSaveDataRef = React.useRef<number | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const isSubmittingRef = React.useRef(false);
     const [showCategoryPicker, setShowCategoryPicker] = useState(false);
@@ -42,10 +53,12 @@ export default function AddTransactionScreen() {
     const [isRecharge, setIsRecharge] = useState(false);
     const [validity, setValidity] = useState(28);
     const [customValidity, setCustomValidity] = useState('');
+
     const [showValidityPicker, setShowValidityPicker] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
     const [showSMSModal, setShowSMSModal] = useState(false);
     const [smsText, setSmsText] = useState('');
+    const [errors, setErrors] = useState<Record<string, string>>({});
 
     // Initial Account Setup
     useEffect(() => {
@@ -54,9 +67,42 @@ export default function AddTransactionScreen() {
         }
     }, [accounts]);
 
-    // Reset Form on Focus
+    // Extract primitive params to avoid re-renders due to object reference changes
+    const prefill_amount = params.prefill_amount as string;
+    const prefill_description = params.prefill_description as string;
+    const prefill_category = params.prefill_category as string;
+    const prefill_account_id = params.prefill_account_id as string;
+    const from_notification = params.from_notification as string;
+
+    // Handle Prefill from Notifications
+    useEffect(() => {
+        if (prefill_amount) setDisplay(prefill_amount);
+        if (prefill_description) setDescription(prefill_description);
+        if (prefill_category) {
+            setCategory(prefill_category);
+            
+            if (categories.length > 0) {
+                const catData = categories.find((c: CategoryNode) => c.name === prefill_category);
+                if (catData?.is_recurring) {
+                    setIsRecharge(true);
+                    setValidity(catData.default_validity || 28);
+                }
+            }
+        }
+        if (prefill_account_id && accounts.length > 0) {
+            const acc = accounts.find(a => a.id.toString() === prefill_account_id);
+            // Only update if it's different to prevent infinite loops
+            if (acc && (!selectedAccount || selectedAccount.id !== acc.id)) {
+                setSelectedAccount(acc);
+            }
+        }
+    }, [prefill_amount, prefill_description, prefill_category, prefill_account_id, accounts, categories, selectedAccount]);
+
+    // Reset Form on Focus (but skip if params are present)
     useFocusEffect(
         React.useCallback(() => {
+            if (prefill_amount || from_notification) return;
+            
             // Reset all state to default
             setDisplay('0');
             setDescription('');
@@ -70,7 +116,7 @@ export default function AddTransactionScreen() {
             setValidity(28);
             setCustomValidity('');
             setShowSuccess(false);
-        }, [])
+        }, [prefill_amount, from_notification])
     );
 
     const handleKeyPress = (val: string) => {
@@ -80,6 +126,10 @@ export default function AddTransactionScreen() {
             if (['+', '-', '*', '/', '.'].includes(val) && ['+', '-', '*', '/', '.'].includes(prev.slice(-1))) return prev;
             return prev + val;
         });
+    };
+
+    const handleDescriptionChange = (text: string) => {
+        setDescription(text);
     };
 
     const handleDelete = () => {
@@ -120,22 +170,38 @@ export default function AddTransactionScreen() {
         };
 
         let finalAmount = safeCalculate(display);
+        const newErrors: Record<string, string> = {};
 
         if (!finalAmount || finalAmount <= 0) {
-            Alert.alert('Invalid Amount', 'Please enter a valid amount');
-            return;
+            newErrors.amount = 'Please enter a valid amount';
         }
         if (!category) {
-            Alert.alert('Category Required', 'Please select a category');
-            return;
+            newErrors.category = 'Please select a category';
         }
         if (!selectedAccount) {
-            Alert.alert('Account Required', 'Please select an account');
+            newErrors.account = 'Please select an account';
+        }
+
+        if (Object.keys(newErrors).length > 0) {
+            setErrors(newErrors);
             return;
         }
+        setErrors({});
 
         if (isSubmittingRef.current) return;
 
+        const duplicate = await checkDuplicate(finalAmount, category, date.toISOString(), 'expense');
+        if (duplicate) {
+            setDuplicateTransaction(duplicate);
+            setShowDuplicateWarning(true);
+            pendingSaveDataRef.current = finalAmount;
+            return;
+        }
+
+        await executeSave(finalAmount);
+    };
+
+    const executeSave = async (finalAmount: number) => {
         try {
             setIsSubmitting(true);
             isSubmittingRef.current = true;
@@ -156,25 +222,88 @@ export default function AddTransactionScreen() {
                     const expiryDate = addDays(date, days);
                     const reminderDate = addDays(expiryDate, -2); // 2 days before
 
-                    // Schedule Notification
-                    const notificationId = await scheduleRechargeReminder(
-                        "Recharge Expiring Soon",
-                        `Your ${subcategory || 'mobile'} recharge expires in 2 days.`,
-                        reminderDate
-                    );
+                    // Schedule Multi-tier Notifications
+                    await schedulePaymentNotifications({
+                        id: txId, // Using transaction ID as temporary unique ID for recharges
+                        type: 'recharge',
+                        name: description || subcategory || category || 'Recharge',
+                        amount: finalAmount,
+                        dueDate: expiryDate.toISOString().split('T')[0],
+                        category: category,
+                        accountId: selectedAccount.id,
+                    });
 
                     await addRechargeMeta({
                         expense_id: txId,
                         validity_days: days,
                         expiry_date: expiryDate.toISOString(),
                         reminder_date: reminderDate.toISOString(),
-                        notification_id: notificationId
+                        notification_id: 'MULTI_TIER_MANAGED'
                     });
+
+                    // Auto-add to subscriptions
+                    let billing_cycle = 'monthly';
+                    if (days >= 80) billing_cycle = 'quarterly';
+                    if (days >= 360) billing_cycle = 'yearly';
+
+                    await addSubscription({
+                        name: description || subcategory || category || 'Recurring Expense',
+                        amount: finalAmount,
+                        billing_cycle: billing_cycle as any,
+                        next_renewal_date: expiryDate.toISOString().split('T')[0],
+                        category: category,
+                        account_id: selectedAccount.id,
+                        icon: '🔄',
+                        color: Colors.danger[500],
+                        is_active: 1,
+                        notes: 'Auto-added from new transaction'
+                    });
+                }
+            }
+
+            // Auto-add to subscriptions when category is "Subscription"
+            if (category === 'Subscription' && !isRecharge) {
+                const nextRenewal = addDays(date, 30); // Default monthly cycle
+                await addSubscription({
+                    name: description || subcategory || 'Subscription',
+                    amount: finalAmount,
+                    billing_cycle: 'monthly',
+                    next_renewal_date: nextRenewal.toISOString().split('T')[0],
+                    category: 'Subscription',
+                    sub_category: subcategory || undefined,
+                    account_id: selectedAccount.id,
+                    icon: '📦',
+                    color: '#7C3AED',
+                    is_active: 1,
+                    notes: `Auto-added from expense • ${subcategory || 'General'}`,
+                });
+            }
+
+            // Handle Mark as Paid from notification
+            if (params.from_notification === 'mark_paid' && params.item_id) {
+                const itemId = parseInt(params.item_id as string);
+                if (params.item_type === 'subscription') {
+                    const { advanceRenewalDate } = await import('../../services/subscriptions');
+                    await advanceRenewalDate(itemId);
+                } else if (params.item_type === 'recharge') {
+                    // Clean up the old recharge_meta since the user just saved a new entry for it
+                    const { deleteRechargeMeta } = await import('../../services/database');
+                    const { cancelPaymentNotifications } = await import('../../services/paymentNotifications');
+                    await cancelPaymentNotifications(itemId, 'recharge');
+                    await deleteRechargeMeta(itemId);
                 }
             }
 
             await refreshData();
             DeviceEventEmitter.emit('RECOMPUTE_SATISFACTION');
+
+            // Trigger Daily Report Update
+            try {
+                const { scheduleOrUpdateDailyReport } = await import('../../services/dailyReportNotification');
+                await scheduleOrUpdateDailyReport();
+            } catch (e) {
+                console.warn("Daily report trigger failed", e);
+            }
 
             // Sound Feedback
             if (category === 'Income') {
@@ -251,9 +380,14 @@ export default function AddTransactionScreen() {
             {/* Main Display */}
             <Animated.View entering={FadeInDown.delay(100).duration(600)} style={styles.displayContainer}>
                 <View style={styles.amountWrapper}>
-                    <Text style={styles.currencySymbol}>₹</Text>
-                    <Text style={styles.amountDisplay} numberOfLines={1} adjustsFontSizeToFit>{display}</Text>
+                    <Text style={[styles.currencySymbol, errors.amount && { color: Colors.danger[400] }]}>₹</Text>
+                    <Text style={[styles.amountDisplay, errors.amount && { color: Colors.danger[600] }]} numberOfLines={1} adjustsFontSizeToFit>{display}</Text>
                 </View>
+                {errors.amount && (
+                    <Animated.Text entering={FadeIn.duration(300)} style={styles.inlineErrorText}>
+                        {errors.amount}
+                    </Animated.Text>
+                )}
             </Animated.View>
 
             <ScrollView
@@ -273,35 +407,42 @@ export default function AddTransactionScreen() {
                         </View>
                     </PressableScale>
 
-                    <PressableScale style={[styles.pill, { flex: 1 }]} onPress={cycleAccount}>
-                        <View style={styles.pillIconContainer}>
-                            <WalletIcon size={20} color={Colors.primary[600]} />
-                        </View>
-                        <View style={styles.pillContent}>
-                            <Text style={styles.pillLabel}>Account</Text>
-                            <Text style={styles.pillValue} numberOfLines={1}>
-                                {selectedAccount ? selectedAccount.name : 'Select'}
-                            </Text>
-                        </View>
-                    </PressableScale>
+                    <View style={{ flex: 1 }}>
+                        <PressableScale style={[styles.pill, errors.account && { borderColor: Colors.danger[300] }]} onPress={cycleAccount}>
+                            <View style={[styles.pillIconContainer, errors.account && { backgroundColor: Colors.danger[50] }]}>
+                                <WalletIcon size={20} color={errors.account ? Colors.danger[600] : Colors.primary[600]} />
+                            </View>
+                            <View style={styles.pillContent}>
+                                <Text style={[styles.pillLabel, errors.account && { color: Colors.danger[400] }]}>Account</Text>
+                                <Text style={[styles.pillValue, errors.account && { color: Colors.danger[600] }]} numberOfLines={1}>
+                                    {selectedAccount ? selectedAccount.name : 'Select'}
+                                </Text>
+                            </View>
+                        </PressableScale>
+                        {errors.account && <Text style={styles.pillErrorText}>{errors.account}</Text>}
+                    </View>
                 </Animated.View>
 
                 {/* Category Selector */}
-                <Animated.View entering={FadeInDown.delay(300).duration(600)}>
-                    <PressableScale style={[styles.pill, styles.widePill]} onPress={() => setShowCategoryPicker(true)}>
-                        <View style={styles.pillIconContainer}>
-                            <TagIcon size={20} color={category ? Colors.primary[600] : Colors.gray[400]} />
+                <Animated.View entering={FadeInDown.delay(300).duration(600)} style={{ marginBottom: 16 }}>
+                    <PressableScale 
+                        style={[styles.pill, styles.widePill, { marginBottom: 0 }, errors.category && { borderColor: Colors.danger[300] }]} 
+                        onPress={() => setShowCategoryPicker(true)}
+                    >
+                        <View style={[styles.pillIconContainer, errors.category && { backgroundColor: Colors.danger[50] }]}>
+                            <TagIcon size={20} color={errors.category ? Colors.danger[600] : (category ? Colors.primary[600] : Colors.gray[400])} />
                         </View>
                         <View style={styles.pillContent}>
-                            <Text style={styles.pillLabel}>Category</Text>
-                            <Text style={[styles.pillValue, !category && { color: Colors.gray[400] }]}>
+                            <Text style={[styles.pillLabel, errors.category && { color: Colors.danger[400] }]}>Category</Text>
+                            <Text style={[styles.pillValue, !category && { color: Colors.gray[400] }, errors.category && { color: Colors.danger[600] }]}>
                                 {category ? (subcategory ? `${category}  •  ${subcategory}` : category) : 'Select Category'}
                             </Text>
                         </View>
                         <View style={styles.cycleIcon}>
-                            <ChevronDown size={14} color={Colors.gray[400]} />
+                            <ChevronDown size={14} color={errors.category ? Colors.danger[400] : Colors.gray[400]} />
                         </View>
                     </PressableScale>
+                    {errors.category && <Text style={styles.pillErrorText}>{errors.category}</Text>}
                 </Animated.View>
 
                 {/* Note Input */}
@@ -310,7 +451,7 @@ export default function AddTransactionScreen() {
                         placeholder="What was this for? (optional)"
                         placeholderTextColor={Colors.gray[400]}
                         value={description}
-                        onChangeText={setDescription}
+                        onChangeText={handleDescriptionChange}
                         style={styles.input}
                     />
                 </Animated.View>
@@ -452,6 +593,23 @@ export default function AddTransactionScreen() {
                     </View>
                 </View>
             </Modal>
+
+            <DuplicateWarningSheet 
+                visible={showDuplicateWarning}
+                existingTransaction={duplicateTransaction}
+                onCancel={() => {
+                    setShowDuplicateWarning(false);
+                    setDuplicateTransaction(null);
+                    pendingSaveDataRef.current = null;
+                }}
+                onSaveAnyway={() => {
+                    setShowDuplicateWarning(false);
+                    if (pendingSaveDataRef.current !== null) {
+                        executeSave(pendingSaveDataRef.current);
+                        pendingSaveDataRef.current = null;
+                    }
+                }}
+            />
         </View>
     );
 }
@@ -517,6 +675,19 @@ const styles = StyleSheet.create({
         fontFamily: Typography.family.bold,
         color: Colors.gray[900],
         maxWidth: Dimensions.get('window').width * 0.8,
+    },
+    inlineErrorText: {
+        fontSize: Typography.size.sm,
+        color: Colors.danger[600],
+        fontFamily: Typography.family.medium,
+        marginTop: 8,
+    },
+    pillErrorText: {
+        fontSize: 10,
+        color: Colors.danger[600],
+        fontFamily: Typography.family.bold,
+        marginTop: 4,
+        marginLeft: 4,
     },
     formContainer: {
         paddingHorizontal: 16,

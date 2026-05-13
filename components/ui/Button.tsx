@@ -1,9 +1,9 @@
 
 import React from 'react';
-import { Text, StyleSheet, ActivityIndicator, ViewStyle } from 'react-native';
+import { Text, StyleSheet, ActivityIndicator, ViewStyle, TextStyle } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { Pressable } from 'react-native';
-import { Colors, Layout } from '../../constants/Theme';
+import { Colors, Layout, Typography } from '../../constants/Theme';
 
 interface ButtonProps {
     onPress: () => void;
@@ -11,7 +11,10 @@ interface ButtonProps {
     variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
     loading?: boolean;
     style?: ViewStyle;
+    containerStyle?: ViewStyle;
+    textStyle?: TextStyle;
     icon?: React.ReactNode;
+    disabled?: boolean;
 }
 
 export const Button: React.FC<ButtonProps> = ({
@@ -20,7 +23,10 @@ export const Button: React.FC<ButtonProps> = ({
     variant = 'primary',
     loading = false,
     style,
-    icon
+    containerStyle,
+    textStyle,
+    icon,
+    disabled = false
 }) => {
     const scale = useSharedValue(1);
 
@@ -57,7 +63,8 @@ export const Button: React.FC<ButtonProps> = ({
             onPress={onPress}
             onPressIn={handlePressIn}
             onPressOut={handlePressOut}
-            disabled={loading}
+            disabled={loading || disabled}
+            style={[containerStyle]}
         >
             <Animated.View style={[
                 styles.button,
@@ -71,7 +78,13 @@ export const Button: React.FC<ButtonProps> = ({
                 ) : (
                     <>
                         {icon && icon}
-                        <Text style={[styles.text, { color: getTextColor(), marginLeft: icon ? 8 : 0 }]}>{title}</Text>
+                        <Text style={[
+                            styles.text, 
+                            { color: getTextColor(), marginLeft: icon ? 8 : 0 },
+                            textStyle
+                        ]}>
+                            {title}
+                        </Text>
                     </>
                 )}
             </Animated.View>
@@ -87,10 +100,12 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         flexDirection: 'row',
+        minHeight: 52,
     },
     text: {
         fontSize: 16,
-        fontWeight: '600',
+        fontFamily: Typography.family.bold,
         letterSpacing: 0.5,
     },
 });
+

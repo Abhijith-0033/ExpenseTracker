@@ -160,3 +160,13 @@ export const Layout = {
     },
   },
 };
+
+export const SemanticColors = {
+  expense: '#F04438',
+  income: '#12B76A',
+  transfer: '#0BA5EC',
+  textPrimary: Colors.gray[900],
+  textSecondary: Colors.gray[400],
+  surfaceAlt: Colors.gray[100],
+  border: Colors.gray[200],
+};

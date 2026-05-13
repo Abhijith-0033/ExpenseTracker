@@ -37,6 +37,7 @@ export default function AddTransferScreen() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const isSubmittingRef = React.useRef(false);
     const [showSuccess, setShowSuccess] = useState(false);
+    const [errors, setErrors] = useState<Record<string, string>>({});
     
     useFocusEffect(
         React.useCallback(() => {
@@ -91,30 +92,30 @@ export default function AddTransferScreen() {
     };
 
     const handleSave = async () => {
-        // Safe calculation for amount
         let finalAmount = 0;
+        const newErrors: Record<string, string> = {};
         try {
-            // Replace any trailing decimal
             let cleanDisplay = display;
             if (cleanDisplay.endsWith('.')) cleanDisplay = cleanDisplay.slice(0, -1);
             finalAmount = parseFloat(cleanDisplay);
         } catch (e) {
-            Alert.alert('Invalid Amount', 'Please enter a valid number');
-            return;
+            finalAmount = 0;
         }
 
-        if (!finalAmount || finalAmount <= 0) {
-            Alert.alert('Invalid Amount', 'Please enter an amount greater than 0');
-            return;
+        if (finalAmount <= 0) {
+            newErrors.amount = 'Please enter a valid amount';
         }
         if (!fromAccount || !toAccount) {
-            Alert.alert('Required', 'Please select both source and destination accounts');
+            newErrors.accounts = 'Select both accounts';
+        } else if (fromAccount.id === toAccount.id) {
+            newErrors.accounts = 'Source and destination must differ';
+        }
+
+        if (Object.keys(newErrors).length > 0) {
+            setErrors(newErrors);
             return;
         }
-        if (fromAccount.id === toAccount.id) {
-            Alert.alert('Invalid', 'Source and destination accounts must be different');
-            return;
-        }
+        setErrors({});
 
         if (isSubmittingRef.current) return;
 
@@ -163,28 +164,46 @@ export default function AddTransferScreen() {
                     <View style={{ width: 40 }} />
                 </View>
 
+                {/* Main Display */}
                 <View style={styles.amountContainer}>
-                    <Text style={styles.currencySymbol}>₹</Text>
-                    <Text style={styles.amountDisplay}>{display}</Text>
+                    <Text style={[styles.currencySymbol, errors.amount && { color: Colors.danger[200] }]}>₹</Text>
+                    <Text style={[styles.amountDisplay, errors.amount && { color: Colors.danger[100] }]} numberOfLines={1} adjustsFontSizeToFit>{display}</Text>
                 </View>
+                {errors.amount && (
+                    <Animated.Text entering={FadeIn.duration(300)} style={styles.inlineErrorTextHeader}>
+                        {errors.amount}
+                    </Animated.Text>
+                )}
 
-                <View style={styles.transferFlow}>
-                    <TouchableOpacity style={styles.accountBox} onPress={cycleFromAccount}>
-                        <Text style={styles.accountLabel}>FROM</Text>
-                        <Text style={styles.accountName} numberOfLines={1}>{fromAccount?.name || 'Select'}</Text>
-                        <Text style={styles.accountBalance}>{formatCurrency(fromAccount?.balance || 0)}</Text>
-                    </TouchableOpacity>
-                    
-                    <View style={styles.flowIcon}>
-                        <ArrowRight size={20} color="white" />
+                {/* Accounts Row */}
+                <Animated.View entering={FadeInDown.delay(200).duration(600)} style={styles.transferFlow}>
+                    <View style={styles.transferRow}>
+                        <PressableScale style={[styles.pill, { flex: 1 }, errors.accounts && { borderColor: Colors.danger[300] }]} onPress={cycleFromAccount}>
+                            <View style={styles.pillIconContainer}>
+                                <WalletIcon size={20} color={Colors.primary[600]} />
+                            </View>
+                            <View style={styles.pillContent}>
+                                <Text style={styles.pillLabel}>From</Text>
+                                <Text style={styles.pillValue} numberOfLines={1}>{fromAccount?.name}</Text>
+                            </View>
+                        </PressableScale>
+
+                        <View style={styles.arrowContainer}>
+                            <ArrowRight size={20} color={Colors.gray[400]} />
+                        </View>
+
+                        <PressableScale style={[styles.pill, { flex: 1 }, errors.accounts && { borderColor: Colors.danger[300] }]} onPress={cycleToAccount}>
+                            <View style={styles.pillIconContainer}>
+                                <WalletIcon size={20} color={Colors.primary[600]} />
+                            </View>
+                            <View style={styles.pillContent}>
+                                <Text style={styles.pillLabel}>To</Text>
+                                <Text style={styles.pillValue} numberOfLines={1}>{toAccount?.name}</Text>
+                            </View>
+                        </PressableScale>
                     </View>
-
-                    <TouchableOpacity style={styles.accountBox} onPress={cycleToAccount}>
-                        <Text style={styles.accountLabel}>TO</Text>
-                        <Text style={styles.accountName} numberOfLines={1}>{toAccount?.name || 'Select'}</Text>
-                        <Text style={styles.accountBalance}>{formatCurrency(toAccount?.balance || 0)}</Text>
-                    </TouchableOpacity>
-                </View>
+                    {errors.accounts && <Text style={styles.pillErrorText}>{errors.accounts}</Text>}
+                </Animated.View>
             </LinearGradient>
 
             <View style={styles.content}>
@@ -290,45 +309,51 @@ const styles = StyleSheet.create({
         color: 'white',
     },
     transferFlow: {
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 24,
+        marginTop: 20,
+    },
+    transferRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 24,
+        width: '100%',
     },
-    accountBox: {
-        flex: 1,
-        backgroundColor: 'rgba(255,255,255,0.15)',
+    pill: {
+        backgroundColor: 'white',
+        flexDirection: 'row',
+        alignItems: 'center',
         padding: 12,
         borderRadius: 16,
-        alignItems: 'center',
-        maxWidth: (width - 100) / 2,
+        borderWidth: 2,
+        borderColor: 'transparent',
     },
-    flowIcon: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: 'rgba(255,255,255,0.25)',
+    pillIconContainer: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: Colors.primary[50],
         justifyContent: 'center',
         alignItems: 'center',
-        marginHorizontal: 12,
+        marginRight: 10,
     },
-    accountLabel: {
+    pillContent: {
+        flex: 1,
+    },
+    pillLabel: {
         fontSize: 10,
         fontFamily: Typography.family.bold,
-        color: 'rgba(255,255,255,0.6)',
-        marginBottom: 4,
-        letterSpacing: 1,
+        color: Colors.gray[400],
     },
-    accountName: {
+    pillValue: {
         fontSize: Typography.size.sm,
         fontFamily: Typography.family.bold,
-        color: 'white',
-        marginBottom: 2,
+        color: Colors.gray[800],
     },
-    accountBalance: {
-        fontSize: Typography.size.xs,
-        fontFamily: Typography.family.regular,
-        color: 'rgba(255,255,255,0.8)',
+    arrowContainer: {
+        paddingHorizontal: 12,
     },
     content: {
         flex: 1,
@@ -353,7 +378,33 @@ const styles = StyleSheet.create({
     dateText: {
         fontSize: Typography.size.sm,
         fontFamily: Typography.family.bold,
-        color: Colors.gray[800],
+        color: Colors.gray[900],
+        maxWidth: width * 0.8,
+    },
+    inlineErrorTextHeader: {
+        fontSize: Typography.size.sm,
+        color: 'white',
+        fontFamily: Typography.family.medium,
+        marginTop: -20,
+        marginBottom: 10,
+        textAlign: 'center',
+        backgroundColor: 'rgba(240, 68, 56, 0.3)',
+        alignSelf: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        borderRadius: 8,
+    },
+    pillErrorText: {
+        fontSize: 10,
+        color: 'white',
+        fontFamily: Typography.family.bold,
+        marginTop: 6,
+        textAlign: 'center',
+        backgroundColor: 'rgba(240, 68, 56, 0.3)',
+        alignSelf: 'center',
+        paddingHorizontal: 10,
+        paddingVertical: 2,
+        borderRadius: 6,
     },
     noteInput: {
         flex: 1,

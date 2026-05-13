@@ -4,10 +4,11 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, M
 import { useRouter, useFocusEffect } from 'expo-router';
 import { ArrowLeft, Plus, X, Search, Filter } from 'lucide-react-native';
 import { Colors, Layout, Typography } from '../../constants/Theme';
-import { getBooks, addBook, ExpenseBook } from '../../services/books';
+import { getBooks, addBook, updateBook, deleteBook, ExpenseBook } from '../../services/books';
 import { BookCard } from '../../components/BookCard';
 import { formatCurrency } from '../../utils/currency';
 import { PressableScale } from '../../components/ui/PressableScale';
+import { Snackbar } from '../../components/Snackbar';
 
 export default function BooksScreen() {
     const router = useRouter();
@@ -19,9 +20,15 @@ export default function BooksScreen() {
 
     // Modal State
     const [modalVisible, setModalVisible] = useState(false);
+    const [editModalVisible, setEditModalVisible] = useState(false);
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
     const [budget, setBudget] = useState('');
+    const [editingBook, setEditingBook] = useState<ExpenseBook | null>(null);
+
+    // Snackbar State
+    const [snackbarVisible, setSnackbarVisible] = useState(false);
+    const [snackbarMessage, setSnackbarMessage] = useState('');
 
     const fetchData = async () => {
         try {
@@ -66,9 +73,71 @@ export default function BooksScreen() {
             setDescription('');
             setBudget('');
             fetchData();
+            setSnackbarMessage('Expense book created');
+            setSnackbarVisible(true);
         } catch (e) {
             Alert.alert('Error', 'Failed to create book');
         }
+    };
+
+    const handleEditBook = (book: ExpenseBook & { total_spent: number; total_income: number; item_count: number }) => {
+        setEditingBook(book);
+        setName(book.name);
+        setDescription(book.description || '');
+        setBudget(book.budget.toString());
+        setEditModalVisible(true);
+    };
+
+    const handleUpdateBook = async () => {
+        if (!editingBook || !name.trim()) {
+            Alert.alert('Required', 'Please enter a book name');
+            return;
+        }
+
+        // Check for duplicate names
+        const existingBook = books.find(b => b.name.toLowerCase() === name.toLowerCase() && b.id !== editingBook.id);
+        if (existingBook) {
+            Alert.alert('Error', 'An expense book with this name already exists');
+            return;
+        }
+
+        try {
+            await updateBook(editingBook.id, name, description, parseFloat(budget) || 0);
+            setEditModalVisible(false);
+            setEditingBook(null);
+            setName('');
+            setDescription('');
+            setBudget('');
+            fetchData();
+            setSnackbarMessage('Expense book updated');
+            setSnackbarVisible(true);
+        } catch (e) {
+            Alert.alert('Error', 'Failed to update book');
+        }
+    };
+
+    const handleDeleteBook = (book: ExpenseBook & { total_spent: number; total_income: number; item_count: number }) => {
+        Alert.alert(
+            'Delete Expense Book',
+            `This will permanently delete '${book.name}' and all its entries. This cannot be undone.`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await deleteBook(book.id);
+                            fetchData();
+                            setSnackbarMessage('Expense book deleted');
+                            setSnackbarVisible(true);
+                        } catch (e) {
+                            Alert.alert('Error', 'Failed to delete book');
+                        }
+                    }
+                }
+            ]
+        );
     };
 
     const totalTracked = books.reduce((sum, b) => sum + b.total_spent, 0);
@@ -126,8 +195,8 @@ export default function BooksScreen() {
                                 key={book.id}
                                 book={book}
                                 onPress={() => router.push(`/books/${book.id}` as any)}
-                                onEdit={() => { /* Implement specific edit modal if needed, or handle in detail */ }}
-                                onDelete={() => { /* Confirm delete logic here or in detail */ }}
+                                onEdit={() => handleEditBook(book)}
+                                onDelete={() => handleDeleteBook(book)}
                             />
                         ))
                     ) : (
@@ -190,9 +259,66 @@ export default function BooksScreen() {
                     </View>
                 </View>
             </Modal>
+
+            {/* Edit Modal */}
+            <Modal visible={editModalVisible} transparent animationType="slide">
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Edit Expense Book</Text>
+                            <TouchableOpacity onPress={() => {
+                                setEditModalVisible(false);
+                                setEditingBook(null);
+                                setName('');
+                                setDescription('');
+                                setBudget('');
+                            }}>
+                                <X size={24} color={Colors.gray[500]} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <Text style={styles.label}>Book Name *</Text>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="e.g. House Renovation"
+                            value={name}
+                            onChangeText={setName}
+                            autoFocus
+                        />
+
+                        <Text style={styles.label}>Description (Optional)</Text>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="e.g. Painting and repairs"
+                            value={description}
+                            onChangeText={setDescription}
+                        />
+
+                        <Text style={styles.label}>Budget Target (Optional)</Text>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="0"
+                            keyboardType="numeric"
+                            value={budget}
+                            onChangeText={setBudget}
+                        />
+
+                        <TouchableOpacity style={styles.saveBtn} onPress={handleUpdateBook}>
+                            <Text style={styles.saveBtnText}>Save Changes</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Snackbar */}
+            <Snackbar
+                visible={snackbarVisible}
+                message={snackbarMessage}
+                onDismiss={() => setSnackbarVisible(false)}
+            />
         </View>
     );
-}
+};
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: Colors.gray[50] },

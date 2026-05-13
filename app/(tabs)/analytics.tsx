@@ -337,6 +337,7 @@ export default function AnalyticsScreen() {
                         onSelectCategory={handleCategorySelect}
                         subcategoryData={subcategoryData}
                         loadingSubcategories={loadingSubcats}
+                        totalAmount={totalExpense}
                     />
                 ) : (
                     <Text style={styles.noData}>No data for this period</Text>

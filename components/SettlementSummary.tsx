@@ -1,18 +1,16 @@
 
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { ArrowRight, ArrowLeft } from 'lucide-react-native';
-import { Colors, Layout } from '../constants/Theme';
+import { Colors, Layout, Typography } from '../constants/Theme';
+
+import { Balance, SettlementTransaction } from '../services/billSplitter';
 
 interface SettlementSummaryProps {
-    settlements: {
-        from_name: string;
-        to_name: string;
-        amount: number;
-    }[];
+    settlements: SettlementTransaction[];
+    balances?: Balance[];
 }
 
-export const SettlementSummary = ({ settlements }: SettlementSummaryProps) => {
+export const SettlementSummary = ({ settlements, balances = [] }: SettlementSummaryProps) => {
     if (settlements.length === 0) {
         return (
             <View style={styles.container}>
@@ -26,12 +24,33 @@ export const SettlementSummary = ({ settlements }: SettlementSummaryProps) => {
     return (
         <View style={styles.container}>
             <Text style={styles.title}>How to Settle Up</Text>
+            {balances.length > 0 && (
+                <View style={styles.calculationBox}>
+                    <Text style={styles.calcTitle}>Individual Balances</Text>
+                    {balances.map(item => (
+                        <View key={item.member_id} style={styles.calcRow}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.calcName}>{item.member_name}</Text>
+                                <Text style={styles.calcDetails}>Spent ₹{item.total_spent.toFixed(0)} • Share ₹{item.total_share.toFixed(0)}</Text>
+                            </View>
+                            <Text style={[
+                                styles.calcAmount,
+                                { color: item.amount >= 0.01 ? Colors.success[600] : item.amount <= -0.01 ? Colors.danger[600] : Colors.gray[400] }
+                            ]}>
+                                {Math.abs(item.amount) < 0.01 ? 'Settled' : `${item.amount > 0 ? '+' : ''}₹${item.amount.toFixed(2)}`}
+                            </Text>
+
+                        </View>
+                    ))}
+
+                </View>
+            )}
             <View style={styles.list}>
                 {settlements.map((item, index) => (
                     <View key={index} style={styles.item}>
                         <View style={styles.personContainer}>
-                            <View style={[styles.avatar, { backgroundColor: Colors.danger[100] }]}>
-                                <Text style={[styles.avatarText, { color: Colors.danger[700] }]}>
+                            <View style={[styles.avatar, { backgroundColor: Colors.danger[50] }]}>
+                                <Text style={[styles.avatarText, { color: Colors.danger[600] }]}>
                                     {item.from_name.charAt(0).toUpperCase()}
                                 </Text>
                             </View>
@@ -41,12 +60,12 @@ export const SettlementSummary = ({ settlements }: SettlementSummaryProps) => {
                         <View style={styles.amountContainer}>
                             <Text style={styles.actionText}>pays</Text>
                             <View style={styles.arrowLine} />
-                            <Text style={styles.amountText}>₹{item.amount}</Text>
+                            <Text style={styles.amountText}>₹{item.amount.toLocaleString('en-IN')}</Text>
                         </View>
 
                         <View style={styles.personContainer}>
-                            <View style={[styles.avatar, { backgroundColor: Colors.success[100] }]}>
-                                <Text style={[styles.avatarText, { color: Colors.success[700] }]}>
+                            <View style={[styles.avatar, { backgroundColor: Colors.success[50] }]}>
+                                <Text style={[styles.avatarText, { color: Colors.success[600] }]}>
                                     {item.to_name.charAt(0).toUpperCase()}
                                 </Text>
                             </View>
@@ -69,9 +88,45 @@ const styles = StyleSheet.create({
     },
     title: {
         fontSize: 18,
-        fontWeight: '700',
+        fontFamily: Typography.family.bold,
         color: Colors.gray[900],
         marginBottom: 16,
+    },
+    calculationBox: {
+        backgroundColor: Colors.gray[50],
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: Colors.gray[100],
+    },
+    calcTitle: {
+        fontSize: 12,
+        fontFamily: Typography.family.bold,
+        color: Colors.gray[500],
+        textTransform: 'uppercase',
+        marginBottom: 8,
+    },
+    calcRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 6,
+    },
+    calcName: {
+        fontSize: 14,
+        color: Colors.gray[800],
+        fontFamily: Typography.family.medium,
+    },
+    calcDetails: {
+        fontSize: 11,
+        color: Colors.gray[500],
+        fontFamily: Typography.family.regular,
+        marginTop: 2,
+    },
+    calcAmount: {
+        fontSize: 14,
+        fontFamily: Typography.family.bold,
     },
     list: {
         gap: 16,
@@ -80,27 +135,30 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
+        backgroundColor: Colors.gray[50],
+        padding: 12,
+        borderRadius: 16,
     },
     personContainer: {
         alignItems: 'center',
-        width: 60,
+        width: 70,
     },
     avatar: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 4,
+        marginBottom: 6,
     },
     avatarText: {
-        fontSize: 16,
-        fontWeight: '700',
+        fontSize: 18,
+        fontFamily: Typography.family.bold,
     },
     name: {
         fontSize: 12,
         color: Colors.gray[900],
-        fontWeight: '500',
+        fontFamily: Typography.family.medium,
         textAlign: 'center',
     },
     amountContainer: {
@@ -110,7 +168,8 @@ const styles = StyleSheet.create({
     },
     actionText: {
         fontSize: 12,
-        color: Colors.gray[400],
+        color: Colors.gray[500],
+        fontFamily: Typography.family.medium,
         marginBottom: 4,
     },
     arrowLine: {
@@ -120,9 +179,9 @@ const styles = StyleSheet.create({
         marginBottom: 4,
     },
     amountText: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: Colors.gray[900],
+        fontSize: 17,
+        fontFamily: Typography.family.bold,
+        color: Colors.primary[600],
     },
     emptyState: {
         alignItems: 'center',
@@ -131,7 +190,7 @@ const styles = StyleSheet.create({
     },
     emptyText: {
         fontSize: 16,
-        fontWeight: '600',
+        fontFamily: Typography.family.bold,
         color: Colors.success[600],
     },
 });

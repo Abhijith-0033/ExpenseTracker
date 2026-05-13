@@ -4,11 +4,15 @@ import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { ArrowLeft, Plus, X, Search } from 'lucide-react-native';
 import { Colors, Layout, Typography } from '../../constants/Theme';
-import { getDebts, addDebtPerson, deleteDebtPerson, updateDebtAmount, Debt } from '../../services/database';
+import { getDebts, addDebtPerson, deleteDebtPerson, Debt, getAccounts, Account } from '../../services/database';
 import { getDebtSummary, getTopDebtors, getDebtTrend } from '../../services/debts';
-import { DebtCard } from '../../components/DebtCard';
 import { DebtOverviewCharts } from '../../components/DebtCharts';
+import { DebtCard } from '../../components/DebtCard';
 import { formatCurrency } from '../../utils/currency';
+import { SwipeableRow } from '../../components/SwipeableRow';
+import { FormField } from '../../components/FormField';
+import { AccountSelector } from '../../components/AccountSelector';
+import { Snackbar } from '../../components/Snackbar';
 
 export default function DebtsScreen() {
     const router = useRouter();
@@ -25,13 +29,21 @@ export default function DebtsScreen() {
     const [newName, setNewName] = useState('');
     const [newAmount, setNewAmount] = useState('');
     const [newNotes, setNewNotes] = useState('');
+    const [accounts, setAccounts] = useState<Account[]>([]);
+    const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
+    const [errors, setErrors] = useState<Record<string, string>>({});
+    const [pendingDeleteDebt, setPendingDeleteDebt] = useState<number | null>(null);
 
     const fetchData = React.useCallback(async () => {
         try {
-            const data = await getDebts(activeTab);
-            const sum = await getDebtSummary();
+            const [data, sum, accs] = await Promise.all([
+                getDebts(activeTab),
+                getDebtSummary(),
+                getAccounts()
+            ]);
             setDebts(data);
             setSummary(sum);
+            setAccounts(accs.filter(a => a.type !== 'meta_categories'));
         } catch (e) {
             console.error(e);
         } finally {
@@ -47,45 +59,49 @@ export default function DebtsScreen() {
 
     const handleAdd = async () => {
         if (!newName.trim()) {
-            Alert.alert('Error', 'Name is required');
+            setErrors({ name: 'Name is required' });
             return;
         }
+        setErrors({});
         try {
-            await addDebtPerson(newName, activeTab, newNotes, parseFloat(newAmount) || 0);
+            await addDebtPerson(newName, activeTab, newNotes, parseFloat(newAmount) || 0, selectedAccountId ?? undefined);
             setModalVisible(false);
             setNewName('');
             setNewAmount('');
             setNewNotes('');
+            setSelectedAccountId(null);
             fetchData();
         } catch (e) {
             Alert.alert('Error', 'Failed to add person');
         }
     };
 
-    const handleDelete = async (id: number) => {
-        Alert.alert(
-            'Delete',
-            'Are you sure you want to remove this person?',
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Delete', style: 'destructive', onPress: async () => {
-                        await deleteDebtPerson(id);
-                        fetchData();
-                    }
-                }
-            ]
-        );
+    const handleDelete = (id: number) => {
+        setPendingDeleteDebt(id);
     };
 
+    const commitDelete = async () => {
+        if (!pendingDeleteDebt) return;
+        try {
+            await deleteDebtPerson(pendingDeleteDebt);
+            fetchData();
+        } catch (e) {
+            Alert.alert("Error", "Failed to delete person");
+        } finally {
+            setPendingDeleteDebt(null);
+        }
+    };
+
+    const validDebts = debts.filter(d => d.id !== pendingDeleteDebt);
+
     // Prepare Chart Data
-    const pieData = debts.map(d => ({
+    const pieData = validDebts.map(d => ({
         value: d.amount,
         color: activeTab === 'debt' ? Colors.danger[500] : Colors.success[500],
         text: d.name
     })).filter(d => d.value > 0);
 
-    const barData = debts.slice(0, 5).map(d => ({
+    const barData = validDebts.slice(0, 5).map(d => ({
         value: d.amount,
         label: d.name.substring(0, 5),
         frontColor: activeTab === 'debt' ? Colors.danger[500] : Colors.success[500],
@@ -139,16 +155,23 @@ export default function DebtsScreen() {
                 {loading ? (
                     <ActivityIndicator size="large" color={Colors.primary[500]} />
                 ) : (
-                    debts.length > 0 ? (
-                        debts.map(item => (
-                            <DebtCard
+                    validDebts.length > 0 ? (
+                        validDebts.map(item => (
+                            <SwipeableRow
                                 key={item.id}
-                                item={item}
-                                onPress={() => router.push(`/debts/${item.id}`)}
-                                onIncrease={() => {/* Handled in detail usually, or add quick action modal */ }}
-                                onReduce={() => {/* Handled in detail */ }}
                                 onDelete={() => handleDelete(item.id)}
-                            />
+                                onEdit={() => router.push(`/debts/${item.id}`)}
+                                deleteConfirmTitle="Remove Person"
+                                deleteConfirmMessage={`Are you sure you want to remove ${item.name}?`}
+                            >
+                                <DebtCard
+                                    item={item}
+                                    onPress={() => router.push(`/debts/${item.id}`)}
+                                    onIncrease={() => {/* Handled in detail usually, or add quick action modal */ }}
+                                    onReduce={() => {/* Handled in detail */ }}
+                                    onDelete={() => handleDelete(item.id)}
+                                />
+                            </SwipeableRow>
                         ))
                     ) : (
                         <View style={styles.emptyState}>
@@ -176,31 +199,46 @@ export default function DebtsScreen() {
                             </TouchableOpacity>
                         </View>
 
-                        <Text style={styles.label}>Name</Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="John Doe"
+                        <FormField 
+                            label="Name"
                             value={newName}
-                            onChangeText={setNewName}
+                            onChangeText={(val) => { setNewName(val); setErrors({}); }}
+                            placeholder="John Doe"
+                            error={errors.name}
+                            required
                         />
 
-                        <Text style={styles.label}>Initial Amount (Optional)</Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="0"
-                            keyboardType="numeric"
+                        <FormField 
+                            label="Initial Amount (Optional)"
                             value={newAmount}
                             onChangeText={setNewAmount}
+                            placeholder="0"
+                            keyboardType="numeric"
                         />
 
-                        <Text style={styles.label}>Notes</Text>
-                        <TextInput
-                            style={[styles.input, { height: 80 }]}
-                            placeholder="Description..."
-                            multiline
+                        <FormField 
+                            label="Notes"
                             value={newNotes}
                             onChangeText={setNewNotes}
+                            placeholder="Description..."
+                            multiline
                         />
+
+                        {parseFloat(newAmount) > 0 && (
+                            <View style={{ marginBottom: 20 }}>
+                                <Text style={styles.label}>Link to Account (Optional)</Text>
+                                <AccountSelector 
+                                    accounts={accounts}
+                                    selectedAccountId={selectedAccountId}
+                                    onSelect={setSelectedAccountId}
+                                />
+                                <Text style={styles.helpText}>
+                                    {activeTab === 'debt' 
+                                        ? "This will INCREASE the account balance." 
+                                        : "This will DECREASE the account balance."}
+                                </Text>
+                            </View>
+                        )}
 
                         <TouchableOpacity style={styles.saveBtn} onPress={handleAdd}>
                             <Text style={styles.saveBtnText}>Save</Text>
@@ -208,6 +246,13 @@ export default function DebtsScreen() {
                     </View>
                 </View>
             </Modal>
+
+            <Snackbar 
+                visible={!!pendingDeleteDebt}
+                message="Person removed"
+                onUndo={() => setPendingDeleteDebt(null)}
+                onDismiss={commitDelete}
+            />
         </View>
     );
 }
@@ -300,6 +345,7 @@ const styles = StyleSheet.create({
     },
     modalTitle: { fontSize: Typography.size.xl, fontFamily: Typography.family.bold },
     label: { fontSize: Typography.size.sm, fontFamily: Typography.family.bold, marginBottom: 8, color: Colors.gray[700] },
+    helpText: { fontSize: 12, color: Colors.gray[500], marginTop: 4, fontFamily: Typography.family.medium },
     input: {
         backgroundColor: Colors.gray[50],
         padding: 16,

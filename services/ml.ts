@@ -21,7 +21,7 @@ export const predictNextMonthExpenses = async (): Promise<ForecastResult> => {
     const query = `
         SELECT substr(date, 1, 7) as month, SUM(amount) as total
         FROM transactions
-        WHERE category != 'Income' AND category != 'Transfer' AND date >= ? AND date <= ?
+        WHERE category != 'Income' AND category != 'Transfer' AND category != 'Debt/Credit' AND date >= ? AND date <= ?
         GROUP BY substr(date, 1, 7)
     `;
     const results = await db.getAllAsync<{ month: string, total: number }>(query, [threeMonthsAgo, currentMonthEnd]);
@@ -41,7 +41,7 @@ export const predictNextMonthExpenses = async (): Promise<ForecastResult> => {
     const catQuery = `
         SELECT category, SUM(amount) / ? as predicted
         FROM transactions
-        WHERE category != 'Income' AND category != 'Transfer' AND date >= ? AND date <= ?
+        WHERE category != 'Income' AND category != 'Transfer' AND category != 'Debt/Credit' AND date >= ? AND date <= ?
         GROUP BY category
         ORDER BY predicted DESC
         LIMIT 3

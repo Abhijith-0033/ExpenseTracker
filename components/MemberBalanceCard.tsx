@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Colors, Layout } from '../constants/Theme';
+import { Colors, Layout, Typography } from '../constants/Theme';
 
 interface MemberBalanceCardProps {
     name: string;
@@ -45,28 +45,32 @@ export const MemberBalanceCard = ({ name, amount }: MemberBalanceCardProps) => {
 
 const styles = StyleSheet.create({
     container: {
-        borderRadius: 12,
-        padding: 12,
-        minWidth: 100,
+        borderRadius: 16,
+        padding: 14,
+        minWidth: 120,
         marginRight: 12,
         borderWidth: 1,
+        ...Layout.shadows.sm,
     },
     topRow: {
         flexDirection: 'column',
-        marginBottom: 4,
+        marginBottom: 6,
     },
     name: {
         fontSize: 14,
-        fontWeight: '600',
+        fontFamily: Typography.family.bold,
         color: Colors.gray[900],
         marginBottom: 2,
     },
     label: {
         fontSize: 12,
-        fontWeight: '500',
+        fontFamily: Typography.family.medium,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
     amount: {
-        fontSize: 18,
-        fontWeight: '700',
+        fontSize: 20,
+        fontFamily: Typography.family.bold,
     },
 });
+

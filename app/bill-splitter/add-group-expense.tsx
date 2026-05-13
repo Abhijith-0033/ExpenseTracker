@@ -1,12 +1,11 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Switch } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, User, DollarSign, Calendar as CalendarIcon, Check, Receipt, Trash2 } from 'lucide-react-native';
+import { ArrowLeft, User, Calendar as CalendarIcon, Check, Receipt, Trash2, X } from 'lucide-react-native';
 import { Colors, Layout } from '../../constants/Theme';
 import { getGroupMembers, addExpense, getExpenseById, updateExpense, deleteExpense, BillGroupMember, CreateExpenseParams } from '../../services/billSplitter';
 
-import { StyleSheet as RNStyleSheet } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { format } from 'date-fns';
 
@@ -229,7 +228,9 @@ export default function AddGroupExpenseScreen() {
                         <Trash2 size={22} color={Colors.danger[600]} />
                     </TouchableOpacity>
                 ) : (
-                    <View style={{ width: 24 }} />
+                    <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
+                        <X size={22} color={Colors.gray[700]} />
+                    </TouchableOpacity>
                 )}
             </View>
 
@@ -385,7 +386,7 @@ export default function AddGroupExpenseScreen() {
                     onPress={handleSave}
                     disabled={!isValid || saving}
                 >
-                    {saving ? <ActivityIndicator color="white" /> : <Text style={styles.saveBtnText}>Save Expense</Text>}
+                    {saving ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.saveBtnText}>{isEditing ? 'Update Expense' : 'Save Expense'}</Text>}
                 </TouchableOpacity>
             </View>
         </KeyboardAvoidingView>
@@ -407,6 +408,7 @@ const styles = StyleSheet.create({
     backBtn: { padding: 4, marginLeft: -4 },
     headerTitle: { fontSize: 18, fontWeight: '700', color: Colors.gray[900], flex: 1, textAlign: 'center' },
     deleteBtn: { padding: 4, marginRight: -4 },
+    closeBtn: { padding: 4, marginRight: -4 },
     scrollContent: { padding: 20, paddingBottom: 100 },
     mainInputContainer: {
         flexDirection: 'row',
@@ -637,8 +639,8 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.gray[300],
     },
     saveBtnText: {
-        color: 'white',
+        color: Colors.white,
         fontSize: 16,
-        fontWeight: 'bold',
+        fontWeight: '800',
     },
 });

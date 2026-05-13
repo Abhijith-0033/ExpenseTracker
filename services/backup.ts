@@ -12,7 +12,10 @@ import {
     IncomeSource,
     Debt,
     DebtHistory,
-    RechargeMeta
+    RechargeMeta,
+    SavingsGoal,
+    SavingsContribution,
+    Subscription
 } from './database';
 import { ExpenseBook, BookItem } from './books';
 import { BillGroup, BillGroupMember, BillExpense, BillExpenseSplit } from './billSplitter';
@@ -43,6 +46,9 @@ interface BackupData {
         billExpenses: BillExpense[];
         billExpenseSplits: BillExpenseSplit[];
         rechargeMeta: RechargeMeta[];
+        savingsGoals: SavingsGoal[];
+        savingsContributions: SavingsContribution[];
+        subscriptions: Subscription[];
     };
 }
 
@@ -72,7 +78,10 @@ export const exportData = async () => {
             billGroupMembers,
             billExpenses,
             billExpenseSplits,
-            rechargeMeta
+            rechargeMeta,
+            savingsGoals,
+            savingsContributions,
+            subscriptions
         ] = await Promise.all([
             db.getAllAsync<Transaction>('SELECT * FROM transactions'),
             db.getAllAsync<Account>('SELECT * FROM accounts'), // Includes meta categories
@@ -87,6 +96,9 @@ export const exportData = async () => {
             db.getAllAsync<BillExpense>('SELECT * FROM bill_expenses'),
             db.getAllAsync<BillExpenseSplit>('SELECT * FROM bill_expense_splits'),
             db.getAllAsync<RechargeMeta>('SELECT * FROM recharge_meta'),
+            db.getAllAsync<SavingsGoal>('SELECT * FROM savings_goals'),
+            db.getAllAsync<SavingsContribution>('SELECT * FROM savings_contributions'),
+            db.getAllAsync<Subscription>('SELECT * FROM subscriptions'),
         ]);
 
         // 2. Construct Backup Object
@@ -111,7 +123,10 @@ export const exportData = async () => {
                 billGroupMembers,
                 billExpenses,
                 billExpenseSplits,
-                rechargeMeta
+                rechargeMeta,
+                savingsGoals,
+                savingsContributions,
+                subscriptions
             }
         };
 
@@ -248,6 +263,9 @@ const performRestore = async (data: BackupData['data']) => {
             await db.runAsync('DELETE FROM income_sources');
             await db.runAsync('DELETE FROM category_budgets');
             await db.runAsync('DELETE FROM recharge_meta');
+            await db.runAsync('DELETE FROM savings_contributions');
+            await db.runAsync('DELETE FROM savings_goals');
+            await db.runAsync('DELETE FROM subscriptions');
             await db.runAsync('DELETE FROM transactions');
             await db.runAsync('DELETE FROM accounts');
 
@@ -365,6 +383,33 @@ const performRestore = async (data: BackupData['data']) => {
                     await db.runAsync(
                         'INSERT INTO recharge_meta (id, expense_id, validity_days, expiry_date, reminder_date, notification_id) VALUES (?, ?, ?, ?, ?, ?)',
                         [rm.id, rm.expense_id, rm.validity_days, rm.expiry_date, rm.reminder_date, rm.notification_id]
+                    );
+                }
+            }
+
+            if (data.savingsGoals) {
+                for (const g of data.savingsGoals) {
+                    await db.runAsync(
+                        'INSERT INTO savings_goals (id, name, target_amount, current_amount, deadline, linked_account_id, icon, color, created_at, last_updated, is_completed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                        [g.id, g.name, g.target_amount, g.current_amount, g.deadline, g.linked_account_id, g.icon, g.color, g.created_at, g.last_updated, g.is_completed]
+                    );
+                }
+            }
+
+            if (data.savingsContributions) {
+                for (const c of data.savingsContributions) {
+                    await db.runAsync(
+                        'INSERT INTO savings_contributions (id, goal_id, amount, date, notes, auto_detected, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                        [c.id, c.goal_id, c.amount, c.date, c.notes, c.auto_detected, c.created_at]
+                    );
+                }
+            }
+
+            if (data.subscriptions) {
+                for (const s of data.subscriptions) {
+                    await db.runAsync(
+                        'INSERT INTO subscriptions (id, name, amount, billing_cycle, next_renewal_date, category, account_id, icon, color, is_active, reminder_notification_id, notes, created_at, last_updated) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                        [s.id, s.name, s.amount, s.billing_cycle, s.next_renewal_date, s.category, s.account_id, s.icon, s.color, s.is_active, s.reminder_notification_id, s.notes, s.created_at, s.last_updated]
                     );
                 }
             }
