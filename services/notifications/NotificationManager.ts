@@ -46,6 +46,7 @@ export const SETTINGS_KEYS = {
   NOTIF_BUDGET_ALERTS: 'notif_budget_alerts',
   NOTIF_EMI_REMINDERS: 'notif_emi_reminders',
   NOTIF_EMI_AUTOPAY: 'notif_emi_autopay',
+  NOTIF_TELEGRAM: 'notif_telegram',
 };
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -154,6 +155,13 @@ export const setupNotificationChannels = async (): Promise<void> => {
         importance: Notifications.AndroidImportance.HIGH,
         vibrationPattern: [0, 250, 250, 250],
         lightColor: '#673AB7',
+      });
+
+      await Notifications.setNotificationChannelAsync('telegram-alerts', {
+        name: 'Telegram Bot Alerts',
+        importance: Notifications.AndroidImportance.HIGH,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#0088CC',
       });
     } catch (error) {
       console.warn('Failed to setup notification channels:', error);

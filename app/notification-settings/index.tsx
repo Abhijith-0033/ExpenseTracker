@@ -37,6 +37,7 @@ export default function NotificationSettingsScreen() {
   const [budgetAlertsEnabled, setBudgetAlertsEnabled] = useState(false);
   const [emiRemindersEnabled, setEMIRemindersEnabled] = useState(false);
   const [emiAutopayEnabled, setEMIAutopayEnabled] = useState(false);
+  const [telegramAlertsEnabled, setTelegramAlertsEnabled] = useState(false);
   
   // UI state
   const [loading, setLoading] = useState(false);
@@ -68,6 +69,7 @@ export default function NotificationSettingsScreen() {
         AsyncStorage.getItem(SETTINGS_KEYS.NOTIF_BUDGET_ALERTS),
         AsyncStorage.getItem(SETTINGS_KEYS.NOTIF_EMI_REMINDERS),
         AsyncStorage.getItem(SETTINGS_KEYS.NOTIF_EMI_AUTOPAY),
+        AsyncStorage.getItem(SETTINGS_KEYS.NOTIF_TELEGRAM),
       ]);
 
       setMasterEnabled(settings[0] === 'true');
@@ -86,6 +88,7 @@ export default function NotificationSettingsScreen() {
       setBudgetAlertsEnabled(settings[13] === 'true');
       setEMIRemindersEnabled(settings[14] === 'true');
       setEMIAutopayEnabled(settings[15] === 'true');
+      setTelegramAlertsEnabled(settings[16] === 'true');
     } catch (error) {
       console.error('Failed to load notification settings:', error);
     }
@@ -151,6 +154,7 @@ export default function NotificationSettingsScreen() {
         AsyncStorage.setItem(SETTINGS_KEYS.NOTIF_BUDGET_ALERTS, 'false'),
         AsyncStorage.setItem(SETTINGS_KEYS.NOTIF_EMI_REMINDERS, 'false'),
         AsyncStorage.setItem(SETTINGS_KEYS.NOTIF_EMI_AUTOPAY, 'false'),
+        AsyncStorage.setItem(SETTINGS_KEYS.NOTIF_TELEGRAM, 'false'),
       ]);
       
       // Update UI state
@@ -167,6 +171,7 @@ export default function NotificationSettingsScreen() {
       setBudgetAlertsEnabled(false);
       setEMIRemindersEnabled(false);
       setEMIAutopayEnabled(false);
+      setTelegramAlertsEnabled(false);
       
       // Cancel all notifications
       await cancelByPrefix('');
@@ -502,6 +507,22 @@ export default function NotificationSettingsScreen() {
             onToggle={(value) => {
               setEMIAutopayEnabled(value);
               updateSetting(SETTINGS_KEYS.NOTIF_EMI_AUTOPAY, value);
+            }}
+            disabled={!masterEnabled}
+          />
+        </View>
+
+        {/* Integrations Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>INTEGRATIONS</Text>
+          
+          <ToggleRow
+            title="Telegram Transaction Alerts"
+            subtitle="Notify when Telegram expenses are added or fail"
+            value={telegramAlertsEnabled}
+            onToggle={(value) => {
+              setTelegramAlertsEnabled(value);
+              updateSetting(SETTINGS_KEYS.NOTIF_TELEGRAM, value);
             }}
             disabled={!masterEnabled}
           />

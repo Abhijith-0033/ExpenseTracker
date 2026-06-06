@@ -100,3 +100,29 @@ export async function getCategoryStats(category: string) {
         return { totalAllTime: 0, totalThisMonth: 0, monthlyAvg: 0, highestMonth: { month: '', total: 0 }, avgPerTx: 0, freqThisMonth: 0 };
     }
 }
+
+export async function getSubcategoryBreakdown(category: string) {
+    const db = await ensureDb();
+    if (!db) return [];
+
+    const thisMonthPrefix = format(new Date(), 'yyyy-MM');
+
+    const query = `
+        SELECT 
+            subcategory as name, 
+            SUM(amount) as grandTotal,
+            SUM(CASE WHEN substr(date, 1, 7) = ? THEN amount ELSE 0 END) as monthlyTotal
+        FROM transactions 
+        WHERE category = ?
+        GROUP BY subcategory
+        ORDER BY grandTotal DESC
+    `;
+    
+    try {
+        return await db.getAllAsync<{ name: string, grandTotal: number, monthlyTotal: number }>(query, [thisMonthPrefix, category]);
+    } catch (e) {
+        console.error("Failed to get subcategory breakdown", e);
+        return [];
+    }
+}
+

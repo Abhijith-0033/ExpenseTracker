@@ -215,11 +215,10 @@ export const CategoryDrillDown: React.FC<CategoryDrilldownProps> = ({ categoryDa
             <View style={styles.pieContainer}>
                 <PieChart
                     data={pieData}
-                    donut
+                    isThreeD
                     showText
                     textColor="white"
                     radius={100}
-                    innerRadius={60}
                     textSize={10}
                     focusOnPress
                     showValuesAsLabels

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, StatusBar, Alert, TextInput, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, StatusBar, Alert, TextInput, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, TrendingUp, TrendingDown, Check, Clock, Wallet } from 'lucide-react-native';
 import { Colors, Layout, Typography } from '../../constants/Theme';
@@ -169,8 +169,12 @@ export default function DebtDetailScreen() {
 
             {/* Modal */}
             <Modal visible={modalVisible} transparent animationType="fade">
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
+                <KeyboardAvoidingView 
+                    style={styles.modalOverlay}
+                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                >
+                    <View style={[styles.modalContent, { maxHeight: '90%' }]}>
+                        <ScrollView showsVerticalScrollIndicator={false}>
                         <Text style={styles.modalTitle}>
                             {actionTitle}
                         </Text>
@@ -240,8 +244,9 @@ export default function DebtDetailScreen() {
                                 <Text style={{ color: 'white', fontWeight: 'bold' }}>Confirm</Text>
                             </TouchableOpacity>
                         </View>
+                        </ScrollView>
                     </View>
-                </View>
+                </KeyboardAvoidingView>
             </Modal>
         </View>
     );

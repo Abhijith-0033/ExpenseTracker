@@ -250,7 +250,7 @@ export default function Dashboard() {
 
             <PressableScale style={[styles.metricCardFull, { backgroundColor: Colors.accent.lavender }]} onPress={() => {}}>
               <View style={styles.metricCardIconRow}>
-                <View style={[styles.metricCardIcon, { backgroundColor: 'rgba(255,255,255,0.6)' }]}>
+                <View style={[styles.metricCardIcon, { backgroundColor: 'rgba(255,255,255,0.6)', marginBottom: 0 }]}>
                   <Activity size={20} color={Colors.primary[600]} />
                 </View>
               </View>
@@ -260,10 +260,10 @@ export default function Dashboard() {
               </View>
             </PressableScale>
 
-            <PressableScale style={[styles.metricCardFull, { backgroundColor: 'rgba(156, 39, 176, 0.1)' }]} onPress={() => router.push('/emi-tracker' as any)}>
+            <PressableScale style={[styles.metricCardFull, { backgroundColor: Colors.accent.lavender }]} onPress={() => router.push('/emi-tracker' as any)}>
               <View style={styles.metricCardIconRow}>
-                <View style={[styles.metricCardIcon, { backgroundColor: 'rgba(156, 39, 176, 0.2)' }]}>
-                  <Calendar size={20} color="#9C27B0" />
+                <View style={[styles.metricCardIcon, { backgroundColor: 'rgba(255, 255, 255, 0.8)', marginBottom: 0 }]}>
+                  <Calendar size={20} color={Colors.primary[600]} />
                 </View>
                 {emiSummary.total_overdue > 0 && (
                   <View style={[styles.badge, { backgroundColor: Colors.danger[500] }]}>
@@ -273,10 +273,9 @@ export default function Dashboard() {
               </View>
               <View style={{ flex: 1, marginLeft: 16 }}>
                 <Text style={styles.metricTitle}>EMI Tracker</Text>
-                <Text style={[styles.metricValue, { color: '#9C27B0' }]}>{emiSummary.total_active} Active</Text>
+                <Text style={[styles.metricValue, { color: Colors.primary[700] }]}>{emiSummary.total_active} Active</Text>
                 <Text style={styles.metricSubtitle}>{emiSummary.total_pending} pending • {formatCurrency(emiSummary.total_emi_amount)}/month</Text>
               </View>
-              <ArrowRight size={20} color={Colors.gray[400]} />
             </PressableScale>
           </Animated.View>
 

@@ -2,7 +2,7 @@
   "expo": {
     "name": "Gastos",
     "slug": "ExpenseTracker",
-    "version": "2.7.0",
+    "version": "2.9.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "gastos",
@@ -13,7 +13,7 @@
     },
     "android": {
       "package": "com.expensetracker.app",
-      "versionCode": 37,
+      "versionCode": 39,
       "adaptiveIcon": {
         "backgroundColor": "#0F172A",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

@@ -47,6 +47,27 @@ export default function AddTransferScreen() {
         }, [])
     );
 
+    // Ensure accounts are initialized if they load after mount
+    React.useEffect(() => {
+        if (accounts.length > 0) {
+            if (!fromAccount) {
+                setFromAccount(accounts[0]);
+                if (accounts.length > 1) {
+                    setToAccount(accounts[1]);
+                } else {
+                    setToAccount(accounts[0]);
+                }
+            } else if (!toAccount) {
+                if (accounts.length > 1) {
+                    const other = accounts.find(a => a.id !== fromAccount.id);
+                    setToAccount(other || accounts[0]);
+                } else {
+                    setToAccount(accounts[0]);
+                }
+            }
+        }
+    }, [accounts]);
+
     const handleKeyPress = (key: string) => {
         if (display.length >= 12) return;
         if (display === '0' && key !== '.') {
@@ -68,27 +89,45 @@ export default function AddTransferScreen() {
     const handleClear = () => setDisplay('0');
 
     const cycleFromAccount = () => {
-        const available = accounts;
-        if (available.length <= 1) return;
-        const idx = available.findIndex(a => a.id === fromAccount?.id);
-        const next = available[(idx + 1) % available.length];
+        if (accounts.length <= 1) return;
+        const idx = accounts.findIndex(a => a.id === fromAccount?.id);
+        let nextIdx = (idx + 1) % accounts.length;
+        let next = accounts[nextIdx];
+
         if (next.id === toAccount?.id) {
-            setFromAccount(available[(idx + 2) % available.length]);
-        } else {
-            setFromAccount(next);
+            if (accounts.length === 2) {
+                // Swap
+                setFromAccount(toAccount);
+                setToAccount(fromAccount);
+                return;
+            } else {
+                // Skip the selected "toAccount"
+                nextIdx = (nextIdx + 1) % accounts.length;
+                next = accounts[nextIdx];
+            }
         }
+        setFromAccount(next);
     };
 
     const cycleToAccount = () => {
-        const available = accounts;
-        if (available.length <= 1) return;
-        const idx = available.findIndex(a => a.id === toAccount?.id);
-        const next = available[(idx + 1) % available.length];
+        if (accounts.length <= 1) return;
+        const idx = accounts.findIndex(a => a.id === toAccount?.id);
+        let nextIdx = (idx + 1) % accounts.length;
+        let next = accounts[nextIdx];
+
         if (next.id === fromAccount?.id) {
-            setToAccount(available[(idx + 2) % available.length]);
-        } else {
-            setToAccount(next);
+            if (accounts.length === 2) {
+                // Swap
+                setToAccount(fromAccount);
+                setFromAccount(toAccount);
+                return;
+            } else {
+                // Skip the selected "fromAccount"
+                nextIdx = (nextIdx + 1) % accounts.length;
+                next = accounts[nextIdx];
+            }
         }
+        setToAccount(next);
     };
 
     const handleSave = async () => {

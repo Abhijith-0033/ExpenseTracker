@@ -318,13 +318,53 @@ export const markPaymentAsPaid = async (
   const db = getDatabase();
   if (!db) throw new Error('Database not initialized');
 
-  await db.runAsync(
-    `UPDATE emi_payments 
-    SET paid_date = ?, amount_paid = ?, payment_status = 'paid', 
-        account_id = ?, transaction_id = ?, notes = ?, created_at = datetime('now')
-    WHERE id = ?`,
-    [paidDate, amountPaid, accountId, transactionId, notes, paymentId]
-  );
+  await db.withTransactionAsync(async () => {
+    // 1. Get payment to check if it's already paid (to avoid double deduction)
+    const payment = await db.getFirstAsync<EMIPayment>('SELECT * FROM emi_payments WHERE id = ?', [paymentId]);
+    if (!payment || payment.payment_status === 'paid') return;
+
+    // 2. Update payment status
+    await db.runAsync(
+      `UPDATE emi_payments 
+      SET paid_date = ?, amount_paid = ?, payment_status = 'paid', 
+          account_id = ?, transaction_id = ?, notes = ?, created_at = datetime('now')
+      WHERE id = ?`,
+      [paidDate, amountPaid, accountId, transactionId, notes, paymentId]
+    );
+
+    // 3. Update account balance (subtract since it's a payment out)
+    if (accountId) {
+      await db.runAsync('UPDATE accounts SET balance = balance - ? WHERE id = ?', [amountPaid, accountId]);
+    }
+  });
+};
+
+/**
+ * Revert a paid payment back to pending
+ */
+export const revertPaymentStatus = async (paymentId: number): Promise<void> => {
+  const db = getDatabase();
+  if (!db) throw new Error('Database not initialized');
+
+  await db.withTransactionAsync(async () => {
+    // 1. Get payment details
+    const payment = await db.getFirstAsync<EMIPayment>('SELECT * FROM emi_payments WHERE id = ?', [paymentId]);
+    if (!payment || payment.payment_status !== 'paid') return;
+
+    // 2. Revert account balance if applicable
+    if (payment.account_id && payment.amount_paid) {
+      await db.runAsync('UPDATE accounts SET balance = balance + ? WHERE id = ?', [payment.amount_paid, payment.account_id]);
+    }
+
+    // 3. Reset payment status
+    await db.runAsync(
+      `UPDATE emi_payments 
+       SET paid_date = NULL, amount_paid = NULL, payment_status = 'pending', 
+           account_id = NULL, transaction_id = NULL, notes = NULL, created_at = datetime('now')
+       WHERE id = ?`,
+      [paymentId]
+    );
+  });
 };
 
 /**

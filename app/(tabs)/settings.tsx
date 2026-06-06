@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Switch } from 'react-native';
 import { useRouter, Link } from 'expo-router';
-import { ChevronRight, Wallet, Tag, Database, Bell, FileUp, FileDown, FileText, Info, Calendar, Users, Target, CalendarClock, RefreshCw, FileBarChart } from 'lucide-react-native';
+import { ChevronRight, Wallet, Tag, Database, Bell, FileUp, FileDown, FileText, Info, Calendar, Users, Target, CalendarClock, RefreshCw, FileBarChart, Send } from 'lucide-react-native';
 import { useApp } from '../../context/AppContext';
 import { Colors, Typography, Layout } from '../../constants/Theme';
 import { checkReminderStatus, scheduleDailyReminder } from '../../services/notifications';
@@ -144,6 +144,25 @@ export default function SettingsScreen() {
                         <FileBarChart size={20} color={Colors.success[600]} />
                     </View>
                     <Text style={styles.rowText}>Financial Report</Text>
+                    <ChevronRight size={20} color="#9ca3af" />
+                </TouchableOpacity>
+            </View>
+
+            {/* Integrations Section */}
+            <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Integrations</Text>
+
+                <TouchableOpacity
+                    style={styles.row}
+                    onPress={() => router.push('/telegram-settings' as any)}
+                >
+                    <View style={[styles.rowIcon, { backgroundColor: 'rgba(0,136,204,0.1)' }]}>
+                        <Send size={20} color="#0088CC" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.rowText}>Telegram Bot</Text>
+                        <Text style={styles.rowSubtext}>Add expenses via Telegram</Text>
+                    </View>
                     <ChevronRight size={20} color="#9ca3af" />
                 </TouchableOpacity>
             </View>

@@ -120,19 +120,35 @@ export const addDebtRepayment = async (repayment: Omit<DebtRepayment, 'id' | 'cr
   
   const now = new Date().toISOString();
   
-  const result = await db.runAsync(`
-    INSERT INTO debt_repayments (debt_id, amount, payment_date, payment_type, note, created_at)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `, [
-    repayment.debt_id,
-    repayment.amount,
-    repayment.payment_date,
-    repayment.payment_type,
-    repayment.note || null,
-    now
-  ]);
+  let insertedId = 0;
+  await db.withTransactionAsync(async () => {
+    const result = await db.runAsync(`
+      INSERT INTO debt_repayments (debt_id, amount, payment_date, payment_type, note, account_id, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `, [
+      repayment.debt_id,
+      repayment.amount,
+      repayment.payment_date,
+      repayment.payment_type,
+      repayment.note || null,
+      repayment.account_id || null,
+      now
+    ]);
+    insertedId = result.lastInsertRowId;
+
+    if (repayment.account_id) {
+      // Determine if we should add or subtract based on debt direction
+      // For borrowed debt: payment reduces what I owe (expense/payment out) -> subtract from account
+      // For lent debt: payment is received back (income/payment in) -> add to account
+      const debt = await db.getFirstAsync<DebtRecord>('SELECT direction FROM debt_records WHERE id = ?', [repayment.debt_id]);
+      if (debt) {
+        const amountChange = debt.direction === 'borrowed' ? -repayment.amount : repayment.amount;
+        await db.runAsync('UPDATE accounts SET balance = balance + ? WHERE id = ?', [amountChange, repayment.account_id]);
+      }
+    }
+  });
   
-  return result.lastInsertRowId;
+  return insertedId;
 };
 
 export const updateDebtRepayment = async (id: number, repayment: Partial<Omit<DebtRepayment, 'id' | 'created_at'>>): Promise<void> => {
@@ -160,7 +176,21 @@ export const deleteDebtRepayment = async (id: number): Promise<void> => {
   await initDatabase();
   const db = getDatabase();
   
-  await db.runAsync('DELETE FROM debt_repayments WHERE id = ?', [id]);
+  await db.withTransactionAsync(async () => {
+    const repayment = await db.getFirstAsync<DebtRepayment>('SELECT * FROM debt_repayments WHERE id = ?', [id]);
+    if (!repayment) return;
+
+    if (repayment.account_id) {
+      const debt = await db.getFirstAsync<DebtRecord>('SELECT direction FROM debt_records WHERE id = ?', [repayment.debt_id]);
+      if (debt) {
+        // Revert the account change
+        const amountChange = debt.direction === 'borrowed' ? repayment.amount : -repayment.amount;
+        await db.runAsync('UPDATE accounts SET balance = balance + ? WHERE id = ?', [amountChange, repayment.account_id]);
+      }
+    }
+
+    await db.runAsync('DELETE FROM debt_repayments WHERE id = ?', [id]);
+  });
 };
 
 // --- DEBT SUMMARY ---

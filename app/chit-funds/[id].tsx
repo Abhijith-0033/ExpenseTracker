@@ -4,9 +4,11 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, Plus, TrendingUp, Users, Calendar, DollarSign, Percent, Edit, Trash2, Crown, CheckCircle } from 'lucide-react-native';
 import { Colors, Layout, Typography, SemanticColors } from '../../constants/Theme';
 import { getChitFundById, getChitMonthlyRecords, getChitMembers, updateChitMonthlyRecord, deleteChitMonthlyRecord } from '../../services/chitfund/chitService';
+import { getAccounts, Account } from '../../services/database';
 import { calculateChitFundPosition, analyzeChitFundPerformance, ChitFund, ChitMonthlyRecord } from '../../services/chitfund/ChitEngine';
 import { formatCurrency } from '../../utils/currency';
 import { Snackbar } from '../../components/Snackbar';
+import { AccountSelector } from '../../components/AccountSelector';
 import { LineChart, BarChart } from 'react-native-gifted-charts';
 import { format } from 'date-fns';
 
@@ -24,6 +26,8 @@ export default function ChitFundDetailScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editingRecord, setEditingRecord] = useState<ChitMonthlyRecord | null>(null);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
 
   // Snackbar state
   const [snackbarVisible, setSnackbarVisible] = useState(false);
@@ -55,6 +59,9 @@ export default function ChitFundDetailScreen() {
       setMembers(membersData);
       setCalculation(calculationData);
       setAnalysis(analysisData);
+
+      const accountsData = await getAccounts();
+      setAccounts(accountsData);
     } catch (error) {
       console.error('Failed to fetch chit fund details:', error);
       Alert.alert('Error', 'Failed to load chit fund details');
@@ -77,6 +84,7 @@ export default function ChitFundDetailScreen() {
     setWinnerName(record.winner_name || '');
     setBidAmount(record.bid_amount?.toString() || '');
     setRecordNote(record.notes || '');
+    setSelectedAccountId(record.account_id || null);
     setEditModalVisible(true);
   };
 
@@ -91,7 +99,8 @@ export default function ChitFundDetailScreen() {
         winner_name: winnerName || null,
         winner_is_me: winnerName === 'Me' ? 1 : 0,
         bid_amount: bidAmount ? parseFloat(bidAmount) : null,
-        notes: recordNote || null
+        notes: recordNote || null,
+        account_id: selectedAccountId
       });
 
       setEditModalVisible(false);
@@ -495,6 +504,13 @@ export default function ChitFundDetailScreen() {
               multiline
               value={recordNote}
               onChangeText={setRecordNote}
+            />
+
+            <Text style={styles.label}>Account</Text>
+            <AccountSelector
+              accounts={accounts}
+              selectedAccountId={selectedAccountId}
+              onSelect={setSelectedAccountId}
             />
             
             <View style={styles.modalActions}>

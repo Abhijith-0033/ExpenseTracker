@@ -44,6 +44,10 @@ export const schedulePaymentNotifications = async (item: PaymentItem): Promise<v
   if (!db) return;
 
   const dueDate = new Date(item.dueDate);
+  if (isNaN(dueDate.getTime())) {
+    console.warn(`Invalid due date provided for ${item.name}: ${item.dueDate}`);
+    return;
+  }
   const now = new Date();
 
   const schedules = [

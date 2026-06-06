@@ -12,6 +12,7 @@ export interface Transaction {
   date: string; // ISO string
   description: string;
   created_at: number;
+  source?: string; // 'manual' | 'telegram'
   type?: 'expense' | 'income' | 'transfer' | 'debt';
 }
 
@@ -49,6 +50,9 @@ let lastTransactionTime = 0;
 
 const getAccountBalanceDelta = (tx: Pick<Transaction, 'amount' | 'category' | 'subcategory'>) => {
   if (tx.category === 'Income') return tx.amount;
+  if (tx.category === 'Transfer') {
+    return tx.subcategory === 'Transfer In' ? tx.amount : -tx.amount;
+  }
   if (tx.category === 'Debt/Credit') {
     return tx.subcategory === 'Borrowed' || tx.subcategory === 'Received Back'
       ? tx.amount
@@ -387,6 +391,7 @@ export const initDatabase = async () => {
         payment_date TEXT NOT NULL,
         payment_type TEXT DEFAULT 'principal',
         note TEXT DEFAULT NULL,
+        account_id INTEGER DEFAULT NULL,
         created_at TEXT DEFAULT (datetime('now')),
         FOREIGN KEY (debt_id) REFERENCES debt_records(id) ON DELETE CASCADE
       );
@@ -426,6 +431,7 @@ export const initDatabase = async () => {
         commission_deducted REAL DEFAULT NULL,
         net_received REAL DEFAULT NULL,
         dividend_received REAL DEFAULT NULL,
+        account_id INTEGER DEFAULT NULL,
         notes TEXT DEFAULT NULL,
         created_at TEXT DEFAULT (datetime('now')),
         FOREIGN KEY (chit_id) REFERENCES chit_funds(id) ON DELETE CASCADE
@@ -538,6 +544,24 @@ export const initDatabase = async () => {
         await db.runAsync('INSERT INTO income_sources (name, icon) VALUES (?, ?)', [d.name, d.icon]);
       }
     }
+    
+    // Migrations for account_id in debt and chit tables
+    const debtRepaymentInfo = await db.getAllAsync<{ name: string }>("PRAGMA table_info(debt_repayments)");
+    if (!debtRepaymentInfo.some(c => c.name === 'account_id')) {
+      await db.execAsync("ALTER TABLE debt_repayments ADD COLUMN account_id INTEGER DEFAULT NULL");
+    }
+    
+    const chitMonthlyInfo = await db.getAllAsync<{ name: string }>("PRAGMA table_info(chit_monthly_records)");
+    if (!chitMonthlyInfo.some(c => c.name === 'account_id')) {
+      await db.execAsync("ALTER TABLE chit_monthly_records ADD COLUMN account_id INTEGER DEFAULT NULL");
+    }
+
+    // --- Telegram Source Column Migration ---
+    const txTableInfo = await db.getAllAsync<{ name: string }>("PRAGMA table_info(transactions)");
+    const txColumnNames = txTableInfo.map(c => c.name);
+    if (!txColumnNames.includes('source')) {
+      await db.execAsync("ALTER TABLE transactions ADD COLUMN source TEXT DEFAULT 'manual'");
+    }
 
     console.log('Database initialized successfully');
   } catch (error) {
@@ -582,6 +606,45 @@ export const addTransaction = async (tx: Omit<Transaction, 'id' | 'created_at'>)
     return insertedId;
   } catch (e) {
     console.error("Transaction Error", e);
+    throw e;
+  }
+};
+
+// Telegram-safe transaction insert — bypasses the 5-second throttle guard.
+// Used ONLY by the Telegram processor. Do NOT call from UI code.
+export const addTransactionDirect = async (
+  tx: Omit<Transaction, 'id' | 'created_at'> & { source?: string }
+): Promise<number> => {
+  await initDatabase();
+  const db = getDatabase();
+  const timestamp = Date.now();
+
+  try {
+    let insertedId = 0;
+    await db.withTransactionAsync(async () => {
+      const result = await db.runAsync(
+        `INSERT INTO transactions (amount, category, subcategory, account_id, date, description, created_at, source)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          tx.amount,
+          tx.category,
+          tx.subcategory || '',
+          tx.account_id,
+          tx.date,
+          tx.description || '',
+          timestamp,
+          tx.source ?? 'manual'
+        ]
+      );
+      insertedId = result.lastInsertRowId;
+      await db.runAsync(
+        `UPDATE accounts SET balance = balance + ? WHERE id = ?`,
+        [getAccountBalanceDelta(tx), tx.account_id]
+      );
+    });
+    return insertedId;
+  } catch (e) {
+    console.error('addTransactionDirect Error', e);
     throw e;
   }
 };
@@ -1071,7 +1134,25 @@ export const updateRechargeMeta = async (id: number, updates: Partial<RechargeMe
 export const updateBillTransaction = async (expenseId: number, updates: {amount: number, description: string}) => {
   await initDatabase();
   const db = getDatabase();
-  await db.runAsync('UPDATE transactions SET amount = ?, description = ? WHERE id = ?', [updates.amount, updates.description, expenseId]);
+  
+  await db.withTransactionAsync(async () => {
+    // 1. Get old transaction to calculate delta
+    const oldTx = await db.getFirstAsync<Transaction>('SELECT * FROM transactions WHERE id = ?', [expenseId]);
+    if (!oldTx) return;
+
+    // 2. Update transaction
+    await db.runAsync('UPDATE transactions SET amount = ?, description = ? WHERE id = ?', [updates.amount, updates.description, expenseId]);
+
+    // 3. Calculate balance delta
+    const oldDelta = getAccountBalanceDelta(oldTx);
+    const newDelta = getAccountBalanceDelta({...oldTx, amount: updates.amount});
+    const balanceChange = newDelta - oldDelta;
+
+    // 4. Update account balance
+    if (balanceChange !== 0) {
+      await db.runAsync('UPDATE accounts SET balance = balance + ? WHERE id = ?', [balanceChange, oldTx.account_id]);
+    }
+  });
 };
 
 export const updateCategories = async (categories: CategoryNode[]) => {

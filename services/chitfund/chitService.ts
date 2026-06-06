@@ -132,21 +132,46 @@ export const updateChitMonthlyRecord = async (id: number, record: Partial<Omit<C
   await initDatabase();
   const db = getDatabase();
   
-  const fields: string[] = [];
-  const params: any[] = [];
-  
-  Object.entries(record).forEach(([key, value]) => {
-    if (value !== undefined) {
-      fields.push(`${key} = ?`);
-      params.push(value);
+  await db.withTransactionAsync(async () => {
+    const oldRecord = await db.getFirstAsync<ChitMonthlyRecord>('SELECT * FROM chit_monthly_records WHERE id = ?', [id]);
+    if (!oldRecord) return;
+
+    // 1. Revert old account changes
+    if (oldRecord.account_id) {
+      if (oldRecord.amount_paid) {
+        await db.runAsync('UPDATE accounts SET balance = balance + ? WHERE id = ?', [oldRecord.amount_paid, oldRecord.account_id]);
+      }
+      if (oldRecord.net_received) {
+        await db.runAsync('UPDATE accounts SET balance = balance - ? WHERE id = ?', [oldRecord.net_received, oldRecord.account_id]);
+      }
+    }
+
+    // 2. Update the record
+    const fields: string[] = [];
+    const params: any[] = [];
+    Object.entries(record).forEach(([key, value]) => {
+      if (value !== undefined) {
+        fields.push(`${key} = ?`);
+        params.push(value);
+      }
+    });
+
+    if (fields.length > 0) {
+      params.push(id);
+      await db.runAsync(`UPDATE chit_monthly_records SET ${fields.join(', ')} WHERE id = ?`, params);
+    }
+
+    // 3. Apply new account changes
+    const newRecord = { ...oldRecord, ...record };
+    if (newRecord.account_id) {
+      if (newRecord.amount_paid) {
+        await db.runAsync('UPDATE accounts SET balance = balance - ? WHERE id = ?', [newRecord.amount_paid, newRecord.account_id]);
+      }
+      if (newRecord.net_received) {
+        await db.runAsync('UPDATE accounts SET balance = balance + ? WHERE id = ?', [newRecord.net_received, newRecord.account_id]);
+      }
     }
   });
-  
-  if (fields.length === 0) return;
-  
-  params.push(id);
-  
-  await db.runAsync(`UPDATE chit_monthly_records SET ${fields.join(', ')} WHERE id = ?`, params);
 };
 
 export const deleteChitMonthlyRecord = async (id: number): Promise<void> => {

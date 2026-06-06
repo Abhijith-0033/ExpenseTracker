@@ -14,6 +14,7 @@ import { initializeNotificationManager } from '../services/notifications/Notific
 import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
 import { runAutoPay } from '../services/emitracker/AutoPayEngine';
+import { startPolling, stopPolling, registerBackgroundTask } from '../telegram/TelegramPoller';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -35,12 +36,21 @@ export default function RootLayout() {
         await initializeNotificationManager();
         // Run AutoPay for EMI payments
         await runAutoPay();
+        
+        // Start Telegram polling (silently fails if not linked)
+        startPolling();
+        // Register background task (silently fails if package not installed)
+        registerBackgroundTask();
       } catch (e) {
         console.warn('Error initializing notifications:', e);
       }
     }
 
     prepare();
+
+    return () => {
+      stopPolling();
+    };
   }, []);
 
   useEffect(() => {
@@ -176,6 +186,7 @@ export default function RootLayout() {
                 <Stack.Screen name="chit-funds/edit" options={{ headerShown: false }} />
                 <Stack.Screen name="notification-settings" options={{ headerShown: false }} />
                 <Stack.Screen name="manage-accounts" options={{ headerShown: false }} />
+                <Stack.Screen name="telegram-settings" options={{ headerShown: false }} />
                 <Stack.Screen name="+not-found" />
               </Stack>
             </View>

@@ -31,6 +31,7 @@ export interface ChitMonthlyRecord {
   commission_deducted: number | null;
   net_received: number | null;
   dividend_received: number | null;
+  account_id: number | null;
   notes: string | null;
   created_at: string;
 }

@@ -208,32 +208,52 @@ export default function EMITrackerScreen() {
         <Text style={styles.headerSubtitle}>Track your loan EMIs</Text>
       </View>
 
-      {/* Summary Cards */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.summaryContainer}>
-        <View style={[styles.summaryCard, { backgroundColor: Colors.primary[50] }]}>
-          <CreditCard size={20} color={Colors.primary[600]} />
-          <Text style={styles.summaryLabel}>Active EMIs</Text>
-          <Text style={styles.summaryValue}>{emiRecords.filter((r) => r.status === 'active').length}</Text>
+      {/* Summary Grid */}
+      <View style={styles.metricsGridContainer}>
+        <View style={styles.metricsGridRow}>
+          <View style={styles.metricCardHalf}>
+            <View style={[styles.metricCardIcon, { backgroundColor: 'rgba(124, 58, 237, 0.1)' }]}>
+              <CreditCard size={18} color={Colors.primary[600]} />
+            </View>
+            <Text style={styles.metricGridLabel}>Active EMIs</Text>
+            <Text style={[styles.metricGridValue, { color: Colors.primary[700] }]}>
+              {emiRecords.filter((r) => r.status === 'active').length}
+            </Text>
+          </View>
+
+          <View style={styles.metricCardHalf}>
+            <View style={[styles.metricCardIcon, { backgroundColor: Colors.accent.rose }]}>
+              <AlertCircle size={18} color={Colors.danger[600]} />
+            </View>
+            <Text style={styles.metricGridLabel}>Overdue Payments</Text>
+            <Text style={[styles.metricGridValue, { color: Colors.danger[700] }]}>
+              {paymentStats.overdue}
+            </Text>
+          </View>
         </View>
 
-        <View style={[styles.summaryCard, { backgroundColor: Colors.warning[50] }]}>
-          <Clock size={20} color={Colors.warning[600]} />
-          <Text style={styles.summaryLabel}>Pending</Text>
-          <Text style={styles.summaryValue}>{paymentStats.pending}</Text>
-        </View>
+        <View style={styles.metricsGridRow}>
+          <View style={styles.metricCardHalf}>
+            <View style={[styles.metricCardIcon, { backgroundColor: 'rgba(245, 158, 11, 0.1)' }]}>
+              <Clock size={18} color="#F59E0B" />
+            </View>
+            <Text style={styles.metricGridLabel}>Pending Next</Text>
+            <Text style={[styles.metricGridValue, { color: '#B45309' }]}>
+              {paymentStats.pending}
+            </Text>
+          </View>
 
-        <View style={[styles.summaryCard, { backgroundColor: Colors.danger[50] }]}>
-          <AlertCircle size={20} color={Colors.danger[600]} />
-          <Text style={styles.summaryLabel}>Overdue</Text>
-          <Text style={styles.summaryValue}>{paymentStats.overdue}</Text>
+          <View style={styles.metricCardHalf}>
+            <View style={[styles.metricCardIcon, { backgroundColor: Colors.accent.mint }]}>
+              <CheckCircle size={18} color={Colors.success[600]} />
+            </View>
+            <Text style={styles.metricGridLabel}>Total Paid</Text>
+            <Text style={[styles.metricGridValue, { color: Colors.success[700] }]}>
+              {paymentStats.paid}
+            </Text>
+          </View>
         </View>
-
-        <View style={[styles.summaryCard, { backgroundColor: Colors.success[50] }]}>
-          <CheckCircle size={20} color={Colors.success[600]} />
-          <Text style={styles.summaryLabel}>Paid</Text>
-          <Text style={styles.summaryValue}>{paymentStats.paid}</Text>
-        </View>
-      </ScrollView>
+      </View>
 
       {/* EMI List */}
       <ScrollView
@@ -290,30 +310,39 @@ const styles = StyleSheet.create({
     fontFamily: Typography.family.medium,
     color: Colors.gray[500],
   },
-  summaryContainer: {
+  metricsGridContainer: {
     paddingHorizontal: Layout.spacing.lg,
-    marginBottom: Layout.spacing.md,
+    marginBottom: Layout.spacing.lg,
+    gap: 12,
   },
-  summaryCard: {
+  metricsGridRow: {
     flexDirection: 'row',
+    gap: 12,
+  },
+  metricCardHalf: {
+    flex: 1,
+    backgroundColor: Colors.white,
+    padding: 16,
+    borderRadius: 24,
+    ...Layout.shadows.sm,
+  },
+  metricCardIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: Layout.spacing.md,
-    paddingVertical: Layout.spacing.sm,
-    borderRadius: Layout.radius.md,
-    marginRight: Layout.spacing.sm,
-    minWidth: 100,
+    marginBottom: 12,
   },
-  summaryLabel: {
-    fontSize: Typography.size.xs,
+  metricGridLabel: {
     fontFamily: Typography.family.medium,
+    fontSize: Typography.size.xs,
     color: Colors.gray[600],
-    marginLeft: Layout.spacing.sm,
+    marginBottom: 4,
   },
-  summaryValue: {
-    fontSize: Typography.size.lg,
+  metricGridValue: {
     fontFamily: Typography.family.bold,
-    color: Colors.gray[900],
-    marginLeft: Layout.spacing.sm,
+    fontSize: Typography.size.lg,
   },
   listContainer: {
     flex: 1,

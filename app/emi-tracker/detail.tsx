@@ -4,7 +4,10 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, Edit2, Calendar, DollarSign, Percent, Clock, CheckCircle, AlertCircle, TrendingUp, PieChart, BarChart } from 'lucide-react-native';
 import { Colors, Typography, Layout } from '../../constants/Theme';
 import { formatCurrency } from '../../utils/currency';
-import { getEMIRecord, getEMIPayments, EMIRecord, EMIPayment, markPaymentAsPaid } from '../../services/emitracker/EMIEngine';
+import { getEMIRecord, getEMIPayments, EMIRecord, EMIPayment, markPaymentAsPaid, revertPaymentStatus } from '../../services/emitracker/EMIEngine';
+import { getAccounts, Account } from '../../services/database';
+import { AccountSelector } from '../../components/AccountSelector';
+import { Modal, TextInput } from 'react-native';
 import { PieChart as GiftedPieChart, BarChart as GiftedBarChart } from 'react-native-gifted-charts';
 import { format, parseISO, isBefore, isToday, differenceInDays } from 'date-fns';
 
@@ -17,15 +20,25 @@ export default function EMIDetailScreen() {
 
   const [emiRecord, setEMIRecord] = useState<EMIRecord | null>(null);
   const [payments, setPayments] = useState<EMIPayment[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Payment Modal State
+  const [paymentModalVisible, setPaymentModalVisible] = useState(false);
+  const [selectedPayment, setSelectedPayment] = useState<EMIPayment | null>(null);
+  const [paymentDate, setPaymentDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
+  const [paymentNote, setPaymentNote] = useState('Manually marked as paid');
 
   const loadData = useCallback(async () => {
     if (!emiId) return;
     try {
       const record = await getEMIRecord(emiId);
       const paymentList = await getEMIPayments(emiId);
+      const accountList = await getAccounts();
       setEMIRecord(record);
       setPayments(paymentList);
+      setAccounts(accountList);
     } catch (error) {
       console.error('Error loading EMI details:', error);
       Alert.alert('Error', 'Failed to load EMI details');
@@ -100,26 +113,46 @@ export default function EMIDetailScreen() {
   };
 
   const handleMarkAsPaid = (payment: EMIPayment) => {
+    setSelectedPayment(payment);
+    setPaymentDate(format(new Date(), 'yyyy-MM-dd'));
+    setPaymentNote('Manually marked as paid');
+    setSelectedAccountId(null);
+    setPaymentModalVisible(true);
+  };
+
+  const submitPayment = async () => {
+    if (!selectedPayment) return;
+    try {
+      await markPaymentAsPaid(
+        selectedPayment.id,
+        paymentDate,
+        selectedPayment.amount_paid || emiRecord?.emi_amount || 0,
+        selectedAccountId,
+        null,
+        paymentNote
+      );
+      setPaymentModalVisible(false);
+      loadData();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to mark payment as paid');
+    }
+  };
+
+  const handleRevertPayment = (payment: EMIPayment) => {
     Alert.alert(
-      'Mark as Paid',
-      `Are you sure you want to mark this payment as paid?`,
+      'Revert Payment',
+      'Are you sure you want to revert this payment to pending? Any account balance deduction will be reversed.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Confirm',
+          text: 'Revert',
+          style: 'destructive',
           onPress: async () => {
             try {
-              await markPaymentAsPaid(
-                payment.id,
-                format(new Date(), 'yyyy-MM-dd'),
-                payment.amount_paid || emiRecord?.emi_amount || 0,
-                null,
-                null,
-                'Manually marked as paid'
-              );
+              await revertPaymentStatus(payment.id);
               loadData();
             } catch (error) {
-              Alert.alert('Error', 'Failed to mark payment as paid');
+              Alert.alert('Error', 'Failed to revert payment');
             }
           }
         }
@@ -358,12 +391,69 @@ export default function EMIDetailScreen() {
                     <Edit2 size={16} color={Colors.primary[600]} />
                     <Text style={styles.paymentActionText}>Edit Payment</Text>
                   </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.paymentActionButton, { marginLeft: Layout.spacing.md }]}
+                    onPress={() => handleRevertPayment(payment)}
+                  >
+                    <Clock size={16} color={Colors.danger[600]} />
+                    <Text style={[styles.paymentActionText, { color: Colors.danger[600] }]}>Revert</Text>
+                  </TouchableOpacity>
                 </View>
               )}
             </View>
           ))}
         </View>
       </ScrollView>
+
+      {/* Payment Modal */}
+      <Modal
+        visible={paymentModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setPaymentModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Mark as Paid</Text>
+              <TouchableOpacity onPress={() => setPaymentModalVisible(false)}>
+                <Text style={styles.modalClose}>×</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.label}>Amount: {formatCurrency(selectedPayment?.amount_paid || emiRecord?.emi_amount || 0)}</Text>
+              
+              <Text style={[styles.label, { marginTop: Layout.spacing.md }]}>Date</Text>
+              <TextInput
+                style={styles.input}
+                value={paymentDate}
+                onChangeText={setPaymentDate}
+                placeholder="YYYY-MM-DD"
+              />
+
+              <Text style={styles.label}>Note</Text>
+              <TextInput
+                style={styles.input}
+                value={paymentNote}
+                onChangeText={setPaymentNote}
+                placeholder="Notes"
+              />
+
+              <Text style={styles.label}>Account</Text>
+              <AccountSelector
+                accounts={accounts}
+                selectedAccountId={selectedAccountId}
+                onSelect={setSelectedAccountId}
+              />
+
+              <TouchableOpacity style={styles.submitBtn} onPress={submitPayment}>
+                <Text style={styles.submitBtnText}>Confirm Payment</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -672,5 +762,59 @@ const styles = StyleSheet.create({
     fontFamily: Typography.family.bold,
     color: Colors.primary[600],
     marginLeft: Layout.spacing.xs,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  modalTitle: {
+    fontSize: Typography.size.xl,
+    fontFamily: Typography.family.bold,
+    color: Colors.gray[900],
+  },
+  modalClose: {
+    fontSize: 28,
+    color: Colors.gray[500],
+  },
+  label: {
+    fontSize: Typography.size.sm,
+    fontFamily: Typography.family.bold,
+    marginBottom: 8,
+    color: Colors.gray[700],
+  },
+  input: {
+    backgroundColor: Colors.gray[50],
+    padding: 16,
+    borderRadius: Layout.radius.lg,
+    marginBottom: 16,
+    fontSize: Typography.size.md,
+    borderWidth: 1,
+    borderColor: Colors.gray[200],
+  },
+  submitBtn: {
+    backgroundColor: Colors.primary[600],
+    padding: 16,
+    borderRadius: Layout.radius.lg,
+    alignItems: 'center',
+    marginTop: 24,
+  },
+  submitBtnText: {
+    color: 'white',
+    fontSize: Typography.size.md,
+    fontFamily: Typography.family.bold,
   },
 });

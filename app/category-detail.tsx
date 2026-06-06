@@ -6,7 +6,7 @@ import { Colors, Layout, Typography } from '../constants/Theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BarChart } from 'react-native-gifted-charts';
 import { getCategories, CategoryNode, Transaction } from '../services/database';
-import { getCategoryTransactions, getCategoryMonthlyTotals, getCategoryStats } from '../services/categoryDetailQueries';
+import { getCategoryTransactions, getCategoryMonthlyTotals, getCategoryStats, getSubcategoryBreakdown } from '../services/categoryDetailQueries';
 import { getMergedClassifications } from '../satisfaction/categoryClassification';
 import { formatCurrency } from '../utils/currency';
 import { startOfMonth, subMonths, startOfYear, format, parseISO } from 'date-fns';
@@ -29,6 +29,7 @@ export default function CategoryDetailScreen() {
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [chartData, setChartData] = useState<any[]>([]);
     const [stats, setStats] = useState<any>(null);
+    const [subcategoryBreakdown, setSubcategoryBreakdown] = useState<any[]>([]);
     const [classifications, setClassifications] = useState<Record<string, string>>({});
 
     useEffect(() => {
@@ -74,14 +75,16 @@ export default function CategoryDetailScreen() {
         if (!selectedCategory) return;
         
         const { start, end } = getDateRange();
-        const [txs, monthly, st] = await Promise.all([
+        const [txs, monthly, st, subBreakdown] = await Promise.all([
             getCategoryTransactions(selectedCategory, start, end),
             getCategoryMonthlyTotals(selectedCategory, start, end),
-            getCategoryStats(selectedCategory)
+            getCategoryStats(selectedCategory),
+            getSubcategoryBreakdown(selectedCategory)
         ]);
 
         setTransactions(txs);
         setStats(st);
+        setSubcategoryBreakdown(subBreakdown);
         
         // Format chart data for BarChart
         if (monthly.length > 0) {
@@ -263,6 +266,30 @@ export default function CategoryDetailScreen() {
                             <Text style={styles.insightLabel}>Frequency</Text>
                             <Text style={styles.insightValue}>{stats.freqThisMonth}</Text>
                             <Text style={styles.insightSub}>this month</Text>
+                        </View>
+                    </View>
+                )}
+
+                {/* Subcategory Breakdown */}
+                {subcategoryBreakdown.length > 0 && (
+                    <View style={styles.chartCard}>
+                        <Text style={styles.sectionTitle}>Subcategory Breakdown</Text>
+                        <View style={{ marginTop: 16 }}>
+                            {subcategoryBreakdown.map((sub, index) => (
+                                <View key={sub.name} style={[
+                                    styles.subRow, 
+                                    index !== subcategoryBreakdown.length - 1 && styles.subRowBorder
+                                ]}>
+                                    <View style={styles.subLeft}>
+                                        <Text style={styles.subName}>{sub.name || 'Uncategorized'}</Text>
+                                        <Text style={styles.subMonthlyLabel}>This Month</Text>
+                                    </View>
+                                    <View style={styles.subRight}>
+                                        <Text style={styles.subGrandTotal}>{formatCurrency(sub.grandTotal)}</Text>
+                                        <Text style={styles.subMonthlyTotal}>{formatCurrency(sub.monthlyTotal)}</Text>
+                                    </View>
+                                </View>
+                            ))}
                         </View>
                     </View>
                 )}
@@ -494,5 +521,43 @@ const styles = StyleSheet.create({
         fontSize: Typography.size.sm,
         fontFamily: Typography.family.medium,
         color: Colors.gray[500],
+    },
+    subRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 12,
+    },
+    subRowBorder: {
+        borderBottomWidth: 1,
+        borderBottomColor: Colors.gray[100],
+    },
+    subLeft: {
+        flex: 1,
+    },
+    subName: {
+        fontSize: Typography.size.md,
+        fontFamily: Typography.family.bold,
+        color: Colors.gray[900],
+        marginBottom: 2,
+    },
+    subMonthlyLabel: {
+        fontSize: 10,
+        color: Colors.gray[500],
+        fontFamily: Typography.family.medium,
+    },
+    subRight: {
+        alignItems: 'flex-end',
+    },
+    subGrandTotal: {
+        fontSize: Typography.size.md,
+        fontFamily: Typography.family.bold,
+        color: Colors.gray[900],
+    },
+    subMonthlyTotal: {
+        fontSize: 12,
+        color: Colors.primary[600],
+        fontFamily: Typography.family.bold,
+        marginTop: 2,
     },
 });

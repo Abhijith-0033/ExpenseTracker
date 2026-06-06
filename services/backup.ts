@@ -22,7 +22,7 @@ import { BillGroup, BillGroupMember, BillExpense, BillExpenseSplit } from './bil
 
 // Schema Versioning to ensure backward/forward compatibility in future
 const CURRENT_SCHEMA_VERSION = 1;
-const EXPORT_APP_VERSION = '1.9.2';
+const EXPORT_APP_VERSION = '2.7.0';
 
 interface BackupData {
     metadata: {
@@ -49,6 +49,16 @@ interface BackupData {
         savingsGoals: SavingsGoal[];
         savingsContributions: SavingsContribution[];
         subscriptions: Subscription[];
+        // New tables
+        debtRecords: any[];
+        debtRepayments: any[];
+        chitFunds: any[];
+        chitMonthlyRecords: any[];
+        chitMembers: any[];
+        emiRecords: any[];
+        emiPayments: any[];
+        notificationSchedules: any[];
+        dailyReportCache: any[];
     };
 }
 
@@ -81,7 +91,16 @@ export const exportData = async () => {
             rechargeMeta,
             savingsGoals,
             savingsContributions,
-            subscriptions
+            subscriptions,
+            debtRecords,
+            debtRepayments,
+            chitFunds,
+            chitMonthlyRecords,
+            chitMembers,
+            emiRecords,
+            emiPayments,
+            notificationSchedules,
+            dailyReportCache
         ] = await Promise.all([
             db.getAllAsync<Transaction>('SELECT * FROM transactions'),
             db.getAllAsync<Account>('SELECT * FROM accounts'), // Includes meta categories
@@ -99,6 +118,15 @@ export const exportData = async () => {
             db.getAllAsync<SavingsGoal>('SELECT * FROM savings_goals'),
             db.getAllAsync<SavingsContribution>('SELECT * FROM savings_contributions'),
             db.getAllAsync<Subscription>('SELECT * FROM subscriptions'),
+            db.getAllAsync<any>('SELECT * FROM debt_records'),
+            db.getAllAsync<any>('SELECT * FROM debt_repayments'),
+            db.getAllAsync<any>('SELECT * FROM chit_funds'),
+            db.getAllAsync<any>('SELECT * FROM chit_monthly_records'),
+            db.getAllAsync<any>('SELECT * FROM chit_members'),
+            db.getAllAsync<any>('SELECT * FROM emi_records'),
+            db.getAllAsync<any>('SELECT * FROM emi_payments'),
+            db.getAllAsync<any>('SELECT * FROM notification_schedules'),
+            db.getAllAsync<any>('SELECT * FROM daily_report_cache'),
         ]);
 
         // 2. Construct Backup Object
@@ -126,7 +154,16 @@ export const exportData = async () => {
                 rechargeMeta,
                 savingsGoals,
                 savingsContributions,
-                subscriptions
+                subscriptions,
+                debtRecords,
+                debtRepayments,
+                chitFunds,
+                chitMonthlyRecords,
+                chitMembers,
+                emiRecords,
+                emiPayments,
+                notificationSchedules,
+                dailyReportCache
             }
         };
 
@@ -265,7 +302,16 @@ const performRestore = async (data: BackupData['data']) => {
             await db.runAsync('DELETE FROM recharge_meta');
             await db.runAsync('DELETE FROM savings_contributions');
             await db.runAsync('DELETE FROM savings_goals');
+            await db.runAsync('DELETE FROM emi_payments');
+            await db.runAsync('DELETE FROM emi_records');
+            await db.runAsync('DELETE FROM chit_monthly_records');
+            await db.runAsync('DELETE FROM chit_members');
+            await db.runAsync('DELETE FROM chit_funds');
+            await db.runAsync('DELETE FROM debt_repayments');
+            await db.runAsync('DELETE FROM debt_records');
             await db.runAsync('DELETE FROM subscriptions');
+            await db.runAsync('DELETE FROM notification_schedules');
+            await db.runAsync('DELETE FROM daily_report_cache');
             await db.runAsync('DELETE FROM transactions');
             await db.runAsync('DELETE FROM accounts');
 
@@ -332,8 +378,8 @@ const performRestore = async (data: BackupData['data']) => {
             // Expense Book Items
             for (const item of data.expenseBookItems) {
                 await db.runAsync(
-                    'INSERT INTO expense_book_items (id, book_id, name, amount, notes, date) VALUES (?, ?, ?, ?, ?, ?)',
-                    [item.id, item.book_id, item.name, item.amount, item.notes ?? null, item.date]
+                    'INSERT INTO expense_book_items (id, book_id, name, amount, notes, date, type, income_source_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                    [item.id, item.book_id, item.name, item.amount, item.notes ?? null, item.date, item.type ?? 'expense', item.income_source_id ?? null]
                 );
             }
 
@@ -408,24 +454,97 @@ const performRestore = async (data: BackupData['data']) => {
             if (data.subscriptions) {
                 for (const s of data.subscriptions) {
                     await db.runAsync(
-                        'INSERT INTO subscriptions (id, name, amount, billing_cycle, next_renewal_date, category, account_id, icon, color, is_active, reminder_notification_id, notes, created_at, last_updated) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                        [s.id, s.name, s.amount, s.billing_cycle, s.next_renewal_date, s.category, s.account_id, s.icon, s.color, s.is_active, s.reminder_notification_id, s.notes, s.created_at, s.last_updated]
+                        'INSERT INTO subscriptions (id, name, amount, billing_cycle, next_renewal_date, category, account_id, icon, color, is_active, reminder_notification_id, notes, created_at, last_updated, custom_interval_value, custom_interval_unit, website, auto_renew, payment_method, sub_category, reminder_days_before, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                        [s.id, s.name, s.amount, s.billing_cycle, s.next_renewal_date, s.category, s.account_id, s.icon, s.color, s.is_active, s.reminder_notification_id, s.notes, s.created_at, s.last_updated, s.custom_interval_value ?? null, s.custom_interval_unit ?? null, s.website ?? null, s.auto_renew ?? 1, s.payment_method ?? null, s.sub_category ?? null, s.reminder_days_before ?? 3, s.status ?? 'active']
                     );
                 }
             }
 
-        });
+            // --- New Modules Restore ---
 
-        Alert.alert("Success", "Data restored successfully! The app will reload to apply changes.", [
-            {
-                text: "OK", onPress: () => {
-                    // In a real app we might restart, here we just let the user know. 
-                    // The navigation/context might need a manual refresh hook, but since we are replacing DB, 
-                    // usually the next fetch hook updates UI. A forcible reload is better.
-                    // For now, simple alert.
+            if (data.debtRecords) {
+                for (const d of data.debtRecords) {
+                    await db.runAsync(
+                        'INSERT INTO debt_records (id, name, description, principal, interest_rate, interest_type, repayment_freq, custom_freq_days, start_date, expected_end_date, status, direction, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                        [d.id, d.name, d.description ?? null, d.principal, d.interest_rate, d.interest_type, d.repayment_freq, d.custom_freq_days, d.start_date, d.expected_end_date, d.status, d.direction, d.created_at, d.updated_at]
+                    );
                 }
             }
-        ]);
+
+            if (data.debtRepayments) {
+                for (const dr of data.debtRepayments) {
+                    await db.runAsync(
+                        'INSERT INTO debt_repayments (id, debt_id, amount, payment_date, payment_type, note, account_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                        [dr.id, dr.debt_id, dr.amount, dr.payment_date, dr.payment_type, dr.note ?? null, dr.account_id, dr.created_at]
+                    );
+                }
+            }
+
+            if (data.chitFunds) {
+                for (const cf of data.chitFunds) {
+                    await db.runAsync(
+                        'INSERT INTO chit_funds (id, name, total_members, monthly_amount, total_pot, duration_months, start_date, foreman_commission, status, my_turn_month, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                        [cf.id, cf.name, cf.total_members, cf.monthly_amount, cf.total_pot, cf.duration_months, cf.start_date, cf.foreman_commission, cf.status, cf.my_turn_month, cf.notes ?? null, cf.created_at]
+                    );
+                }
+            }
+
+            if (data.chitMonthlyRecords) {
+                for (const cm of data.chitMonthlyRecords) {
+                    await db.runAsync(
+                        'INSERT INTO chit_monthly_records (id, chit_id, month_number, month_date, amount_paid, payment_date, payment_status, winner_name, winner_is_me, bid_amount, pot_amount, commission_deducted, net_received, dividend_received, account_id, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                        [cm.id, cm.chit_id, cm.month_number, cm.month_date, cm.amount_paid, cm.payment_date, cm.payment_status, cm.winner_name, cm.winner_is_me, cm.bid_amount, cm.pot_amount, cm.commission_deducted, cm.net_received, cm.dividend_received, cm.account_id, cm.notes ?? null, cm.created_at]
+                    );
+                }
+            }
+
+            if (data.chitMembers) {
+                for (const mb of data.chitMembers) {
+                    await db.runAsync(
+                        'INSERT INTO chit_members (id, chit_id, member_name, member_turn_month, notes) VALUES (?, ?, ?, ?, ?)',
+                        [mb.id, mb.chit_id, mb.member_name, mb.member_turn_month, mb.notes ?? null]
+                    );
+                }
+            }
+
+            if (data.emiRecords) {
+                for (const er of data.emiRecords) {
+                    await db.runAsync(
+                        'INSERT INTO emi_records (id, name, lender_name, principal, total_amount, emi_amount, interest_rate, tenure_months, start_date, due_day, is_autopay, autopay_account_id, status, category, notes, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                        [er.id, er.name, er.lender_name ?? null, er.principal, er.total_amount, er.emi_amount, er.interest_rate, er.tenure_months, er.start_date, er.due_day, er.is_autopay, er.autopay_account_id, er.status, er.category, er.notes ?? null, er.created_at, er.updated_at]
+                    );
+                }
+            }
+
+            if (data.emiPayments) {
+                for (const ep of data.emiPayments) {
+                    await db.runAsync(
+                        'INSERT INTO emi_payments (id, emi_id, month_number, due_date, paid_date, amount_paid, principal_component, interest_component, outstanding_balance, payment_status, payment_mode, account_id, transaction_id, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                        [ep.id, ep.emi_id, ep.month_number, ep.due_date, ep.paid_date, ep.amount_paid, ep.principal_component, ep.interest_component, ep.outstanding_balance, ep.payment_status, ep.payment_mode, ep.account_id, ep.transaction_id, ep.notes ?? null, ep.created_at]
+                    );
+                }
+            }
+
+            if (data.notificationSchedules) {
+                for (const ns of data.notificationSchedules) {
+                    await db.runAsync(
+                        'INSERT INTO notification_schedules (id, item_type, item_id, notification_id, trigger_type, scheduled_for, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                        [ns.id, ns.item_type, ns.item_id, ns.notification_id, ns.trigger_type, ns.scheduled_for, ns.created_at]
+                    );
+                }
+            }
+
+            if (data.dailyReportCache) {
+                for (const dr of data.dailyReportCache) {
+                    await db.runAsync(
+                        'INSERT INTO daily_report_cache (id, report_date, total_expense, total_income, top_category, top_category_amount, transaction_count, month_expense_to_date, current_balance, last_updated) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                        [dr.id, dr.report_date, dr.total_expense, dr.total_income, dr.top_category, dr.top_category_amount, dr.transaction_count, dr.month_expense_to_date, dr.current_balance, dr.last_updated]
+                    );
+                }
+            }
+        });
+
+        Alert.alert("Success", "Data restored successfully! The app will reload to apply changes.");
 
     } catch (e) {
         console.error("Restore Transaction Failed", e);

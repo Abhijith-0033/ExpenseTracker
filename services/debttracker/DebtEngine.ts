@@ -25,6 +25,7 @@ export interface DebtRepayment {
   payment_date: string;
   payment_type: 'principal' | 'interest' | 'both';
   note?: string;
+  account_id?: number;
   created_at: string;
 }
 

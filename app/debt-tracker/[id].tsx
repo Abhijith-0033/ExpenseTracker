@@ -4,9 +4,11 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, Plus, TrendingDown, Calendar, DollarSign, Percent, Clock, CheckCircle } from 'lucide-react-native';
 import { Colors, Layout, Typography, SemanticColors } from '../../constants/Theme';
 import { getDebtRecordById, getDebtRepayments, addDebtRepayment, deleteDebtRepayment } from '../../services/debttracker/debtService';
+import { getAccounts, Account } from '../../services/database';
 import { calculateCurrentBalance, analyzePaymentHistory, DebtRecord } from '../../services/debttracker/DebtEngine';
 import { formatCurrency } from '../../utils/currency';
 import { Snackbar } from '../../components/Snackbar';
+import { AccountSelector } from '../../components/AccountSelector';
 import { LineChart, BarChart } from 'react-native-gifted-charts';
 import { format } from 'date-fns';
 
@@ -23,6 +25,8 @@ export default function DebtDetailScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [addPaymentModalVisible, setAddPaymentModalVisible] = useState(false);
   const [completionModalVisible, setCompletionModalVisible] = useState(false);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
 
   // Snackbar state
   const [snackbarVisible, setSnackbarVisible] = useState(false);
@@ -51,6 +55,9 @@ export default function DebtDetailScreen() {
       setRepayments(repaymentsData);
       setCalculation(calculationData);
       setPaymentHistory(historyData);
+
+      const accountsData = await getAccounts();
+      setAccounts(accountsData);
     } catch (error) {
       console.error('Failed to fetch debt details:', error);
       Alert.alert('Error', 'Failed to load debt details');
@@ -78,7 +85,8 @@ export default function DebtDetailScreen() {
         amount: parseFloat(paymentAmount),
         payment_date: paymentDate,
         payment_type: paymentType,
-        note: paymentNote || undefined
+        note: paymentNote || undefined,
+        account_id: selectedAccountId || undefined
       });
 
       // Reset form
@@ -86,6 +94,7 @@ export default function DebtDetailScreen() {
       setPaymentDate(new Date().toISOString().split('T')[0]);
       setPaymentType('principal');
       setPaymentNote('');
+      setSelectedAccountId(null);
       setAddPaymentModalVisible(false);
 
       // Check if debt is fully paid
@@ -391,56 +400,65 @@ export default function DebtDetailScreen() {
               </TouchableOpacity>
             </View>
             
-            <Text style={styles.label}>Amount *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="0.00"
-              keyboardType="numeric"
-              value={paymentAmount}
-              onChangeText={setPaymentAmount}
-            />
-            
-            <Text style={styles.label}>Payment Type</Text>
-            <View style={styles.paymentTypeOptions}>
-              {(['principal', 'interest', 'both'] as const).map((type) => (
-                <TouchableOpacity
-                  key={type}
-                  style={[
-                    styles.paymentTypeOption,
-                    paymentType === type && styles.paymentTypeOptionSelected
-                  ]}
-                  onPress={() => setPaymentType(type)}
-                >
-                  <Text style={[
-                    styles.paymentTypeOptionText,
-                    paymentType === type && styles.paymentTypeOptionTextSelected
-                  ]}>
-                    {type.charAt(0).toUpperCase() + type.slice(1)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            
-            <Text style={styles.label}>Date</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="YYYY-MM-DD"
-              value={paymentDate}
-              onChangeText={setPaymentDate}
-            />
-            
-            <Text style={styles.label}>Note (Optional)</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="Add a note..."
-              multiline
-              value={paymentNote}
-              onChangeText={setPaymentNote}
-            />
-            
-            <TouchableOpacity style={styles.saveBtn} onPress={handleAddPayment}>
-              <Text style={styles.saveBtnText}>Add Payment</Text>
-            </TouchableOpacity>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
+              <Text style={styles.label}>Amount *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="0.00"
+                keyboardType="numeric"
+                value={paymentAmount}
+                onChangeText={setPaymentAmount}
+              />
+              
+              <Text style={styles.label}>Payment Type</Text>
+              <View style={styles.paymentTypeOptions}>
+                {(['principal', 'interest', 'both'] as const).map((type) => (
+                  <TouchableOpacity
+                    key={type}
+                    style={[
+                      styles.paymentTypeOption,
+                      paymentType === type && styles.paymentTypeOptionSelected
+                    ]}
+                    onPress={() => setPaymentType(type)}
+                  >
+                    <Text style={[
+                      styles.paymentTypeOptionText,
+                      paymentType === type && styles.paymentTypeOptionTextSelected
+                    ]}>
+                      {type.charAt(0).toUpperCase() + type.slice(1)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              
+              <Text style={styles.label}>Date</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="YYYY-MM-DD"
+                value={paymentDate}
+                onChangeText={setPaymentDate}
+              />
+              
+              <Text style={styles.label}>Note (Optional)</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                placeholder="Add a note..."
+                multiline
+                value={paymentNote}
+                onChangeText={setPaymentNote}
+              />
+
+              <Text style={styles.label}>Payment Account</Text>
+              <AccountSelector
+                accounts={accounts}
+                selectedAccountId={selectedAccountId}
+                onSelect={setSelectedAccountId}
+              />
+              
+              <TouchableOpacity style={styles.saveBtn} onPress={handleAddPayment}>
+                <Text style={styles.saveBtnText}>Add Payment</Text>
+              </TouchableOpacity>
+            </ScrollView>
           </View>
         </View>
       )}
