@@ -65,10 +65,10 @@ function initTables() {
   // This handles databases that were created before this upgrade.
   const ptCols = db.prepare("PRAGMA table_info(pending_transactions)").all().map(r => r.name);
   if (!ptCols.includes('subcategory')) {
-    db.exec("ALTER TABLE pending_transactions ADD COLUMN subcategory TEXT DEFAULT NULL");
+    db.exec("ALTER TABLE pending_transactions ADD COLUMN subcategory TEXT DEFAULT NULL;");
   }
   if (!ptCols.includes('account')) {
-    db.exec("ALTER TABLE pending_transactions ADD COLUMN account TEXT DEFAULT NULL");
+    db.exec("ALTER TABLE pending_transactions ADD COLUMN account TEXT DEFAULT NULL;");
   }
 }
 

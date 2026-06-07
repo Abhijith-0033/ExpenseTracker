@@ -63,18 +63,22 @@ export async function processPendingTransaction(transaction: any): Promise<{
 
     let account = accounts[0]; // fallback: first account
 
+    // Try to find a "Cash" account as the primary fallback
+    const cashAccount = accounts.find((a: { name: string }) => a.name.toLowerCase() === 'cash');
+    if (cashAccount) account = cashAccount;
+
     // Priority 1: named account from bot message (e.g. transaction.account = "HDFC")
     if (transaction.account) {
       const byName = accounts.find(
         (a: { name: string }) => a.name.toLowerCase() === transaction.account.toLowerCase()
       );
       if (byName) account = byName;
-    // Priority 2: default to "Cash" if no account was typed in Telegram
-    } else {
-      const cashAccount = accounts.find(
-        (a: { name: string }) => a.name.toLowerCase() === 'cash'
+    // Priority 2: default account saved by user in Telegram settings
+    } else if (defaultAccountId) {
+      const byId = accounts.find(
+        (a: { id: number }) => a.id.toString() === defaultAccountId
       );
-      if (cashAccount) account = cashAccount;
+      if (byId) account = byId;
     }
 
     // ── STEP 3 — Duplicate check ──────────────────────────────────────────────
