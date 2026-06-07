@@ -145,7 +145,7 @@ export async function processCommand(command: any): Promise<string | null> {
 
         if (rows.length === 0) return '📊 *Today\'s Summary*\n\nNo transactions today.';
 
-        const expenses = rows.filter(r => r.category !== 'Income');
+        const expenses = rows.filter(r => r.category !== 'Income' && r.category !== 'Transfer' && r.category !== 'Debt/Credit');
         const incomes = rows.filter(r => r.category === 'Income');
         const totalExpense = expenses.reduce((s, r) => s + r.amount, 0);
         const totalIncome = incomes.reduce((s, r) => s + r.amount, 0);
@@ -192,7 +192,7 @@ export async function processCommand(command: any): Promise<string | null> {
           [mondayStr]
         );
 
-        const expenses = rows.filter(r => r.category !== 'Income');
+        const expenses = rows.filter(r => r.category !== 'Income' && r.category !== 'Transfer' && r.category !== 'Debt/Credit');
         const incomes = rows.filter(r => r.category === 'Income');
 
         // Top categories
@@ -223,7 +223,7 @@ export async function processCommand(command: any): Promise<string | null> {
           [monthPrefix]
         );
 
-        const expenses = rows.filter(r => r.category !== 'Income');
+        const expenses = rows.filter(r => r.category !== 'Income' && r.category !== 'Transfer' && r.category !== 'Debt/Credit');
         const incomes = rows.filter(r => r.category === 'Income');
 
         const catTotals: Record<string, number> = {};

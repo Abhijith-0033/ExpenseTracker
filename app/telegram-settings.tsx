@@ -610,7 +610,7 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: Colors.gray[150],
+    backgroundColor: Colors.gray[200],
     marginVertical: 16,
   },
   pickerSection: {
@@ -733,7 +733,7 @@ const styles = StyleSheet.create({
     fontFamily: Typography.family.regular,
   },
   txDate: {
-    fontSize: Typography.size.xxs,
+    fontSize: Typography.size.xs,
     color: Colors.gray[400],
     marginTop: 2,
     fontFamily: Typography.family.regular,
