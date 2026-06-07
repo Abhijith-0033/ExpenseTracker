@@ -232,7 +232,7 @@ async function handlePlainMessage(msg) {
     ? `${result.category} › ${result.subcategory}`
     : result.category;
 
-  const accountLine = `\nAccount:   ${result.account || 'Default account'}`;
+  const accountLine = `\nAccount:   ${result.account || 'Cash'}`;
   const noteLine    = result.note    ? `\nNote:      ${result.note}`    : '';
   const warningText = result.warnings && result.warnings.length > 0
     ? '\n\n' + result.warnings.join('\n')

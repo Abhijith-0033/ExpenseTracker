@@ -69,12 +69,12 @@ export async function processPendingTransaction(transaction: any): Promise<{
         (a: { name: string }) => a.name.toLowerCase() === transaction.account.toLowerCase()
       );
       if (byName) account = byName;
-    // Priority 2: default account saved by user in Telegram settings
-    } else if (defaultAccountId) {
-      const byId = accounts.find(
-        (a: { id: number }) => a.id.toString() === defaultAccountId
+    // Priority 2: default to "Cash" if no account was typed in Telegram
+    } else {
+      const cashAccount = accounts.find(
+        (a: { name: string }) => a.name.toLowerCase() === 'cash'
       );
-      if (byId) account = byId;
+      if (cashAccount) account = cashAccount;
     }
 
     // ── STEP 3 — Duplicate check ──────────────────────────────────────────────

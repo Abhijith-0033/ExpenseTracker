@@ -57,10 +57,18 @@ export async function pollOnce(): Promise<void> {
       AsyncStorage.getItem(TELEGRAM_KEYS.APP_USER_ID),
     ]);
 
-    if (enabled !== 'true' || !appUserId) return;
+    console.log(`[Telegram] pollOnce: enabled=${enabled}, appUserId=${appUserId}`);
+
+    if (enabled !== 'true' || !appUserId) {
+      console.log(`[Telegram] pollOnce skipping (not enabled or missing user)`);
+      return;
+    }
 
     const pending = await fetchPending(appUserId);
-    if (!pending) return; // Server unreachable — fail silently
+    if (!pending) {
+      console.log(`[Telegram] pollOnce: fetchPending returned null`);
+      return; // Server unreachable — fail silently
+    }
 
     if (pending.transactions.length > 0) {
       console.log(`[Telegram] Poll found ${pending.transactions.length} transaction(s) to process`);

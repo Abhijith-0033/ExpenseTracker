@@ -45,6 +45,7 @@ export async function fetchPending(appUserId: string): Promise<{ transactions: a
     const serverUrl = await getServerUrl();
     if (!serverUrl) return null;
 
+    console.log(`[Telegram] fetchPending → GET ${serverUrl}/api/pending/${appUserId}`);
     const response = await fetchWithTimeout(
       `${serverUrl}/api/pending/${appUserId}`,
       {
@@ -55,6 +56,8 @@ export async function fetchPending(appUserId: string): Promise<{ transactions: a
         },
       }
     );
+
+    console.log(`[Telegram] fetchPending ← status ${response.status}`);
 
     if (response.status === 401) {
       // Bad credentials — clear stored data
@@ -73,7 +76,7 @@ export async function fetchPending(appUserId: string): Promise<{ transactions: a
   } catch (err) {
     // Network error, timeout, server down — all handled silently
     if ((err as any)?.name !== 'AbortError') {
-      console.warn('[Telegram] fetchPending failed silently:', (err as any)?.message);
+      console.warn('[Telegram] fetchPending failed:', (err as any)?.message);
     }
     return null;
   }
