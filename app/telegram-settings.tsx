@@ -3,9 +3,9 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Switch
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ArrowLeft, Send, CheckCircle, AlertCircle, RefreshCw, LogOut, ChevronDown, Check } from 'lucide-react-native';
+import { ArrowLeft, Send, CheckCircle, AlertCircle, RefreshCw, LogOut } from 'lucide-react-native';
 import { Colors, Typography, Layout } from '../constants/Theme';
-import { getCategories, getAccounts, getDatabase } from '../services/database';
+import { getCategories, getDatabase } from '../services/database';
 import { TELEGRAM_KEYS, checkServerHealth, syncCategories } from '../telegram/TelegramService';
 import { startPolling, stopPolling, unregisterBackgroundTask } from '../telegram/TelegramPoller';
 
@@ -24,9 +24,6 @@ export default function TelegramSettingsScreen() {
   const [storedUserId, setStoredUserId] = useState<string | null>(null);
   const [storedServerUrl, setStoredServerUrl] = useState<string | null>(null);
   
-  const [accounts, setAccounts] = useState<any[]>([]);
-  const [defaultAccountId, setDefaultAccountId] = useState<string | null>(null);
-  const [showAccountPicker, setShowAccountPicker] = useState(false);
   const [recentTelegramTx, setRecentTelegramTx] = useState<any[]>([]);
   
   const [isTesting, setIsTesting] = useState(false);
@@ -38,12 +35,11 @@ export default function TelegramSettingsScreen() {
 
   const loadState = async () => {
     try {
-      const [userId, sUrl, enabled, last, defaultAcc] = await Promise.all([
+      const [userId, sUrl, enabled, last] = await Promise.all([
         AsyncStorage.getItem(TELEGRAM_KEYS.APP_USER_ID),
         AsyncStorage.getItem(TELEGRAM_KEYS.SERVER_URL),
         AsyncStorage.getItem(TELEGRAM_KEYS.ENABLED),
         AsyncStorage.getItem(TELEGRAM_KEYS.LAST_POLL),
-        AsyncStorage.getItem(TELEGRAM_KEYS.DEFAULT_ACCOUNT_ID),
       ]);
 
       const linked = !!userId;
@@ -52,11 +48,6 @@ export default function TelegramSettingsScreen() {
       setStoredServerUrl(sUrl);
       setIsEnabled(enabled !== 'false');
       setLastPoll(last);
-      setDefaultAccountId(defaultAcc);
-
-      // Load all accounts to populate account picker
-      const accs = await getAccounts();
-      setAccounts(accs);
 
       if (linked) {
         // Load recent Telegram transactions
@@ -126,12 +117,7 @@ export default function TelegramSettingsScreen() {
       setIsEnabled(true);
       setLastPoll(new Date().toISOString());
 
-      // Auto-set first account as default if none selected
-      const accs = await getAccounts();
-      if (accs.length > 0 && !defaultAccountId) {
-        await AsyncStorage.setItem(TELEGRAM_KEYS.DEFAULT_ACCOUNT_ID, accs[0].id.toString());
-        setDefaultAccountId(accs[0].id.toString());
-      }
+
 
       Alert.alert('Connected!', 'Your app is now linked to your Telegram Bot.');
       loadState();
@@ -159,7 +145,6 @@ export default function TelegramSettingsScreen() {
               TELEGRAM_KEYS.SERVER_URL,
               TELEGRAM_KEYS.ENABLED,
               TELEGRAM_KEYS.LAST_POLL,
-              TELEGRAM_KEYS.DEFAULT_ACCOUNT_ID,
             ]);
             setIsLinked(false);
             setStoredUserId(null);
@@ -182,11 +167,7 @@ export default function TelegramSettingsScreen() {
     }
   };
 
-  const handleAccountSelect = async (accountId: string) => {
-    setDefaultAccountId(accountId);
-    await AsyncStorage.setItem(TELEGRAM_KEYS.DEFAULT_ACCOUNT_ID, accountId);
-    setShowAccountPicker(false);
-  };
+
 
   const handleTestConnection = async () => {
     if (!storedServerUrl) return;
@@ -360,43 +341,6 @@ export default function TelegramSettingsScreen() {
                 />
               </View>
 
-              <View style={styles.divider} />
-
-              {/* Default Account Picker */}
-              <View style={styles.pickerSection}>
-                <Text style={styles.pickerLabel}>Default Account for Telegram Expenses</Text>
-                <TouchableOpacity 
-                  style={styles.pickerTrigger} 
-                  onPress={() => setShowAccountPicker(!showAccountPicker)}
-                >
-                  <Text style={styles.pickerValue}>
-                    {accounts.find(a => a.id.toString() === defaultAccountId)?.name || 'Select Account'}
-                  </Text>
-                  <ChevronDown size={20} color={Colors.gray[500]} />
-                </TouchableOpacity>
-
-                {showAccountPicker && (
-                  <View style={styles.pickerDropdown}>
-                    {accounts.map(acc => (
-                      <TouchableOpacity 
-                        key={acc.id} 
-                        style={styles.pickerItem} 
-                        onPress={() => handleAccountSelect(acc.id.toString())}
-                      >
-                        <Text style={[
-                          styles.pickerItemText,
-                          defaultAccountId === acc.id.toString() && styles.selectedPickerItemText
-                        ]}>
-                          {acc.name} (₹{acc.balance.toLocaleString('en-IN')})
-                        </Text>
-                        {defaultAccountId === acc.id.toString() && (
-                          <Check size={16} color={Colors.primary[600]} />
-                        )}
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-              </View>
             </View>
 
             {/* Test Connection Button */}
