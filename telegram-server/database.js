@@ -30,6 +30,8 @@ function initTables() {
       type            TEXT DEFAULT 'expense',
       amount          REAL NOT NULL,
       category        TEXT NOT NULL,
+      subcategory     TEXT DEFAULT NULL,
+      account         TEXT DEFAULT NULL,
       note            TEXT DEFAULT NULL,
       date            TEXT NOT NULL,
       raw_message     TEXT NOT NULL,
@@ -52,8 +54,17 @@ function initTables() {
       app_user_id TEXT NOT NULL,
       category    TEXT NOT NULL,
       synced_at   TEXT DEFAULT (datetime('now'))
-    );
   `);
+
+  // ── Safe migration: add subcategory + account columns if missing ──────────
+  // This handles databases that were created before this upgrade.
+  const ptCols = db.prepare("PRAGMA table_info(pending_transactions)").all().map(r => r.name);
+  if (!ptCols.includes('subcategory')) {
+    db.exec("ALTER TABLE pending_transactions ADD COLUMN subcategory TEXT DEFAULT NULL");
+  }
+  if (!ptCols.includes('account')) {
+    db.exec("ALTER TABLE pending_transactions ADD COLUMN account TEXT DEFAULT NULL");
+  }
 }
 
 // --- User functions ---
@@ -82,9 +93,11 @@ function upsertUser(telegramId, chatId, appUserId) {
 function insertPendingTransaction(tx) {
   getDb().prepare(`
     INSERT INTO pending_transactions
-      (id, app_user_id, type, amount, category, note, date, raw_message, status, telegram_msg_id)
+      (id, app_user_id, type, amount, category, subcategory, account,
+       note, date, raw_message, status, telegram_msg_id)
     VALUES
-      (@id, @app_user_id, @type, @amount, @category, @note, @date, @raw_message, 'pending', @telegram_msg_id)
+      (@id, @app_user_id, @type, @amount, @category, @subcategory, @account,
+       @note, @date, @raw_message, 'pending', @telegram_msg_id)
   `).run(tx);
 }
 

@@ -1,91 +1,24 @@
 'use strict';
 
+const { matchCategory, matchSubcategory } = require('./categories');
+
 /**
- * Maps casual user text → standardized category names.
- * These should match the user's app categories.
- * The app syncs its real category list to the server on connect.
+ * Account aliases: user types → canonical account name.
+ * The processor will match this against account names in the app's SQLite DB.
  */
-const CATEGORY_MAP = {
-  // Food & Dining
-  'food': 'Food', 'eat': 'Food', 'eating': 'Food', 'lunch': 'Food',
-  'dinner': 'Food', 'breakfast': 'Food', 'snack': 'Food', 'coffee': 'Food',
-  'cafe': 'Food', 'restaurant': 'Food', 'swiggy': 'Food', 'zomato': 'Food',
-  'biryani': 'Food', 'pizza': 'Food', 'burger': 'Food',
-
-  // Transport
-  'transport': 'Transport', 'travel': 'Transport', 'bus': 'Transport',
-  'auto': 'Transport', 'cab': 'Transport', 'uber': 'Transport', 'ola': 'Transport',
-  'petrol': 'Transport', 'fuel': 'Transport', 'train': 'Transport',
-  'metro': 'Transport', 'bike': 'Transport', 'taxi': 'Transport',
-  'rickshaw': 'Transport',
-
-  // Shopping
-  'shopping': 'Shopping', 'shop': 'Shopping', 'clothes': 'Shopping',
-  'amazon': 'Shopping', 'flipkart': 'Shopping', 'myntra': 'Shopping',
-  'fashion': 'Shopping', 'shoes': 'Shopping',
-
-  // Bills & Utilities (maps to Housing in default app categories)
-  'bill': 'Housing', 'bills': 'Housing', 'electricity': 'Housing',
-  'water': 'Housing', 'internet': 'Housing', 'wifi': 'Housing',
-  'phone': 'Housing', 'recharge': 'Housing', 'mobile': 'Housing',
-  'rent': 'Housing', 'maintenance': 'Housing',
-
-  // Entertainment
-  'entertainment': 'Entertainment', 'movie': 'Entertainment',
-  'movies': 'Entertainment', 'netflix': 'Entertainment',
-  'spotify': 'Entertainment', 'game': 'Entertainment', 'games': 'Entertainment',
-  'cinema': 'Entertainment', 'theatre': 'Entertainment',
-
-  // Health
-  'medical': 'Housing', 'medicine': 'Housing', 'doctor': 'Housing',
-  'hospital': 'Housing', 'pharmacy': 'Housing', 'health': 'Housing',
-
-  // Education
-  'education': 'Housing', 'book': 'Housing', 'books': 'Housing',
-  'course': 'Housing', 'fees': 'Housing', 'tuition': 'Housing',
-
-  // Grocery (maps to Food in default app)
-  'grocery': 'Food', 'groceries': 'Food', 'vegetables': 'Food',
-  'milk': 'Food', 'fruits': 'Food', 'market': 'Food',
-
-  // Subscriptions
-  'subscription': 'Subscription', 'sub': 'Subscription',
-
-  // Income
-  'salary': 'Income', 'freelance': 'Income', 'investment': 'Income',
-  'dividend': 'Income', 'bonus': 'Income',
-
-  // Other / Misc
-  'other': 'Other', 'misc': 'Other', 'miscellaneous': 'Other',
+const ACCOUNT_ALIASES = {
+  'hdfc':    'HDFC',
+  'sbi':     'SBI',
+  'cash':    'Cash',
+  'gpay':    'GPay',
+  'paytm':   'Paytm',
+  'upi':     'UPI',
+  'card':    'Card',
+  'axis':    'Axis',
+  'icici':   'ICICI',
+  'kotak':   'Kotak',
+  'phonepe': 'PhonePe',
 };
-
-/**
- * Match a text word to a category name.
- * @param {string} text
- * @param {string[]} [userCategories] - synced from app (optional)
- * @returns {string}
- */
-function matchCategory(text, userCategories = []) {
-  const lower = text.trim().toLowerCase();
-  if (!lower) return 'Other';
-
-  // Direct map lookup
-  if (CATEGORY_MAP[lower]) return CATEGORY_MAP[lower];
-
-  // Partial: check if text contains any map key
-  for (const [key, value] of Object.entries(CATEGORY_MAP)) {
-    if (lower.includes(key)) return value;
-  }
-
-  // Check against user's actual category names (case-insensitive)
-  for (const cat of userCategories) {
-    if (lower.includes(cat.toLowerCase()) || cat.toLowerCase().includes(lower)) {
-      return cat;
-    }
-  }
-
-  return 'Other';
-}
 
 /**
  * Parse a date expression from the message.
@@ -130,20 +63,30 @@ function extractDate(text) {
 }
 
 /**
- * Main parser function.
+ * Main parser. Supports both old and new format:
+ *   Old: "food 150"                   → category only, no subcategory
+ *   New: "food/snacks 150 hdfc note"  → category + subcategory + account + note
+ *   Income: "income 45000 hdfc salary"
+ *
  * @param {string} rawText
- * @param {string[]} [userCategories]
- * @returns {{ type, amount, category, note, date, isValid, errorMessage }}
+ * @returns {{
+ *   type: string, amount: number|null, category: string|null,
+ *   subcategory: string|null, account: string|null, note: string|null,
+ *   date: string, isValid: boolean, errorMessage: string|null, warnings: string[]
+ * }}
  */
-function parseMessage(rawText, userCategories = []) {
+function parseMessage(rawText) {
   const result = {
     type: 'expense',
     amount: null,
     category: null,
+    subcategory: null,
+    account: null,
     note: null,
     date: new Date().toISOString(),
     isValid: false,
     errorMessage: null,
+    warnings: [],
   };
 
   if (!rawText || rawText.trim().length === 0) {
@@ -153,79 +96,107 @@ function parseMessage(rawText, userCategories = []) {
 
   let text = rawText.trim();
 
-  // STEP 1 — Check for income prefix
+  // ── STEP 1 — Detect income prefix ──────────────────────────────────────────
   if (/^(income|inc)\s+/i.test(text)) {
     result.type = 'income';
     text = text.replace(/^(income|inc)\s+/i, '').trim();
   }
 
-  // STEP 2 — Extract date if present
+  // ── STEP 2 — Extract date override ─────────────────────────────────────────
   const { date, matched: dateStr } = extractDate(text);
   result.date = date;
   if (dateStr) {
     text = text.replace(dateStr, '').replace(/\s+/g, ' ').trim();
   }
 
-  // STEP 3 — Find amount (first number, supports commas like 1,500)
-  const amountRegex = /\b(\d{1,3}(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?)\b/;
-  const amountMatch = text.match(amountRegex);
+  // ── STEP 3 — Detect slash separator ────────────────────────────────────────
+  // Any remaining slash after date removal is the category/subcategory slash.
+  // The DD/MM date token was already stripped in STEP 2 above, so this is safe.
+  const slashIndex = text.indexOf('/');
+  const hasSlash = slashIndex !== -1;
+
+  let categoryPart   = null;  // text before '/'
+  let restAfterSlash = text;  // text starting from after '/' (or full text if no slash)
+
+  if (hasSlash) {
+    categoryPart   = text.substring(0, slashIndex).trim();
+    restAfterSlash = text.substring(slashIndex + 1).trim();
+  }
+
+  // ── STEP 4 — Extract amount from restAfterSlash ─────────────────────────
+  // Supports: 150  1500  1,500  150.50  1,50,000
+  const amountRegex = /\b(\d{1,3}(?:,\d{2,3})*(?:\.\d{1,2})?|\d+(?:\.\d{1,2})?)\b/;
+  const amountMatch = restAfterSlash.match(amountRegex);
 
   if (!amountMatch) {
     result.errorMessage =
-      '❌ Could not find a valid amount.\n\nFormat: food 150\nor: food 150 lunch with team';
+      '❌ No amount found.\n\n' +
+      'Format: category/subcategory amount\n' +
+      'Example: food/snacks 150';
     return result;
   }
 
-  const amountStr = amountMatch[0].replace(/,/g, '');
-  result.amount = parseFloat(amountStr);
-
-  if (isNaN(result.amount) || result.amount <= 0) {
-    result.errorMessage = '❌ Amount must be a positive number.';
+  const amountValue = parseFloat(amountMatch[0].replace(/,/g, ''));
+  if (isNaN(amountValue) || amountValue <= 0) {
+    result.errorMessage = '❌ Amount must be greater than 0.';
     return result;
   }
+  result.amount = amountValue;
 
-  // STEP 4 — Split text around the amount position
-  const amountIndex = text.indexOf(amountMatch[0]);
-  const beforeAmount = text.substring(0, amountIndex).trim();
-  const afterAmount = text.substring(amountIndex + amountMatch[0].length).trim();
+  // Split restAfterSlash around the amount
+  const amountPos   = restAfterSlash.indexOf(amountMatch[0]);
+  const beforeAmount = restAfterSlash.substring(0, amountPos).trim();          // subcategory token (slash format) OR category token (old format)
+  const afterAmount  = restAfterSlash.substring(amountPos + amountMatch[0].length).trim(); // account + note
 
-  // Category is the word(s) before the amount
-  if (beforeAmount) {
-    result.category = matchCategory(beforeAmount, userCategories);
-  } else if (afterAmount) {
-    // e.g. "150 food" — amount first, then category
-    // Try matching the first word of afterAmount as category
-    const firstWord = afterAmount.split(/\s+/)[0];
-    const mapped = matchCategory(firstWord, userCategories);
-    if (mapped !== 'Other') {
-      result.category = mapped;
-      const rest = afterAmount.replace(firstWord, '').trim();
-      result.note = rest || null;
-    } else {
-      result.category = 'Other';
-      result.note = afterAmount || null;
+  // ── STEP 5 — Resolve category and subcategory ────────────────────────────
+  if (hasSlash) {
+    // NEW FORMAT: categoryPart/[beforeAmount] amount [afterAmount]
+    result.category = matchCategory(categoryPart);
+
+    if (result.category === 'Others' && categoryPart) {
+      result.warnings.push(`⚠️ '${categoryPart}' is not a recognised category. Saved as Others.`);
     }
+
+    if (beforeAmount) {
+      result.subcategory = matchSubcategory(result.category, beforeAmount);
+      if (result.subcategory === null) {
+        result.warnings.push(
+          `⚠️ '${beforeAmount}' is not a recognised subcategory of ${result.category}.`
+        );
+      }
+    }
+    // If nothing between '/' and the amount → subcategory stays null, no warning needed
+
   } else {
-    // Only amount, no category
-    result.category = result.type === 'income' ? 'Income' : 'Other';
+    // OLD FORMAT: [beforeAmount] amount [afterAmount]
+    // beforeAmount is the entire category token; no subcategory
+    result.category = matchCategory(beforeAmount);
+    result.subcategory = null;
   }
 
-  // Note is text after the amount (if category was before)
-  if (beforeAmount && afterAmount) {
-    result.note = afterAmount || null;
+  // ── STEP 6 — Extract account from afterAmount ────────────────────────────
+  const words     = afterAmount ? afterAmount.split(/\s+/) : [];
+  const firstWord = words[0] ? words[0].toLowerCase() : '';
+
+  if (ACCOUNT_ALIASES[firstWord]) {
+    result.account = ACCOUNT_ALIASES[firstWord];       // e.g. 'HDFC'
+    result.note    = words.slice(1).join(' ') || null;
+  } else {
+    result.account = null;                             // app will use its default account
+    result.note    = afterAmount || null;
   }
 
-  // Income type: force category to 'Income'
+  // ── STEP 7 — Income override ─────────────────────────────────────────────
+  // Income transactions: category is always 'Income'; no subcategory.
+  // Account and note resolution (done above) still applies.
   if (result.type === 'income') {
-    result.category = 'Income';
-    // The note can include whatever was before/after
-    const combined = [beforeAmount, afterAmount].filter(Boolean).join(' ').trim();
-    result.note = combined || null;
+    result.category    = 'Income';
+    result.subcategory = null;
   }
 
-  // STEP 5 — Validate
+  // ── STEP 8 — Validate and return ─────────────────────────────────────────
   result.isValid = true;
   return result;
 }
 
-module.exports = { parseMessage, matchCategory, CATEGORY_MAP };
+module.exports = { parseMessage, extractDate };

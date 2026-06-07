@@ -136,11 +136,8 @@ async function handleStatus(msg) {
 
 async function handleCategories(msg) {
   const chatId = String(msg.chat.id);
-  const telegramId = String(msg.from.id);
-  const user = db.getUserByTelegramId(telegramId);
-
-  const userCategories = user ? db.getUserCategories(user.app_user_id) : [];
-  const text = formatCategoryList(userCategories);
+  // formatCategoryList() is now self-contained — no argument needed
+  const text = formatCategoryList();
   await bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
 }
 
@@ -199,11 +196,8 @@ async function handlePlainMessage(msg) {
     return;
   }
 
-  // Get user's synced categories for better matching
-  const userCategories = db.getUserCategories(user.app_user_id);
-
   // STEP 2: Parse the message
-  const result = parseMessage(text, userCategories);
+  const result = parseMessage(text);
 
   if (!result.isValid) {
     await bot.sendMessage(chatId,
@@ -213,7 +207,7 @@ async function handlePlainMessage(msg) {
     return;
   }
 
-  // STEP 3: Store pending transaction
+  // STEP 3: Store pending transaction (now includes subcategory + account)
   const txId = uuidv4();
   db.insertPendingTransaction({
     id: txId,
@@ -221,6 +215,8 @@ async function handlePlainMessage(msg) {
     type: result.type,
     amount: result.amount,
     category: result.category,
+    subcategory: result.subcategory || null,
+    account: result.account || null,
     note: result.note,
     date: result.date,
     raw_message: text,
@@ -230,15 +226,27 @@ async function handlePlainMessage(msg) {
   // STEP 4: Send confirmation with inline keyboard
   const emoji = result.type === 'income' ? '💰' : '💸';
   const dateDisplay = formatDate(result.date);
-  const noteLine = result.note ? `\nNote:      ${result.note}` : '';
+
+  // "Food › Snacks"  or just  "Food"
+  const categoryLine = result.subcategory
+    ? `${result.category} › ${result.subcategory}`
+    : result.category;
+
+  const accountLine = result.account ? `\nAccount:   ${result.account}` : '';
+  const noteLine    = result.note    ? `\nNote:      ${result.note}`    : '';
+  const warningText = result.warnings && result.warnings.length > 0
+    ? '\n\n' + result.warnings.join('\n')
+    : '';
 
   const confirmText =
-    `${emoji} *Got it!*\n\n` +
+    `${emoji} *Confirm Expense?*\n\n` +
+    `Category:  ${categoryLine}\n` +
     `Amount:    ${formatAmount(result.amount)}\n` +
-    `Category:  ${result.category}\n` +
     `Date:      ${dateDisplay}` +
-    noteLine + '\n\n' +
-    `_Saving to your app..._`;
+    accountLine +
+    noteLine +
+    warningText + '\n\n' +
+    `✅ Confirm    ❌ Cancel`;
 
   await bot.sendMessage(chatId, confirmText, {
     parse_mode: 'Markdown',
