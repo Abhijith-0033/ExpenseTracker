@@ -1,7 +1,11 @@
 const Database = require('better-sqlite3');
 const path = require('path');
+const fs = require('fs');
 
-const DB_PATH = path.join(__dirname, 'bot_queue.db');
+// Use /data volume if available (Railway persistent storage), otherwise local
+const DATA_DIR = fs.existsSync('/data') ? '/data' : __dirname;
+const DB_PATH = path.join(DATA_DIR, 'bot_queue.db');
+console.log(`[DB] Using database at: ${DB_PATH}`);
 let db;
 
 function getDb() {
