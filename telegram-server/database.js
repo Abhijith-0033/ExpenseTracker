@@ -54,6 +54,7 @@ function initTables() {
       app_user_id TEXT NOT NULL,
       category    TEXT NOT NULL,
       synced_at   TEXT DEFAULT (datetime('now'))
+    );
   `);
 
   // ── Safe migration: add subcategory + account columns if missing ──────────
