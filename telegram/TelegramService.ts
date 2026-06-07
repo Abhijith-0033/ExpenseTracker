@@ -91,9 +91,12 @@ export async function markProcessed(
 ): Promise<void> {
   const attempt = async () => {
     const serverUrl = await getServerUrl();
-    if (!serverUrl) return;
-
-    await fetchWithTimeout(
+    if (!serverUrl) {
+      console.warn('[Telegram] markProcessed: no serverUrl in storage');
+      return;
+    }
+    console.log(`[Telegram] markProcessed → POST ${serverUrl}/api/processed/${transactionId}`);
+    const response = await fetchWithTimeout(
       `${serverUrl}/api/processed/${transactionId}`,
       {
         method: 'POST',
@@ -108,17 +111,19 @@ export async function markProcessed(
         }),
       }
     );
+    console.log(`[Telegram] markProcessed ← status ${response.status}`);
   };
 
   try {
     await attempt();
-  } catch {
+  } catch (err) {
+    console.warn('[Telegram] markProcessed first attempt failed:', (err as any)?.message);
     // Retry once after 2 seconds
     await new Promise(resolve => setTimeout(resolve, 2000));
     try {
       await attempt();
     } catch (retryErr) {
-      console.warn('[Telegram] markProcessed retry failed:', retryErr);
+      console.warn('[Telegram] markProcessed retry failed:', (retryErr as any)?.message);
     }
   }
 }
