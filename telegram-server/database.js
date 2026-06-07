@@ -106,7 +106,7 @@ function getPendingTransactions(appUserId) {
   return getDb().prepare(`
     SELECT * FROM pending_transactions
     WHERE app_user_id = ?
-      AND status IN ('confirmed', 'pending')
+      AND status IN ('confirmed', 'undo_requested')
       AND created_at > datetime('now', '-24 hours')
     ORDER BY created_at ASC
   `).all(appUserId);
