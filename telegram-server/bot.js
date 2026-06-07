@@ -342,21 +342,32 @@ async function processUpdate(update) {
  */
 async function notifyTransactionProcessed(appUserId, tx, success, errorMsg) {
   try {
+    console.log(`[notify] appUserId=${appUserId} success=${success}`);
     const user = db.getUserByAppUserId(appUserId);
-    if (!user || !bot) return;
+    if (!user) {
+      console.warn(`[notify] No user found for appUserId=${appUserId} — cannot send Telegram message`);
+      return;
+    }
+    if (!bot) {
+      console.warn(`[notify] Bot not initialized`);
+      return;
+    }
 
     const chatId = user.chat_id;
+    console.log(`[notify] Sending message to chatId=${chatId} success=${success}`);
 
     if (success) {
       const dateDisplay = formatDate(tx.date);
       const noteStr = tx.note ? `\n📝 ${tx.note}` : '';
+      const subStr = tx.subcategory ? ` › ${tx.subcategory}` : '';
       await bot.sendMessage(chatId,
         `✅ *Transaction Added!*\n\n` +
-        `${formatAmount(tx.amount)} · ${tx.category}\n` +
+        `${formatAmount(tx.amount)} · ${tx.category}${subStr}\n` +
         `${dateDisplay}${noteStr}\n\n` +
         `Balance updated in your app.`,
         { parse_mode: 'Markdown' }
       );
+      console.log(`[notify] ✅ Message sent to chatId=${chatId}`);
     } else {
       await bot.sendMessage(chatId,
         `❌ Failed to add transaction.\n` +

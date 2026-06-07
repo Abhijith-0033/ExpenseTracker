@@ -88,11 +88,16 @@ app.post('/api/processed/:transaction_id', requireSecret, async (req, res) => {
   const { transaction_id } = req.params;
   const { app_user_id, success, error_message } = req.body;
 
+  console.log(`[/api/processed] txId=${transaction_id} app_user_id=${app_user_id} success=${success}`);
+
   try {
     const tx = db.getTransactionById(transaction_id);
     if (!tx) {
+      console.warn(`[/api/processed] Transaction not found: ${transaction_id}`);
       return res.status(404).json({ error: 'Transaction not found' });
     }
+
+    console.log(`[/api/processed] Found tx: category=${tx.category} amount=${tx.amount} status=${tx.status}`);
 
     db.updateTransactionStatus(
       transaction_id,

@@ -62,8 +62,14 @@ export async function pollOnce(): Promise<void> {
     const pending = await fetchPending(appUserId);
     if (!pending) return; // Server unreachable — fail silently
 
+    if (pending.transactions.length > 0) {
+      console.log(`[Telegram] Poll found ${pending.transactions.length} transaction(s) to process`);
+    }
+
     // Process pending transactions
     for (const transaction of pending.transactions) {
+      console.log(`[Telegram] Processing tx id=${transaction.id} status=${transaction.status} category=${transaction.category} amount=${transaction.amount}`);
+
       // Handle undo requests
       if (transaction.status === 'undo_requested') {
         const result = await processUndo(transaction);
@@ -73,7 +79,9 @@ export async function pollOnce(): Promise<void> {
 
       // Process normal transactions
       const result = await processPendingTransaction(transaction);
+      console.log(`[Telegram] processPendingTransaction result: success=${result.success} error=${result.error}`);
       await markProcessed(transaction.id, appUserId, result.success, result.error);
+      console.log(`[Telegram] markProcessed called for tx id=${transaction.id}`);
 
       if (result.success) {
         const amount = transaction.amount;
