@@ -245,6 +245,77 @@ export async function processCommand(command: any): Promise<string | null> {
         return lines.filter(Boolean).join('\n');
       }
 
+      case 'query_summary': {
+        const monthPrefix = today.substring(0, 7);
+
+        const rows = await db.getAllAsync<{ amount: number; category: string }>(
+          `SELECT amount, category FROM transactions
+           WHERE substr(date, 1, 7) = ?`,
+          [monthPrefix]
+        );
+
+        const expenses = rows.filter(r => r.category !== 'Income' && r.category !== 'Transfer' && r.category !== 'Debt/Credit');
+        const incomes = rows.filter(r => r.category === 'Income');
+        const totalExpense = expenses.reduce((s, r) => s + r.amount, 0);
+        const totalIncome = incomes.reduce((s, r) => s + r.amount, 0);
+
+        const catTotals: Record<string, number> = {};
+        for (const r of expenses) {
+          catTotals[r.category] = (catTotals[r.category] || 0) + r.amount;
+        }
+        const topCats = Object.entries(catTotals)
+          .sort(([, a], [, b]) => b - a)
+          .slice(0, 5)
+          .map(([cat, amt]) => `• ${cat}: ₹${amt.toLocaleString('en-IN')}`);
+
+        const todayDate = new Date();
+        const daysElapsed = todayDate.getDate();
+        const daysInMonth = new Date(todayDate.getFullYear(), todayDate.getMonth() + 1, 0).getDate();
+        const daysLeft = daysInMonth - daysElapsed;
+        const avgDaily = totalExpense / daysElapsed;
+        const projected = avgDaily * daysInMonth;
+
+        const monthName = todayDate.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
+        const lines = [
+          `📊 *${monthName} Summary Report*\n`,
+          `💸 *Total Expenses:* ₹${totalExpense.toLocaleString('en-IN')}`,
+          `💰 *Total Income:* ₹${totalIncome.toLocaleString('en-IN')}`,
+          `💳 *Net Balance:* ₹${(totalIncome - totalExpense).toLocaleString('en-IN')}`,
+          `────────────────`,
+          `📅 *Days Elapsed:* ${daysElapsed} / ${daysInMonth}`,
+          `⏱ *Days Remaining:* ${daysLeft} days`,
+          `📈 *Avg Daily Spend:* ₹${Math.round(avgDaily).toLocaleString('en-IN')}`,
+          `🔮 *Projected Monthly Spend:* ₹${Math.round(projected).toLocaleString('en-IN')}`,
+          topCats.length ? `\n*Top Categories:*\n${topCats.join('\n')}` : '',
+        ];
+        return lines.filter(Boolean).join('\n');
+      }
+
+      case 'query_budget': {
+        const { getBudgetStatus } = await import('../services/budgets');
+        const todayDate = new Date();
+        const statuses = await getBudgetStatus(todayDate);
+
+        if (statuses.length === 0) {
+          return '📊 *Monthly Budgets*\n\nNo budgets set for this month.';
+        }
+
+        const lines = [
+          `📊 *Monthly Budget Status*\n`,
+          ...statuses.map(b => {
+            const pct = Math.round(b.percentage);
+            const alertEmoji = pct >= 100 ? '🔴' : pct >= 80 ? '🟡' : '🟢';
+            return (
+              `*${b.category}* ${alertEmoji}\n` +
+              `• Budget: ₹${b.budget.toLocaleString('en-IN')}\n` +
+              `• Spent:  ₹${b.spent.toLocaleString('en-IN')} (${pct}%)\n` +
+              `• Left:   ₹${b.remaining.toLocaleString('en-IN')}`
+            );
+          }),
+        ];
+        return lines.join('\n\n');
+      }
+
       default:
         return null;
     }

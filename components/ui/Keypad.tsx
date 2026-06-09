@@ -9,6 +9,7 @@ interface KeypadProps {
     onDelete: () => void;
     onSubmit: () => void;
     onClear: () => void;
+    onEvaluate?: () => void;
     disabled?: boolean;
     submitColor?: string;
     submitLabel?: string;
@@ -19,6 +20,7 @@ export const Keypad: React.FC<KeypadProps> = ({
     onDelete,
     onSubmit,
     onClear,
+    onEvaluate,
     disabled,
     submitColor,
     submitLabel = "Save Expense"
@@ -66,12 +68,30 @@ export const Keypad: React.FC<KeypadProps> = ({
 
             <View style={styles.actionsRow}>
                 <TouchableOpacity
-                    style={[styles.actionKey, { backgroundColor: Colors.danger[50] }]}
+                    style={[styles.actionKey, styles.circleActionKey, { backgroundColor: Colors.danger[50] }]}
                     onPress={handleDelete}
                     onLongPress={onClear}
                 >
                     <Delete size={24} color={Colors.danger[500]} />
                 </TouchableOpacity>
+
+                {onEvaluate && (
+                    <TouchableOpacity
+                        style={[
+                            styles.actionKey,
+                            styles.circleActionKey,
+                            { 
+                                borderColor: Colors.primary[600], 
+                                borderWidth: 1, 
+                                backgroundColor: Colors.white,
+                                marginLeft: 16
+                            }
+                        ]}
+                        onPress={onEvaluate}
+                    >
+                        <Text style={[styles.keyText, { color: Colors.primary[600] }]}>=</Text>
+                    </TouchableOpacity>
+                )}
 
                 <TouchableOpacity
                     style={[
@@ -139,6 +159,9 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         borderRadius: Layout.radius.full,
+    },
+    circleActionKey: {
+        width: 60,
     },
     submitKey: {
         flex: 1,

@@ -217,18 +217,6 @@ export const setupNotificationCategories = async (): Promise<void> => {
       { identifier: 'VIEW_BUDGET', buttonTitle: '📊 View Budget', options: { opensAppToForeground: true } },
     ]);
 
-    // Inline reply for quick add (Android only)
-    if (Platform.OS === 'android') {
-      try {
-        await Notifications.setNotificationCategoryAsync('DAILY_REMINDER_INLINE', [
-          { identifier: 'ADD_EXPENSE', buttonTitle: '➕ Add Expense', options: { opensAppToForeground: true } },
-          { identifier: 'ADD_INCOME', buttonTitle: '💰 Add Income', options: { opensAppToForeground: true } },
-          { identifier: 'QUICK_ADD', buttonTitle: '⚡ Quick Add', textInput: { submitButtonTitle: 'Save', placeholder: 'Amount (e.g. 150 Food)' } },
-        ]);
-      } catch (e) {
-        console.warn('Inline reply not supported, falling back');
-      }
-    }
   } catch (error) {
     console.warn('Failed to setup notification categories:', error);
   }
@@ -258,37 +246,6 @@ const getDayOfWeekMessage = (): string => {
     case 0:
     case 6: return "Weekend spending? Don't forget to track it!";
     default: return "Take 30 seconds to log today's expenses.";
-  }
-};
-
-const parseQuickAdd = async (text: string): Promise<{ amount: number; category: string; valid: boolean }> => {
-  try {
-    const match = text.match(/^(\d+\.?\d*)\s*(.*)?$/);
-    if (!match) return { amount: 0, category: '', valid: false };
-
-    const amount = parseFloat(match[1]);
-    const categoryHint = (match[2] || '').trim();
-
-    if (isNaN(amount) || amount <= 0) return { amount: 0, category: '', valid: false };
-
-    // Try to match category against existing categories
-    const db = getDatabase();
-    if (!db) return { amount, category: 'Other', valid: true };
-
-    const categories = await db.getAllAsync<{ name: string }>('SELECT name FROM categories');
-    const matchedCategory = categories.find(cat => 
-      cat.name.toLowerCase().includes(categoryHint.toLowerCase()) ||
-      categoryHint.toLowerCase().includes(cat.name.toLowerCase())
-    );
-
-    return {
-      amount,
-      category: matchedCategory?.name || 'Other',
-      valid: true
-    };
-  } catch (error) {
-    console.error('Error parsing quick add:', error);
-    return { amount: 0, category: '', valid: false };
   }
 };
 
@@ -326,7 +283,7 @@ export const scheduleDailyReminder = async (): Promise<void> => {
         screen: '/(tabs)/add',
         date: getTodayString(),
       },
-      categoryIdentifier: Platform.OS === 'android' ? 'DAILY_REMINDER_INLINE' : 'DAILY_REMINDER_ACTIONS',
+      categoryIdentifier: 'DAILY_REMINDER_ACTIONS',
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DAILY,

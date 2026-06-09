@@ -13,6 +13,30 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Typography, Layout } from '../constants/Theme';
 
+function evaluateExpression(expr: string): number {
+    const safe = expr.replace(/[^0-9+\-*/.]/g, '');
+    if (!safe) return 0;
+    try {
+        // eslint-disable-next-line no-new-func
+        const result = new Function(`return (${safe})`)();
+        return typeof result === 'number' && isFinite(result) ? result : 0;
+    } catch {
+        const tokens = safe.match(/(\d+\.?\d*)|([-+*/])/g);
+        if (!tokens) return parseFloat(safe) || 0;
+        let result = parseFloat(tokens[0]);
+        for (let i = 1; i < tokens.length; i += 2) {
+            const op = tokens[i];
+            const val = parseFloat(tokens[i + 1]);
+            if (isNaN(val)) continue;
+            if (op === '+') result += val;
+            else if (op === '-') result -= val;
+            else if (op === '*') result *= val;
+            else if (op === '/') result = val !== 0 ? result / val : 0;
+        }
+        return result;
+    }
+}
+
 export default function EditTransactionScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
@@ -52,8 +76,16 @@ export default function EditTransactionScreen() {
     }, [id, transactions, accounts]);
 
     const handleKeyPress = (val: string) => {
+        const operators = ['+', '-', '*', '/'];
         if (val === '.') {
-            if (!amount.includes('.')) setAmount(prev => prev + val);
+            const segments = amount.split(/[+\-*/]/);
+            const lastSeg = segments[segments.length - 1];
+            if (!lastSeg.includes('.')) setAmount(prev => prev + val);
+        } else if (operators.includes(val)) {
+            setAmount(prev => {
+                const trimmed = prev.replace(/[+\-*/]+$/, '');
+                return trimmed + val;
+            });
         } else {
             setAmount(prev => (prev === '0' ? val : prev + val));
         }
@@ -61,9 +93,14 @@ export default function EditTransactionScreen() {
 
     const handleDeleteKey = () => setAmount(prev => (prev.length > 1 ? prev.slice(0, -1) : '0'));
 
+    const handleEvaluate = () => {
+        setAmount(evaluateExpression(amount).toString());
+    };
+
     const handleSave = async () => {
+        const finalAmount = evaluateExpression(amount);
         const newErrors: Record<string, string> = {};
-        if (!amount || parseFloat(amount) <= 0) newErrors.amount = 'Valid amount is required';
+        if (!amount || finalAmount <= 0) newErrors.amount = 'Valid amount is required';
         if (!category) newErrors.category = 'Please select a category';
         if (!selectedAccount) newErrors.account = 'Please select an account';
 
@@ -76,7 +113,7 @@ export default function EditTransactionScreen() {
         try {
             // Use the new atomic updateTransaction service to prevent data loss
             await updateTransaction(originalTx.id, {
-                amount: parseFloat(amount),
+                amount: finalAmount,
                 category,
                 subcategory,
                 account_id: selectedAccount.id,
@@ -120,7 +157,7 @@ export default function EditTransactionScreen() {
                     showsVerticalScrollIndicator={false}
                 >
                     <View style={[styles.header, { paddingTop: insets.top || 16 }]}>
-                        <Text style={styles.title}>Edit Expense</Text>
+                        <Text style={styles.title}>{category === 'Income' ? 'Edit Income' : 'Edit Expense'}</Text>
                         <TouchableOpacity onPress={handleDeleteTx}>
                             <Trash2 size={24} color="#ef4444" />
                         </TouchableOpacity>
@@ -181,13 +218,20 @@ export default function EditTransactionScreen() {
                         </View>
                     </View>
 
-                    <Keypad onPress={handleKeyPress} onDelete={handleDeleteKey} onClear={() => setAmount('0')} onSubmit={handleSave} />
+                    <Keypad 
+                        onPress={handleKeyPress} 
+                        onDelete={handleDeleteKey} 
+                        onClear={() => setAmount('0')} 
+                        onSubmit={handleSave} 
+                        onEvaluate={handleEvaluate} 
+                    />
                 </ScrollView>
             </KeyboardAvoidingView>
 
             <CategoryPicker
                 visible={showCategoryPicker}
                 onClose={() => setShowCategoryPicker(false)}
+                type={category === 'Income' ? 'income' : 'expense'}
                 onSelect={(cat, sub) => {
                     setCategory(cat);
                     setSubcategory(sub);

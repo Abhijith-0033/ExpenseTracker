@@ -105,6 +105,8 @@ async function handleHelp(msg) {
     `/today — Today's expenses\n` +
     `/week — This week summary\n` +
     `/month — This month summary\n` +
+    `/summary — Rich monthly report with projection\n` +
+    `/budget — Category budgets vs actuals\n` +
     `/balance — Account balances\n` +
     `/categories — Full category list\n` +
     `/undo — Undo last transaction\n` +
@@ -248,13 +250,25 @@ async function handlePlainMessage(msg) {
     warningText + '\n\n' +
     `✅ Confirm    ❌ Cancel`;
 
+  const inlineKeyboard = [[
+    { text: '✅ Confirm', callback_data: `confirm_${txId}` },
+    { text: '❌ Cancel', callback_data: `cancel_${txId}` },
+  ]];
+
+  // Inline account selector hints if account is omitted
+  if (!result.account) {
+    inlineKeyboard.push([
+      { text: '💳 HDFC', callback_data: `setacc_${txId}_HDFC` },
+      { text: '💳 SBI', callback_data: `setacc_${txId}_SBI` },
+      { text: '💵 Cash', callback_data: `setacc_${txId}_Cash` },
+      { text: '💳 ICICI', callback_data: `setacc_${txId}_ICICI` },
+    ]);
+  }
+
   await bot.sendMessage(chatId, confirmText, {
     parse_mode: 'Markdown',
     reply_markup: {
-      inline_keyboard: [[
-        { text: '✅ Confirm', callback_data: `confirm_${txId}` },
-        { text: '❌ Cancel', callback_data: `cancel_${txId}` },
-      ]]
+      inline_keyboard: inlineKeyboard
     }
   });
 }
@@ -288,6 +302,42 @@ async function handleCallbackQuery(callbackQuery) {
       '❌ Transaction cancelled.',
       { chat_id: chatId, message_id: messageId }
     );
+  } else if (data.startsWith('setacc_')) {
+    const parts = data.split('_');
+    const txId = parts[1];
+    const accName = parts[2];
+
+    db.getDb().prepare('UPDATE pending_transactions SET account = ? WHERE id = ?').run(accName, txId);
+
+    const tx = db.getTransactionById(txId);
+    const dateDisplay = formatDate(tx.date);
+    const categoryLine = tx.subcategory
+      ? `${tx.category} › ${tx.subcategory}`
+      : tx.category;
+    const emoji = tx.type === 'income' ? '💰' : '💸';
+    const noteLine = tx.note ? `\nNote:      ${tx.note}` : '';
+
+    const confirmText =
+      `${emoji} *Confirm Expense?*\n\n` +
+      `Category:  ${categoryLine}\n` +
+      `Amount:    ${formatAmount(tx.amount)}\n` +
+      `Date:      ${dateDisplay}\n` +
+      `Account:   ${tx.account}` +
+      noteLine + '\n\n' +
+      `✅ Confirm    ❌ Cancel`;
+
+    await bot.editMessageText(confirmText, {
+      chat_id: chatId,
+      message_id: messageId,
+      parse_mode: 'Markdown',
+      reply_markup: {
+        inline_keyboard: [[
+          { text: '✅ Confirm', callback_data: `confirm_${txId}` },
+          { text: '❌ Cancel', callback_data: `cancel_${txId}` },
+        ]]
+      }
+    });
+    await bot.answerCallbackQuery(callbackQuery.id, { text: `Account set to ${accName}` });
   }
 }
 
@@ -317,12 +367,14 @@ async function processUpdate(update) {
       await handleCategories(msg);
     } else if (text === '/undo') {
       await handleUndo(msg);
-    } else if (['/today', '/balance', '/week', '/month'].includes(text)) {
+    } else if (['/today', '/balance', '/week', '/month', '/summary', '/budget'].includes(text)) {
       const commandMap = {
         '/today': 'query_today',
         '/balance': 'query_balance',
         '/week': 'query_week',
         '/month': 'query_month',
+        '/summary': 'query_summary',
+        '/budget': 'query_budget',
       };
       await handleQueryCommand(msg, commandMap[text]);
     } else if (text.startsWith('/')) {

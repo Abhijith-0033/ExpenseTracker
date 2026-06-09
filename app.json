@@ -13,7 +13,7 @@
     },
     "android": {
       "package": "com.expensetracker.app",
-      "versionCode": 40,
+      "versionCode": 41,
       "adaptiveIcon": {
         "backgroundColor": "#0F172A",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

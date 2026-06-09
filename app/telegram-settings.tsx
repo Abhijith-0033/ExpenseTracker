@@ -223,7 +223,7 @@ export default function TelegramSettingsScreen() {
               </View>
               <Text style={styles.promoTitle}>Quick Expense Input</Text>
               <Text style={styles.promoDescription}>
-                Link a Telegram Bot to instantly message your transactions e.g. "food 150 lunch" and have them added automatically!
+                Link a Telegram Bot to instantly message your transactions e.g. &quot;food 150 lunch&quot; and have them added automatically!
               </Text>
             </View>
 

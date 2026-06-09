@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, Linking, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, Linking, ActivityIndicator, Platform } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Bell, CheckCircle, AlertCircle, Clock, ChevronRight, Settings } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -43,6 +44,11 @@ export default function NotificationSettingsScreen() {
   const [loading, setLoading] = useState(false);
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
+  
+  // Custom time picker state
+  const [showTimePickerModal, setShowTimePickerModal] = useState(false);
+  const [timePickerTarget, setTimePickerTarget] = useState<'reminder' | 'report'>('reminder');
+  const [timePickerValue, setTimePickerValue] = useState(new Date());
 
   // Load settings on mount
   useEffect(() => {
@@ -187,21 +193,12 @@ export default function NotificationSettingsScreen() {
   };
 
   const showTimePicker = (currentTime: string, type: 'reminder' | 'report') => {
-    // This would open a time picker modal
-    // For now, we'll use a simple approach with preset times
-    Alert.alert(
-      'Select Time',
-      'Choose notification time',
-      [
-        { text: '8:00 AM', onPress: () => handleTimeSelect('08:00', type) },
-        { text: '9:00 AM', onPress: () => handleTimeSelect('09:00', type) },
-        { text: '6:00 PM', onPress: () => handleTimeSelect('18:00', type) },
-        { text: '8:00 PM', onPress: () => handleTimeSelect('20:00', type) },
-        { text: '9:00 PM', onPress: () => handleTimeSelect('21:00', type) },
-        { text: '10:00 PM', onPress: () => handleTimeSelect('22:00', type) },
-        { text: 'Cancel', style: 'cancel' },
-      ]
-    );
+    const [h, m] = currentTime.split(':').map(Number);
+    const d = new Date();
+    d.setHours(h, m, 0, 0);
+    setTimePickerValue(d);
+    setTimePickerTarget(type);
+    setShowTimePickerModal(true);
   };
 
   const handleTimeSelect = (time: string, type: 'reminder' | 'report') => {
@@ -545,6 +542,24 @@ export default function NotificationSettingsScreen() {
         message={snackbarMessage}
         onDismiss={() => setSnackbarVisible(false)}
       />
+
+      {/* Time Picker Modal */}
+      {showTimePickerModal && (
+        <DateTimePicker
+          value={timePickerValue}
+          mode="time"
+          is24Hour={false}
+          display={Platform.OS === 'ios' ? 'spinner' : 'clock'}
+          onChange={(event, selectedDate) => {
+            setShowTimePickerModal(false);
+            if (selectedDate) {
+              const h = selectedDate.getHours().toString().padStart(2, '0');
+              const m = selectedDate.getMinutes().toString().padStart(2, '0');
+              handleTimeSelect(`${h}:${m}`, timePickerTarget);
+            }
+          }}
+        />
+      )}
     </View>
   );
 }

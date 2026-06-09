@@ -77,6 +77,36 @@ export const SatisfactionEngine = {
       }
     });
 
+    // Early exit: no data at all
+    if (totalIncome === 0 && totalExpense === 0) {
+      return {
+        finalScore: 0,
+        status: {
+          label: 'No Data',
+          color: '#9CA3AF', 
+          emoji: '📭',
+          description: 'No transactions recorded this month',
+        },
+        metrics: {
+          totalIncome: 0,
+          totalExpense: 0,
+          essentialExpense: 0,
+          nonEssentialExpense: 0,
+          remainingBalance: 0,
+          savingsRate: 0,
+          essentialRatio: 0,
+          luxuryRatio: 0,
+          consistencyScore: 0.5,
+          balanceStability: 0.5,
+          baseScore: 0,
+          currentMonthBalance: 0,
+          previousMonthBalance: 0,
+          penalties: [],
+          bonuses: []
+        }
+      };
+    }
+
     const remainingBalance = totalIncome - totalExpense;
     const savingsRate = totalIncome > 0 ? remainingBalance / totalIncome : 0;
     const essentialRatio = totalExpense > 0 ? essentialExpense / totalExpense : 0;
@@ -135,9 +165,13 @@ export const SatisfactionEngine = {
     const previousMonthBalance = prevIncome - prevExpense;
     const currentMonthBalance = remainingBalance;
     
-    let balanceStability = 0.5; // neutral
-    if (prevTransactions.length > 0) {
-      balanceStability = currentMonthBalance >= previousMonthBalance ? 1 : Math.max(0, currentMonthBalance / previousMonthBalance);
+    let balanceStability = 0.5;
+    if (prevTransactions.length > 0 && previousMonthBalance !== 0) {
+      balanceStability = currentMonthBalance >= previousMonthBalance
+        ? 1
+        : Math.max(0, currentMonthBalance / previousMonthBalance);
+    } else if (prevTransactions.length > 0 && previousMonthBalance === 0) {
+      balanceStability = currentMonthBalance >= 0 ? 1 : 0;
     }
 
     // 4. Base Score Formula

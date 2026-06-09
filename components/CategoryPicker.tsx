@@ -1,19 +1,33 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Modal, View, Text, TouchableOpacity, StyleSheet, FlatList, SafeAreaView } from 'react-native';
 import { useApp } from '../context/AppContext';
-import { CategoryNode } from '../services/database';
+import { CategoryNode, getIncomeSources } from '../services/database';
 import { X, ChevronRight } from 'lucide-react-native';
 
 interface CategoryPickerProps {
     visible: boolean;
     onClose: () => void;
     onSelect: (category: string, subcategory: string) => void;
+    type?: 'expense' | 'income';
 }
 
-export const CategoryPicker: React.FC<CategoryPickerProps> = ({ visible, onClose, onSelect }) => {
+export const CategoryPicker: React.FC<CategoryPickerProps> = ({ visible, onClose, onSelect, type = 'expense' }) => {
     const { categories } = useApp();
     const [selectedParent, setSelectedParent] = useState<CategoryNode | null>(null);
+    const [incomeSources, setIncomeSources] = useState<string[]>([]);
+
+    useEffect(() => {
+        if (visible && type === 'income') {
+            getIncomeSources()
+                .then(sources => {
+                    setIncomeSources(sources.map(s => s.name));
+                })
+                .catch(err => {
+                    console.error("Failed to load income sources in CategoryPicker", err);
+                });
+        }
+    }, [visible, type]);
 
     const handleSelectSub = (sub: string) => {
         if (selectedParent) {
@@ -59,7 +73,7 @@ export const CategoryPicker: React.FC<CategoryPickerProps> = ({ visible, onClose
             <SafeAreaView style={styles.modalContainer}>
                 <View style={styles.header}>
                     <Text style={styles.title}>
-                        {selectedParent ? selectedParent.name : 'Select Category'}
+                        {type === 'income' ? 'Select Income Category' : (selectedParent ? selectedParent.name : 'Select Category')}
                     </Text>
                     <TouchableOpacity onPress={() => {
                         if (selectedParent) setSelectedParent(null);
@@ -69,7 +83,24 @@ export const CategoryPicker: React.FC<CategoryPickerProps> = ({ visible, onClose
                     </TouchableOpacity>
                 </View>
 
-                {selectedParent ? (
+                {type === 'income' ? (
+                    <FlatList
+                        data={incomeSources}
+                        keyExtractor={(i) => i}
+                        renderItem={({ item }) => (
+                            <TouchableOpacity
+                                style={styles.item}
+                                onPress={() => {
+                                    onSelect('Income', item);
+                                    onClose();
+                                }}
+                            >
+                                <View style={styles.iconPlaceholder} />
+                                <Text style={styles.itemText}>{item}</Text>
+                            </TouchableOpacity>
+                        )}
+                    />
+                ) : selectedParent ? (
                     <View style={{ flex: 1 }}>
                         <TouchableOpacity style={styles.backButton} onPress={() => setSelectedParent(null)}>
                             <Text style={{ color: '#2563eb' }}>Back to Categories</Text>
@@ -82,7 +113,7 @@ export const CategoryPicker: React.FC<CategoryPickerProps> = ({ visible, onClose
                     </View>
                 ) : (
                     <FlatList
-                        data={categories}
+                        data={categories.filter(c => c.name !== 'Income')}
                         keyExtractor={(i) => i.id}
                         renderItem={renderItem}
                     />

@@ -340,7 +340,7 @@ export default function DebtTrackerScreen() {
             <AlertCircle size={48} color={Colors.gray[400]} />
             <Text style={styles.emptyTitle}>No debts tracked</Text>
             <Text style={styles.emptySubtitle}>
-              Track loans you've taken or given with full repayment history
+              Track loans you&apos;ve taken or given with full repayment history
             </Text>
             <TouchableOpacity 
               style={styles.emptyActionBtn} 

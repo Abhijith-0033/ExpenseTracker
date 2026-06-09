@@ -22,7 +22,7 @@ import { playIncomeSound, playExpenseSound } from '../../services/SoundService';
 import { addSubscription } from '../../services/subscriptions';
 import Animated, { FadeIn, FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Sparkles, Clipboard } from 'lucide-react-native';
-import { checkDuplicate } from '../../services/duplicateCheck';
+import { checkDuplicate, getSmartSuggestions, getLastUsedForCategory, SmartSuggestion } from '../../services/duplicateCheck';
 import { DuplicateWarningSheet } from '../../components/DuplicateWarningSheet';
 
 
@@ -59,6 +59,8 @@ export default function AddTransactionScreen() {
     const [showSMSModal, setShowSMSModal] = useState(false);
     const [smsText, setSmsText] = useState('');
     const [errors, setErrors] = useState<Record<string, string>>({});
+    const [suggestions, setSuggestions] = useState<SmartSuggestion[]>([]);
+    const [lastUsedHint, setLastUsedHint] = useState<string>('');
 
     // Initial Account Setup
     useEffect(() => {
@@ -66,6 +68,45 @@ export default function AddTransactionScreen() {
             setSelectedAccount(null); // Explicit text "Select Account"
         }
     }, [accounts]);
+
+    // Smart Suggestions for Amount
+    useEffect(() => {
+        const fetchSuggestions = async () => {
+            const parsed = evaluateExpression(display);
+            if (parsed > 0) {
+                const suggs = await getSmartSuggestions(parsed);
+                setSuggestions(suggs);
+            } else {
+                setSuggestions([]);
+            }
+        };
+        fetchSuggestions();
+    }, [display]);
+
+    // Last Used Hint for Category
+    useEffect(() => {
+        const fetchLastUsed = async () => {
+            if (category) {
+                const lastUsed = await getLastUsedForCategory(category);
+                if (lastUsed) {
+                    setLastUsedHint(`Last used: ${lastUsed.subcategory || 'General'} • ${lastUsed.accountName}`);
+                    
+                    if (lastUsed.subcategory) {
+                        setSubcategory(lastUsed.subcategory);
+                    }
+                    const matchedAccount = accounts.find(a => a.id === lastUsed.accountId);
+                    if (matchedAccount) {
+                        setSelectedAccount(matchedAccount);
+                    }
+                } else {
+                    setLastUsedHint('');
+                }
+            } else {
+                setLastUsedHint('');
+            }
+        };
+        fetchLastUsed();
+    }, [category, accounts]);
 
     // Extract primitive params to avoid re-renders due to object reference changes
     const prefill_amount = params.prefill_amount as string;
@@ -119,13 +160,44 @@ export default function AddTransactionScreen() {
         }, [prefill_amount, from_notification])
     );
 
+    const evaluateExpression = (expr: string): number => {
+        const safe = expr.replace(/[^0-9+\-*/.]/g, '');
+        if (!safe) return 0;
+        try {
+            // eslint-disable-next-line no-new-func
+            const result = new Function(`return (${safe})`)();
+            return typeof result === 'number' && isFinite(result) ? result : 0;
+        } catch {
+            const tokens = safe.match(/(\d+\.?\d*)|([-+*/])/g);
+            if (!tokens) return parseFloat(safe) || 0;
+            let result = parseFloat(tokens[0]);
+            for (let i = 1; i < tokens.length; i += 2) {
+                const op = tokens[i];
+                const val = parseFloat(tokens[i + 1]);
+                if (isNaN(val)) continue;
+                if (op === '+') result += val;
+                else if (op === '-') result -= val;
+                else if (op === '*') result *= val;
+                else if (op === '/') result = val !== 0 ? result / val : 0;
+            }
+            return result;
+        }
+    };
+
     const handleKeyPress = (val: string) => {
-        setDisplay(prev => {
-            if (prev === '0' && !['+', '-', '*', '/', '.'].includes(val)) return val;
-            // Basic prevention of multiple operators
-            if (['+', '-', '*', '/', '.'].includes(val) && ['+', '-', '*', '/', '.'].includes(prev.slice(-1))) return prev;
-            return prev + val;
-        });
+        const operators = ['+', '-', '*', '/'];
+        if (val === '.') {
+            const segments = display.split(/[+\-*/]/);
+            const lastSeg = segments[segments.length - 1];
+            if (!lastSeg.includes('.')) setDisplay(prev => prev + val);
+        } else if (operators.includes(val)) {
+            setDisplay(prev => {
+                const trimmed = prev.replace(/[+\-*/]+$/, '');
+                return trimmed + val;
+            });
+        } else {
+            setDisplay(prev => (prev === '0' ? val : prev + val));
+        }
     };
 
     const handleDescriptionChange = (text: string) => {
@@ -138,38 +210,12 @@ export default function AddTransactionScreen() {
 
     const handleClear = () => setDisplay('0');
 
+    const handleEvaluate = () => {
+        setDisplay(evaluateExpression(display).toString());
+    };
+
     const handleSave = async () => {
-        // Determine the amount with basic eval logic
-        const safeCalculate = (input: string): number => {
-            try {
-                // Sanitize: allow only numbers and basic operators
-                const sanitized = input.replace(/[^-+*/.0-9]/g, '');
-                if (!sanitized) return 0;
-
-                // Use a safer way to evaluate simple math expressions
-                // This approach splits by operators but respects some order
-                // For a truly "safe" version without eval/Function, we use this:
-                const tokens = sanitized.match(/(\d+\.?\d*)|([-+*/])/g);
-                if (!tokens) return 0;
-
-                let result = parseFloat(tokens[0]);
-                for (let i = 1; i < tokens.length; i += 2) {
-                    const op = tokens[i];
-                    const val = parseFloat(tokens[i + 1]);
-                    if (isNaN(val)) continue;
-
-                    if (op === '+') result += val;
-                    else if (op === '-') result -= val;
-                    else if (op === '*') result *= val;
-                    else if (op === '/') result = val !== 0 ? result / val : 0;
-                }
-                return result;
-            } catch (e) {
-                return 0;
-            }
-        };
-
-        let finalAmount = safeCalculate(display);
+        let finalAmount = evaluateExpression(display);
         const newErrors: Record<string, string> = {};
 
         if (!finalAmount || finalAmount <= 0) {
@@ -395,6 +441,30 @@ export default function AddTransactionScreen() {
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
             >
+                {/* Suggestions Section */}
+                {suggestions.length > 0 && (
+                    <Animated.View entering={FadeInDown.duration(400)} style={styles.suggestionsContainer}>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.suggestionsScroll}>
+                            {suggestions.map((sugg, idx) => (
+                                <TouchableOpacity
+                                    key={idx}
+                                    style={styles.suggestionChip}
+                                    onPress={() => {
+                                        setCategory(sugg.category);
+                                        setSubcategory(sugg.subcategory);
+                                        const acc = accounts.find(a => a.id === sugg.accountId);
+                                        if (acc) setSelectedAccount(acc);
+                                    }}
+                                >
+                                    <Text style={styles.suggestionChipText}>
+                                        ✨ {sugg.category} • {sugg.subcategory || 'General'} • {sugg.accountName}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    </Animated.View>
+                )}
+
                 {/* Row 1: Date & Account */}
                 <Animated.View entering={FadeInDown.delay(200).duration(600)} style={styles.selectorsRow}>
                     <PressableScale style={[styles.pill, { flex: 1 }]} onPress={() => setShowDatePicker(true)}>
@@ -443,6 +513,9 @@ export default function AddTransactionScreen() {
                         </View>
                     </PressableScale>
                     {errors.category && <Text style={styles.pillErrorText}>{errors.category}</Text>}
+                    {lastUsedHint && !errors.category && (
+                        <Text style={styles.hintText}>{lastUsedHint}</Text>
+                    )}
                 </Animated.View>
 
                 {/* Note Input */}
@@ -510,6 +583,7 @@ export default function AddTransactionScreen() {
                     onDelete={handleDelete}
                     onClear={handleClear}
                     onSubmit={handleSave}
+                    onEvaluate={handleEvaluate}
                     disabled={isSubmitting}
                 />
             </Animated.View>
@@ -880,6 +954,33 @@ const styles = StyleSheet.create({
         color: 'white',
         fontSize: Typography.size.md,
         fontFamily: Typography.family.bold,
-    }
+    },
+    hintText: {
+        fontSize: 11,
+        color: Colors.gray[500],
+        fontFamily: Typography.family.medium,
+        marginTop: 6,
+        marginLeft: 16,
+    },
+    suggestionsContainer: {
+        marginBottom: 16,
+    },
+    suggestionsScroll: {
+        gap: 8,
+        paddingHorizontal: 4,
+    },
+    suggestionChip: {
+        backgroundColor: Colors.primary[50],
+        borderWidth: 1,
+        borderColor: Colors.primary[100],
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 20,
+    },
+    suggestionChipText: {
+        fontSize: Typography.size.sm,
+        fontFamily: Typography.family.bold,
+        color: Colors.primary[700],
+    },
 });
 

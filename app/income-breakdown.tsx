@@ -50,6 +50,13 @@ export default function IncomeBreakdownScreen() {
     const [trendData, setTrendData] = useState<any[]>([]);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [selectedSource, setSelectedSource] = useState<string | null>(null);
+    
+    // Stats and Table State
+    const [monthlyTableData, setMonthlyTableData] = useState<{ monthName: string, total: number, delta: number | null }[]>([]);
+    const [avgMonthlyIncome, setAvgMonthlyIncome] = useState(0);
+    const [bestMonthValue, setBestMonthValue] = useState(0);
+    const [bestMonthName, setBestMonthName] = useState('N/A');
+    const [activeMonthsCount, setActiveMonthsCount] = useState(0);
 
     useEffect(() => {
         loadData();
@@ -106,6 +113,44 @@ export default function IncomeBreakdownScreen() {
         } else {
             setTrendData([{ value: 0, label: '' }]);
         }
+
+        // Stats & Table Calculations
+        const activeMonths = trend.filter(m => m.total > 0).length || 1;
+        setActiveMonthsCount(activeMonths);
+        setAvgMonthlyIncome(totalIncome / activeMonths);
+
+        if (trend.length > 0) {
+            const maxVal = Math.max(...trend.map(m => m.total));
+            setBestMonthValue(maxVal);
+            const bestM = trend.find(m => m.total === maxVal);
+            if (bestM) {
+                const d = parseISO(bestM.month + '-01');
+                setBestMonthName(format(d, 'MMM yyyy'));
+            } else {
+                setBestMonthName('N/A');
+            }
+        } else {
+            setBestMonthValue(0);
+            setBestMonthName('N/A');
+        }
+
+        const tableData = [];
+        for (let i = 0; i < trend.length; i++) {
+            const current = trend[i];
+            const prev = i > 0 ? trend[i - 1] : null;
+            let delta = null;
+            if (prev && prev.total > 0) {
+                delta = ((current.total - prev.total) / prev.total) * 100;
+            }
+            const d = parseISO(current.month + '-01');
+            tableData.push({
+                monthName: format(d, 'MMM yyyy'),
+                total: current.total,
+                delta: delta
+            });
+        }
+        tableData.reverse();
+        setMonthlyTableData(tableData);
 
         setTransactions(txs);
     };
@@ -169,7 +214,25 @@ export default function IncomeBreakdownScreen() {
                         )}
                     </View>
                     <Text style={styles.heroLabel}>Total Income</Text>
-                    <Text style={[styles.heroValue, { color: Colors.success[700] }]}>{formatCurrency(totalIncome)}</Text>
+                    <Text style={[styles.heroValue, { color: Colors.success[700], marginBottom: period !== 'This Month' ? 12 : 0 }]}>{formatCurrency(totalIncome)}</Text>
+
+                    {/* Stats Grid */}
+                    {period !== 'This Month' && trendData.length > 0 && (
+                        <View style={styles.statsRow}>
+                            <View style={styles.statCol}>
+                                <Text style={styles.statLabel}>Avg / Month</Text>
+                                <Text style={styles.statValue}>{formatCurrency(avgMonthlyIncome)}</Text>
+                            </View>
+                            <View style={styles.statCol}>
+                                <Text style={styles.statLabel}>Best Month</Text>
+                                <Text style={styles.statValue} numberOfLines={1}>{bestMonthValue > 0 ? `${formatCurrency(bestMonthValue)} (${bestMonthName.split(' ')[0]})` : 'N/A'}</Text>
+                            </View>
+                            <View style={styles.statCol}>
+                                <Text style={styles.statLabel}>Months</Text>
+                                <Text style={styles.statValue}>{activeMonthsCount}</Text>
+                            </View>
+                        </View>
+                    )}
                 </View>
 
                 {/* Pie Chart Section */}
@@ -251,6 +314,45 @@ export default function IncomeBreakdownScreen() {
                         </View>
                     </View>
                 )}
+
+                {/* Monthly Breakdown Table */}
+                <View style={styles.chartCard}>
+                    <Text style={styles.sectionTitle}>Monthly Breakdown</Text>
+                    <View style={styles.tableContainer}>
+                        <View style={styles.tableHeader}>
+                            <Text style={[styles.tableHeaderCell, { flex: 2 }]}>Month</Text>
+                            <Text style={[styles.tableHeaderCell, { flex: 2, textAlign: 'right' }]}>Income</Text>
+                            <Text style={[styles.tableHeaderCell, { flex: 1.5, textAlign: 'right' }]}>Change</Text>
+                        </View>
+                        {monthlyTableData.length > 0 ? (
+                            monthlyTableData.map((row, idx) => {
+                                const isPositive = row.delta !== null && row.delta > 0;
+                                const isNegative = row.delta !== null && row.delta < 0;
+                                return (
+                                    <View key={row.monthName} style={styles.tableRow}>
+                                        <Text style={[styles.tableCell, { flex: 2, fontFamily: Typography.family.bold }]}>{row.monthName}</Text>
+                                        <Text style={[styles.tableCell, { flex: 2, textAlign: 'right', color: Colors.gray[900] }]}>{formatCurrency(row.total)}</Text>
+                                        <Text style={[
+                                            styles.tableCell, 
+                                            { 
+                                                flex: 1.5, 
+                                                textAlign: 'right', 
+                                                fontFamily: Typography.family.bold,
+                                                color: isPositive ? Colors.success[600] : isNegative ? Colors.danger[600] : Colors.gray[400] 
+                                            }
+                                        ]}>
+                                            {row.delta === null ? '—' : `${isPositive ? '▲ +' : '▼ '}${row.delta.toFixed(0)}%`}
+                                        </Text>
+                                    </View>
+                                );
+                            })
+                        ) : (
+                            <View style={styles.emptyTable}>
+                                <Text style={styles.emptyText}>No data available</Text>
+                            </View>
+                        )}
+                    </View>
+                </View>
 
                 {/* Transactions List */}
                 <Text style={[styles.sectionTitle, { marginBottom: 16 }]}>
@@ -444,5 +546,60 @@ const styles = StyleSheet.create({
         fontSize: Typography.size.sm,
         fontFamily: Typography.family.medium,
         color: Colors.gray[500],
+    },
+    statsRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: 16,
+        paddingTop: 16,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(34, 197, 94, 0.15)',
+    },
+    statCol: {
+        flex: 1,
+        alignItems: 'flex-start',
+    },
+    statLabel: {
+        fontSize: 10,
+        fontFamily: Typography.family.bold,
+        color: Colors.success[600],
+        marginBottom: 4,
+        textTransform: 'uppercase',
+    },
+    statValue: {
+        fontSize: Typography.size.sm,
+        fontFamily: Typography.family.bold,
+        color: Colors.success[700],
+    },
+    tableContainer: {
+        marginTop: 16,
+    },
+    tableHeader: {
+        flexDirection: 'row',
+        paddingBottom: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: Colors.gray[200],
+    },
+    tableHeaderCell: {
+        fontSize: 12,
+        fontFamily: Typography.family.bold,
+        color: Colors.gray[400],
+        textTransform: 'uppercase',
+    },
+    tableRow: {
+        flexDirection: 'row',
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: Colors.gray[100],
+        alignItems: 'center',
+    },
+    tableCell: {
+        fontSize: Typography.size.sm,
+        fontFamily: Typography.family.medium,
+        color: Colors.gray[700],
+    },
+    emptyTable: {
+        paddingVertical: 20,
+        alignItems: 'center',
     },
 });

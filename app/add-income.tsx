@@ -81,12 +81,44 @@ export default function AddIncomeScreen() {
         }
     };
 
+    const evaluateExpression = (expr: string): number => {
+        const safe = expr.replace(/[^0-9+\-*/.]/g, '');
+        if (!safe) return 0;
+        try {
+            // eslint-disable-next-line no-new-func
+            const result = new Function(`return (${safe})`)();
+            return typeof result === 'number' && isFinite(result) ? result : 0;
+        } catch {
+            const tokens = safe.match(/(\d+\.?\d*)|([-+*/])/g);
+            if (!tokens) return parseFloat(safe) || 0;
+            let result = parseFloat(tokens[0]);
+            for (let i = 1; i < tokens.length; i += 2) {
+                const op = tokens[i];
+                const val = parseFloat(tokens[i + 1]);
+                if (isNaN(val)) continue;
+                if (op === '+') result += val;
+                else if (op === '-') result -= val;
+                else if (op === '*') result *= val;
+                else if (op === '/') result = val !== 0 ? result / val : 0;
+            }
+            return result;
+        }
+    };
+
     const handleKeyPress = (val: string) => {
-        setDisplay(prev => {
-            if (prev === '0' && !['+', '-', '*', '/', '.'].includes(val)) return val;
-            if (['+', '-', '*', '/', '.'].includes(val) && ['+', '-', '*', '/', '.'].includes(prev.slice(-1))) return prev;
-            return prev + val;
-        });
+        const operators = ['+', '-', '*', '/'];
+        if (val === '.') {
+            const segments = display.split(/[+\-*/]/);
+            const lastSeg = segments[segments.length - 1];
+            if (!lastSeg.includes('.')) setDisplay(prev => prev + val);
+        } else if (operators.includes(val)) {
+            setDisplay(prev => {
+                const trimmed = prev.replace(/[+\-*/]+$/, '');
+                return trimmed + val;
+            });
+        } else {
+            setDisplay(prev => (prev === '0' ? val : prev + val));
+        }
     };
 
     const handleDelete = () => {
@@ -95,18 +127,16 @@ export default function AddIncomeScreen() {
 
     const handleClear = () => setDisplay('0');
 
+    const handleEvaluate = () => {
+        setDisplay(evaluateExpression(display).toString());
+    };
+
     const [isSubmitting, setIsSubmitting] = useState(false);
     const isSubmittingRef = React.useRef(false);
 
     const handleSave = async () => {
-        let finalAmount = 0;
+        let finalAmount = evaluateExpression(display);
         const newErrors: Record<string, string> = {};
-        try {
-            const sanitized = display.replace(/[^-+*/.0-9]/g, '');
-            finalAmount = new Function('return ' + sanitized)();
-        } catch (e) {
-            finalAmount = 0;
-        }
 
         if (finalAmount <= 0) {
             newErrors.amount = 'Please enter a valid amount';
@@ -303,6 +333,7 @@ export default function AddIncomeScreen() {
                     onDelete={handleDelete}
                     onClear={handleClear}
                     onSubmit={handleSave}
+                    onEvaluate={handleEvaluate}
                     submitColor={Colors.success[600]}
                     submitLabel="Save Income"
                 />
