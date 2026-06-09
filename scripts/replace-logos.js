@@ -58,7 +58,7 @@ async function main() {
     if (!fs.existsSync(dirPath)) fs.mkdirSync(dirPath, { recursive: true });
 
     // Write launcher icon as webp (ic_launcher.webp and ic_launcher_round.webp)
-    const base = sharp(SOURCE).resize(size, size, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } });
+    
 
     const icLauncher       = path.join(dirPath, 'ic_launcher.webp');
     const icLauncherRound  = path.join(dirPath, 'ic_launcher_round.webp');

@@ -197,7 +197,7 @@ export const deleteDebtRepayment = async (id: number): Promise<void> => {
 
 export const getDebtSummary = async () => {
   await initDatabase();
-  const db = getDatabase();
+  const _db = getDatabase();
   
   const debts = await getDebtRecords('active');
   const summary = {

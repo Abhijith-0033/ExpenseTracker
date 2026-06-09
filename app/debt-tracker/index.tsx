@@ -8,7 +8,7 @@ import { calculateCurrentBalance, DebtRecord } from '../../services/debttracker/
 import { formatCurrency } from '../../utils/currency';
 import { Snackbar } from '../../components/Snackbar';
 import { Swipeable } from 'react-native-gesture-handler';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import  { _useSharedValue, _withSpring } from 'react-native-reanimated';
 
 type FilterType = 'all' | 'borrowed' | 'lent' | 'completed';
 
@@ -103,7 +103,7 @@ export default function DebtTrackerScreen() {
               fetchData();
               setSnackbarMessage('Debt deleted');
               setSnackbarVisible(true);
-            } catch (error) {
+            } catch (_error) {
               Alert.alert('Error', 'Failed to delete debt');
             }
           }
@@ -123,7 +123,7 @@ export default function DebtTrackerScreen() {
         setCalculation(calc);
       };
       loadCalculation();
-    }, [debt.id]);
+    }, [debt, debt.id]);
 
     const renderRightActions = () => {
       return (

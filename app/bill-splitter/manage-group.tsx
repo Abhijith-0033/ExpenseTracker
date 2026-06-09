@@ -2,9 +2,9 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, X, Plus, Trash2 } from 'lucide-react-native';
-import { Colors, Layout } from '../../constants/Theme';
-import { addGroup, updateGroup, getGroupById, addMember, getGroupMembers, deleteMember } from '../../services/billSplitter';
+import { ArrowLeft, Plus, Trash2 } from 'lucide-react-native';
+import { Colors } from '../../constants/Theme';
+import { addGroup, updateGroup, getGroupById, addMember, getGroupMembers } from '../../services/billSplitter';
 
 export default function ManageGroupScreen() {
     const router = useRouter();
@@ -24,7 +24,7 @@ export default function ManageGroupScreen() {
         if (isEditing && groupId) {
             loadGroupData();
         }
-    }, [isEditing, groupId]);
+    }, [isEditing, groupId, loadGroupData]);
 
     const loadGroupData = async () => {
         try {
@@ -35,7 +35,7 @@ export default function ManageGroupScreen() {
                 setDescription(group.description || '');
                 setMembers(groupMembers);
             }
-        } catch (e) {
+        } catch (_e) {
             Alert.alert('Error', 'Failed to load group details');
             router.back();
         } finally {

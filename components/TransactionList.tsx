@@ -1,22 +1,21 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, Dimensions } from 'react-native';
-import { Transaction } from '../services/database';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, Dimensions , Alert } from 'react-native';
+import { Transaction , deleteTransaction } from '../services/database';
 import { format, addDays } from 'date-fns';
-import { ArrowUpRight, ArrowDownLeft, ShoppingBag, Coffee, Car, Home, Film, DollarSign, Edit2, Trash2, X } from 'lucide-react-native';
+import { ArrowUpRight, ShoppingBag, Coffee, Car, Home, Film, DollarSign, X } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { Colors, Layout, Typography } from '../constants/Theme';
 import { AnimatedItem } from './ui/AnimatedItem';
-import { formatCurrency } from '../utils/currency';
 import { useApp } from '../context/AppContext';
-import { deleteTransaction } from '../services/database';
-import { Alert } from 'react-native';
+
+
 import { SwipeableRow } from './SwipeableRow';
 import { RecurringBottomSheet } from './RecurringBottomSheet';
 import { addSubscription } from '../services/subscriptions';
 import { formatAmount } from '../utils/formatAmount';
 import { Snackbar } from './Snackbar';
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { height: _SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface TransactionListProps {
     transactions: Transaction[];
@@ -78,7 +77,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
         try {
             await deleteTransaction(pendingDeleteTx.id, pendingDeleteTx.account_id, pendingDeleteTx.amount, pendingDeleteTx.category);
             await refreshData();
-        } catch (e) {
+        } catch (_e) {
             Alert.alert("Error", "Failed to delete transaction");
         } finally {
             setPendingDeleteTx(null);
@@ -106,7 +105,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
             setShowRecurring(false);
             setRecurringTx(null);
             Alert.alert("Success", "Subscription added!");
-        } catch (e) {
+        } catch (_e) {
             Alert.alert("Error", "Failed to add subscription");
         }
     };

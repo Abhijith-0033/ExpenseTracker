@@ -179,7 +179,7 @@ export const calculateWinnerNetAmount = (
   bidAmount: number | null,
   winnerPaidAmount: number | null
 ): { grossReceived: number; commissionDeducted: number; netReceived: number; dividend: number } => {
-  const { grossPot, commission, netPot } = calculateMonthlyPot(chitFund, monthNumber, bidAmount);
+  const { _grossPot, _commission, netPot } = calculateMonthlyPot(chitFund, monthNumber, bidAmount);
   
   let grossReceived = netPot;
   let commissionDeducted = 0;
@@ -312,7 +312,7 @@ export const analyzeChitFundPerformance = (
 // --- CHIT FUND COMPARISON ---
 
 export const compareChitFunds = (
-  chitFunds: Array<{ chitFund: ChitFund; calculation: ChitCalculation }>
+  chitFunds: { chitFund: ChitFund; calculation: ChitCalculation }[]
 ): {
   bestPerforming: { chitFund: ChitFund; roi: number } | null;
   worstPerforming: { chitFund: ChitFund; roi: number } | null;

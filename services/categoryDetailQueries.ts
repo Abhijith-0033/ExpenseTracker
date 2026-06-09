@@ -1,5 +1,5 @@
 import { getDatabase, initDatabase, Transaction } from './database';
-import { startOfMonth, subMonths, format } from 'date-fns';
+import { _startOfMonth, format } from 'date-fns';
 
 const ensureDb = async () => {
     const db = getDatabase();

@@ -1,6 +1,6 @@
 import { getDatabase, initDatabase } from '../services/database';
 import { getMergedClassifications } from './categoryClassification';
-import { startOfMonth, endOfMonth, subMonths, format, startOfWeek, endOfWeek, subWeeks } from 'date-fns';
+import { startOfMonth, endOfMonth, subMonths, subWeeks } from 'date-fns';
 
 export interface SatisfactionMetrics {
   totalIncome: number;

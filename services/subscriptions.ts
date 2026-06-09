@@ -1,8 +1,7 @@
 import { getDatabase, initDatabase, Subscription } from './database';
-export { Subscription };
-import { cancelNotification } from './notifications';
 import { schedulePaymentNotifications, cancelPaymentNotifications, reschedulePaymentNotifications } from './paymentNotifications';
-import { addDays, addMonths, addYears, subDays } from 'date-fns';
+import { addDays, addMonths, addYears } from 'date-fns';
+export { Subscription };
 
 const ensureDb = async () => {
     const db = getDatabase();

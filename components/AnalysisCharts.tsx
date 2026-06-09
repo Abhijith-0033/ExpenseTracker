@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
 import { LineChart, BarChart, PieChart } from 'react-native-gifted-charts';
 import { Colors, Layout, Typography } from '../constants/Theme';
-import { CategoryTotal, SubcategoryTotal, DailySpending, ExpenseDistribution, MonthlyCategoryTotal, MonthlyComparison } from '../services/analysis';
+import { CategoryTotal, SubcategoryTotal, ExpenseDistribution, MonthlyCategoryTotal, MonthlyComparison } from '../services/analysis';
 import { format } from 'date-fns';
 import { formatCurrency } from '../utils/currency';
 

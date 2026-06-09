@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Animated, { 
     useAnimatedStyle, 
     useSharedValue, 
@@ -87,7 +87,7 @@ export const Snackbar: React.FC<SnackbarProps> = ({
         return () => {
             if (timeoutRef.current) clearTimeout(timeoutRef.current);
         };
-    }, [visible, message]); // Re-animate if message changes while visible
+    }, [visible, message, render, animateIn, animateOut]); // Re-animate if message changes while visible
 
     const animatedStyle = useAnimatedStyle(() => {
         return {

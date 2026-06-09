@@ -21,7 +21,7 @@ export function AnimatedBalance({ value, style, duration = 1000 }: AnimatedBalan
   useEffect(() => {
     scale.value = withSpring(1, { damping: 12, stiffness: 100 });
     opacity.value = withTiming(1, { duration: duration > 500 ? 500 : duration });
-  }, [value]);
+  }, [duration, opacity, scale, value]);
 
   const animatedStyle = useAnimatedStyle(() => {
     return {

@@ -38,7 +38,7 @@ interface TransactionSample {
 const toDayString = (date: Date) => date.toISOString().split('T')[0];
 
 // Internal helper for recurring detection from transaction history.
-export const detectRecurringTransactions = async (daysWindow: number): Promise<Array<{date: string, amount: number, description: string, type: 'income'|'expense'}>> => {
+export const detectRecurringTransactions = async (daysWindow: number): Promise<{date: string, amount: number, description: string, type: 'income'|'expense'}[]> => {
     const db = await ensureDb();
 
     const historyStart = new Date();
@@ -60,7 +60,7 @@ export const detectRecurringTransactions = async (daysWindow: number): Promise<A
         groups.set(key, [...(groups.get(key) || []), tx]);
     });
 
-    const predictedEvents: Array<{date: string, amount: number, description: string, type: 'income'|'expense'}> = [];
+    const predictedEvents: {date: string, amount: number, description: string, type: 'income'|'expense'}[] = [];
     const now = new Date();
     const endWindow = addDays(now, daysWindow);
 

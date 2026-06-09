@@ -341,7 +341,7 @@ export const getAutoPayEligibility = async (
     return { eligible: false, reason: 'No pending payments' };
   }
 
-  const today = format(new Date(), 'yyyy-MM-dd');
+  const _today = format(new Date(), 'yyyy-MM-dd');
   const dueDate = nextPayment.due_date;
   const isDueToday = isToday(parseISO(dueDate));
   const isOverdue = isBefore(parseISO(dueDate), new Date());

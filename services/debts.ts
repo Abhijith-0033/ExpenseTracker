@@ -1,4 +1,4 @@
-import { Debt, getDebts, getDebtHistory } from './database';
+import {  getDebts } from './database';
 
 export interface DebtSummary {
     totalDebt: number;

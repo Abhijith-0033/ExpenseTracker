@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, Dimensions, StatusBar, TouchableOpacity, ActivityIndicator, Modal } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -26,14 +26,13 @@ import { predictNextMonthExpenses, ForecastResult } from '../../services/ml';
 import {
     TrendLineChart,
     ExpenseHistogram,
-    CategoryDrillDown,
     MonthlyStackedBarChart,
     WeeklyBarChart,
     IncomeExpenseLineChart,
     getValueColor
 } from '../../components/AnalysisCharts';
-import { format, startOfMonth, addMonths, subMonths, isSameMonth, startOfDay, endOfDay } from 'date-fns';
-import { ChevronLeft, ChevronRight, Calendar, Filter, Sparkles, TrendingUp, Info, X } from 'lucide-react-native';
+import { format, startOfMonth, addMonths, subMonths } from 'date-fns';
+import { ChevronLeft, ChevronRight, Filter, Sparkles, TrendingUp, Info, X } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { formatCurrency } from '../../utils/currency';
@@ -130,7 +129,7 @@ export default function AnalyticsScreen() {
     useFocusEffect(
         useCallback(() => {
             loadData();
-        }, [viewMode, selectedMonth, customRange])
+        }, [loadData])
     );
 
     const handleCategorySelect = async (category: string) => {

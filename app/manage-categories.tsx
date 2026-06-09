@@ -1,8 +1,8 @@
 
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Alert, Modal, SectionList, Switch } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Alert, Modal, Switch } from 'react-native';
 import { useApp } from '../context/AppContext';
-import { saveCategories, CategoryNode } from '../services/database';
+import { saveCategories } from '../services/database';
 import { Plus, X, Trash2 } from 'lucide-react-native';
 import { Colors, Layout, Typography } from '../constants/Theme';
 
@@ -97,7 +97,7 @@ export default function ManageCategoriesScreen() {
             setEditingSubName(null);
             setIsRepetitive(false);
             setDefaultValidity('28');
-        } catch (e) {
+        } catch (_e) {
             Alert.alert('Error', 'Failed to save');
         }
     };

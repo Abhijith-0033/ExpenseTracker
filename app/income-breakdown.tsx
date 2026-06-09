@@ -60,7 +60,7 @@ export default function IncomeBreakdownScreen() {
 
     useEffect(() => {
         loadData();
-    }, [period, selectedSource]);
+    }, [loadData, period, selectedSource]);
 
     const getDateRange = () => {
         const end = new Date();

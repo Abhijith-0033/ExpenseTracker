@@ -2,7 +2,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity } from 'react-native';
 import { AlertTriangle, Clock } from 'lucide-react-native';
-import { Colors, Typography, Layout } from '../constants/Theme';
+import { Colors, Typography } from '../constants/Theme';
 import { Transaction } from '../services/database';
 import { formatAmount } from '../utils/formatAmount';
 import { format } from 'date-fns';

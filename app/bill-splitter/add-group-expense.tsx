@@ -33,7 +33,7 @@ export default function AddGroupExpenseScreen() {
 
     useEffect(() => {
         loadData();
-    }, [groupId]);
+    }, [groupId, loadData]);
 
     const loadData = async () => {
         try {
@@ -75,7 +75,7 @@ export default function AddGroupExpenseScreen() {
                 // Default payer = first member
                 if (m.length > 0) setPaidBy(m[0].id);
             }
-        } catch (e) {
+        } catch (_e) {
             Alert.alert('Error', 'Failed to load data');
         } finally {
             setLoading(false);
@@ -113,7 +113,7 @@ export default function AddGroupExpenseScreen() {
             return parsedAmount / count;
         }
         return 0;
-    }, [amount, selectedMembers, splitMethod]);
+    }, [parsedAmount, selectedMembers.length, splitMethod]);
 
     const isValid = useMemo(() => {
         if (!title.trim()) return false;
@@ -172,7 +172,7 @@ export default function AddGroupExpenseScreen() {
                 await addExpense(params);
             }
             router.back();
-        } catch (e) {
+        } catch (_e) {
             Alert.alert('Error', 'Failed to save expense');
         } finally {
             setSaving(false);
@@ -195,7 +195,7 @@ export default function AddGroupExpenseScreen() {
                             setSaving(true);
                             await deleteExpense(expenseId);
                             router.back();
-                        } catch (e) {
+                        } catch (_e) {
                             Alert.alert("Error", "Failed to delete expense");
                             setSaving(false);
                         }

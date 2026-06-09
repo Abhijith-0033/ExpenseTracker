@@ -1,14 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, TextInput, ActivityIndicator } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Save, Users, Calendar, DollarSign, Percent, Info } from 'lucide-react-native';
+import { ArrowLeft, Save, DollarSign, Info } from 'lucide-react-native';
 import { Colors, Layout, Typography, SemanticColors } from '../../constants/Theme';
 import { addChitFund, generateMonthlyRecords } from '../../services/chitfund/chitService';
 import { ChitFund } from '../../services/chitfund/ChitEngine';
 import { Snackbar } from '../../components/Snackbar';
 import { FormField } from '../../components/FormField';
 import { formatCurrency } from '../../utils/currency';
-import { format } from 'date-fns';
 
 export default function AddChitFundScreen() {
   const router = useRouter();

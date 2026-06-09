@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Dimensions } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, Settings2, Wallet, TrendingUp, TrendingDown, CalendarRange } from 'lucide-react-native';
@@ -9,7 +9,7 @@ import { LineChart } from 'react-native-gifted-charts';
 import { getAccounts, Account, Transaction } from '../services/database';
 import { getAccountIncomeExpense, getAccountTransactions, getAccountBalanceHistory } from '../services/accountDetailQueries';
 import { formatCurrency } from '../utils/currency';
-import { startOfMonth, subMonths, startOfYear, format } from 'date-fns';
+import { startOfMonth, subMonths, startOfYear } from 'date-fns';
 import { TransactionList } from '../components/TransactionList';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -39,13 +39,13 @@ export default function AccountDetailScreen() {
         if (accounts.length > 0 && selectedAccountId === null && !initialAccountId) {
             setSelectedAccountId(accounts[0].id);
         }
-    }, [accounts]);
+    }, [accounts, initialAccountId, selectedAccountId]);
 
     useEffect(() => {
         if (selectedAccountId !== null) {
             loadAccountData();
         }
-    }, [selectedAccountId, period]);
+    }, [selectedAccountId, period, loadAccountData]);
 
     const loadAccounts = async () => {
         const accs = await getAccounts();

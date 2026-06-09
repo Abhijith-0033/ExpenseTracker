@@ -17,7 +17,7 @@ export const AnimatedItem: React.FC<AnimatedItemProps> = ({ children, index, sty
         const delay = index * 50; // Stagger by 50ms
         opacity.value = withDelay(delay, withTiming(1, { duration: 400 }));
         translateY.value = withDelay(delay, withSpring(0, { damping: 12 }));
-    }, [index]);
+    }, [index, opacity, translateY]);
 
     const animatedStyle = useAnimatedStyle(() => ({
         opacity: opacity.value,

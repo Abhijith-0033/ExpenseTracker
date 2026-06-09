@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator, Alert, Modal, TextInput } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { ArrowLeft, Settings, Plus, Receipt, Share2, HandCoins, X } from 'lucide-react-native';
-import { Colors, Layout, Typography } from '../../constants/Theme';
+import { Colors, Layout } from '../../constants/Theme';
 import {
     getGroupById, getGroupMembers, getGroupExpenses, calculateBalances, calculateSettlements, addExpense,
     BillGroup, BillGroupMember, BillExpenseDetails, Balance, SettlementTransaction
@@ -58,7 +58,7 @@ export default function GroupDetailsScreen() {
             setLoading(false);
             setRefreshing(false);
         }
-    }, [groupId]);
+    }, [groupId, router]);
 
     useFocusEffect(
         React.useCallback(() => {
@@ -97,7 +97,7 @@ export default function GroupDetailsScreen() {
             });
             setShowMoneyModal(false);
             fetchData();
-        } catch (e) {
+        } catch (_e) {
             Alert.alert('Error', 'Failed to save money given.');
         } finally {
             setSavingMoney(false);

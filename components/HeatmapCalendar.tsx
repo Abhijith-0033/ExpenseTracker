@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, getDay } from 'date-fns';
-import { Colors, Layout } from '../constants/Theme';
+import { Colors } from '../constants/Theme';
 import { Transaction } from '../services/database';
 
 interface HeatmapCalendarProps {

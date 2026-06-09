@@ -5,8 +5,7 @@ import {
     updateRechargeMeta, updateBillTransaction, 
     deleteRechargeMeta 
 } from '../services/database';
-import { cancelNotification } from '../services/notifications';
-import { schedulePaymentNotifications, cancelPaymentNotifications, reschedulePaymentNotifications } from '../services/paymentNotifications';
+import {  cancelPaymentNotifications, reschedulePaymentNotifications } from '../services/paymentNotifications';
 import { Colors, Layout, Typography } from '../constants/Theme';
 import { Smartphone, Clock, Edit2, Trash2, X } from 'lucide-react-native';
 import { format, differenceInDays, parseISO, addDays } from 'date-fns';
@@ -122,7 +121,7 @@ export const UpcomingExpenses = () => {
 
                             // 3. Refresh list
                             await loadUpcoming();
-                        } catch (e) {
+                        } catch (_e) {
                             Alert.alert('Error', 'Failed to delete bill.');
                         }
                     }

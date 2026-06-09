@@ -1,8 +1,8 @@
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
-import { getDatabase, initDatabase } from '../database';
-import { format, addDays, subDays, setHours, setMinutes, isAfter, startOfDay, endOfDay, isToday, isTomorrow, isYesterday, differenceInDays, addMonths, addWeeks, parseISO } from 'date-fns';
+import { getDatabase } from '../database';
+import { format, addDays, setHours, setMinutes, differenceInDays, parseISO } from 'date-fns';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // NOTIFICATION ID SYSTEM
@@ -1301,7 +1301,7 @@ export const scheduleEMINotifications = async (emiId: number): Promise<void> => 
       for (const days of reminderDays) {
         if (daysUntilDue === days) {
           const reminderDate = addDays(today, days);
-          const notificationId = `${NOTIFICATION_IDS.EMI_PREFIX}${emiId}_${payment.month_number}_${days}d`;
+          const _notificationId = `${NOTIFICATION_IDS.EMI_PREFIX}${emiId}_${payment.month_number}_${days}d`;
 
           await Notifications.scheduleNotificationAsync({
             content: {
@@ -1326,7 +1326,7 @@ export const scheduleEMINotifications = async (emiId: number): Promise<void> => 
 
       // Schedule on due date
       if (daysUntilDue === 0) {
-        const notificationId = `${NOTIFICATION_IDS.EMI_PREFIX}${emiId}_${payment.month_number}_0d`;
+        const _notificationId = `${NOTIFICATION_IDS.EMI_PREFIX}${emiId}_${payment.month_number}_0d`;
 
         await Notifications.scheduleNotificationAsync({
           content: {
@@ -1350,7 +1350,7 @@ export const scheduleEMINotifications = async (emiId: number): Promise<void> => 
 
       // Schedule overdue notification
       if (daysUntilDue < 0 && Math.abs(daysUntilDue) <= 7) {
-        const notificationId = `${NOTIFICATION_IDS.EMI_PREFIX}${emiId}_${payment.month_number}_overdue`;
+        const _notificationId = `${NOTIFICATION_IDS.EMI_PREFIX}${emiId}_${payment.month_number}_overdue`;
 
         await Notifications.scheduleNotificationAsync({
           content: {
@@ -1399,7 +1399,7 @@ export const scheduleEMIAutoPayNotification = async (
       return;
     }
 
-    const notificationId = `${NOTIFICATION_IDS.EMI_AUTOPAY_PREFIX}${emiId}_${paymentId}`;
+    const _notificationId = `${NOTIFICATION_IDS.EMI_AUTOPAY_PREFIX}${emiId}_${paymentId}`;
 
     await Notifications.scheduleNotificationAsync({
       content: {

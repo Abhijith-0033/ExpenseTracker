@@ -14,11 +14,10 @@ import Animated, {
     useAnimatedStyle,
     withSpring,
     withTiming,
-    FadeIn,
-    FadeOut
+    FadeIn
 } from 'react-native-reanimated';
 
-const screenWidth = Dimensions.get('window').width;
+const _screenWidth = Dimensions.get('window').width;
 
 interface MonthlyExpensePieChartProps {
     initialMonth: Date;
@@ -45,7 +44,7 @@ export const MonthlyExpensePieChart: React.FC<MonthlyExpensePieChartProps> = ({ 
         entranceOpacity.value = 0;
         entranceScale.value = withSpring(1, { damping: 12, stiffness: 90 });
         entranceOpacity.value = withTiming(1, { duration: 600 });
-    }, [initialMonth]);
+    }, [entranceOpacity, entranceScale, initialMonth]);
 
     // Derived category totals from transactions in context
     const categoryData = useMemo(() => {
@@ -103,7 +102,7 @@ export const MonthlyExpensePieChart: React.FC<MonthlyExpensePieChartProps> = ({ 
                 percentage: percentage
             };
         });
-    }, [categoryData, selectedCategoryIndex, variant]);
+    }, [categoryData, selectedCategoryIndex, selectionBounce, variant]);
 
     const totalAmount = useMemo(() =>
         categoryData.reduce((sum, item) => sum + item.total, 0),

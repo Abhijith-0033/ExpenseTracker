@@ -8,7 +8,9 @@ let BackgroundFetch: any = null;
 let TaskManager: any = null;
 
 try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   BackgroundFetch = require('expo-background-fetch');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   TaskManager = require('expo-task-manager');
 } catch {
   console.warn('[Telegram] expo-background-fetch / expo-task-manager not available');

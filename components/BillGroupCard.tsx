@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Users, Receipt, Calendar } from 'lucide-react-native';
+import { Users, Receipt } from 'lucide-react-native';
 import { Colors, Layout } from '../constants/Theme';
 import { BillGroup } from '../services/billSplitter';
 import { format } from 'date-fns';

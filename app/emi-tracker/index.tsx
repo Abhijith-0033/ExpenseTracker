@@ -1,14 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert } from 'react-native';
-import { useRouter } from 'expo-router';
-import { Plus, CreditCard, Calendar, DollarSign, AlertCircle, CheckCircle, Clock, ChevronRight, Trash2, Edit2 } from 'lucide-react-native';
+import { useRouter , useFocusEffect } from 'expo-router';
+import { Plus, CreditCard, Calendar, DollarSign, AlertCircle, CheckCircle, Clock, ChevronRight } from 'lucide-react-native';
 import { Colors, Typography, Layout } from '../../constants/Theme';
 import { formatCurrency } from '../../utils/currency';
-import { getEMIRecords, getEMIPayments, deleteEMIRecord, EMIRecord, EMIPayment } from '../../services/emitracker/EMIEngine';
+import { getEMIRecords, getEMIPayments, deleteEMIRecord, EMIRecord } from '../../services/emitracker/EMIEngine';
 import { SwipeableRow } from '../../components/SwipeableRow';
 import { initDatabase } from '../../services/database';
 
-import { useFocusEffect } from 'expo-router';
 
 export default function EMITrackerScreen() {
   const router = useRouter();
@@ -111,7 +110,7 @@ export default function EMITrackerScreen() {
     }
   };
 
-  const getProgress = async (record: EMIRecord) => {
+  const _getProgress = async (record: EMIRecord) => {
     const payments = await getEMIPayments(record.id);
     const paidCount = payments.filter((p) => p.payment_status === 'paid').length;
     return (paidCount / record.tenure_months) * 100;

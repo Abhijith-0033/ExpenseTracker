@@ -1,17 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Dimensions , Modal, TextInput } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, Edit2, Calendar, DollarSign, Percent, Clock, CheckCircle, AlertCircle, TrendingUp, PieChart, BarChart } from 'lucide-react-native';
+import { ArrowLeft, Edit2, Calendar, DollarSign, Percent, Clock, CheckCircle, AlertCircle } from 'lucide-react-native';
 import { Colors, Typography, Layout } from '../../constants/Theme';
 import { formatCurrency } from '../../utils/currency';
 import { getEMIRecord, getEMIPayments, EMIRecord, EMIPayment, markPaymentAsPaid, revertPaymentStatus } from '../../services/emitracker/EMIEngine';
 import { getAccounts, Account } from '../../services/database';
 import { AccountSelector } from '../../components/AccountSelector';
-import { Modal, TextInput } from 'react-native';
 import { PieChart as GiftedPieChart, BarChart as GiftedBarChart } from 'react-native-gifted-charts';
-import { format, parseISO, isBefore, isToday, differenceInDays } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 
-const screenWidth = Dimensions.get('window').width;
+const _screenWidth = Dimensions.get('window').width;
 
 export default function EMIDetailScreen() {
   const router = useRouter();
@@ -133,7 +132,7 @@ export default function EMIDetailScreen() {
       );
       setPaymentModalVisible(false);
       loadData();
-    } catch (error) {
+    } catch (_error) {
       Alert.alert('Error', 'Failed to mark payment as paid');
     }
   };
@@ -151,7 +150,7 @@ export default function EMIDetailScreen() {
             try {
               await revertPaymentStatus(payment.id);
               loadData();
-            } catch (error) {
+            } catch (_error) {
               Alert.alert('Error', 'Failed to revert payment');
             }
           }

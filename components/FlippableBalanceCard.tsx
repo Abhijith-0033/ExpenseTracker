@@ -9,13 +9,13 @@ import Animated, {
   Extrapolate
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Wallet, Info, ChevronRight } from 'lucide-react-native';
+import { Wallet, ChevronRight } from 'lucide-react-native';
 import { Colors, Typography, Layout } from '../constants/Theme';
 import { formatCurrency } from '../utils/currency';
 import { AnimatedBalance } from './AnimatedBalance';
 import { PressableScale } from './ui/PressableScale';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: _SCREEN_WIDTH } = Dimensions.get('window');
 
 interface Account {
   id: number;

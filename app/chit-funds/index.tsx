@@ -112,7 +112,7 @@ export default function ChitFundsScreen() {
               fetchData();
               setSnackbarMessage('Chit fund deleted');
               setSnackbarVisible(true);
-            } catch (error) {
+            } catch (_error) {
               Alert.alert('Error', 'Failed to delete chit fund');
             }
           }
@@ -132,7 +132,7 @@ export default function ChitFundsScreen() {
         setCalculation(calc);
       };
       loadCalculation();
-    }, [chitFund.id]);
+    }, [chitFund, chitFund.id]);
 
     const renderRightActions = () => {
       return (

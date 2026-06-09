@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { Colors, Layout, Typography } from '../constants/Theme';
 import { Brain } from 'lucide-react-native';
 import { PressableScale } from '../components/ui/PressableScale';

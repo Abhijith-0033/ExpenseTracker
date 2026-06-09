@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput,
-  Alert, StatusBar, ScrollView, Dimensions, DeviceEventEmitter
+  Alert, StatusBar, Dimensions, DeviceEventEmitter
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useApp } from '../context/AppContext';
@@ -9,13 +9,12 @@ import { addTransfer } from '../services/database';
 import { Keypad } from '../components/ui/Keypad';
 import {
   Calendar as CalendarIcon, ArrowRight,
-  Wallet as WalletIcon, X, ArrowDownUp, Check
+  Wallet as WalletIcon, X, ArrowDownUp
 } from 'lucide-react-native';
 import { format } from 'date-fns';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Colors, Layout, Typography } from '../constants/Theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { formatCurrency } from '../utils/currency';
 import { PressableScale } from '../components/ui/PressableScale';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -66,7 +65,7 @@ export default function AddTransferScreen() {
                 }
             }
         }
-    }, [accounts]);
+    }, [accounts, fromAccount, toAccount]);
 
     const handleKeyPress = (key: string) => {
         if (display.length >= 12) return;
@@ -137,7 +136,7 @@ export default function AddTransferScreen() {
             let cleanDisplay = display;
             if (cleanDisplay.endsWith('.')) cleanDisplay = cleanDisplay.slice(0, -1);
             finalAmount = parseFloat(cleanDisplay);
-        } catch (e) {
+        } catch (_e) {
             finalAmount = 0;
         }
 

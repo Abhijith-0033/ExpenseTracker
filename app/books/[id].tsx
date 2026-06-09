@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, TextInput, ActivityIndicator, Share } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, TextInput, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { ArrowLeft, Plus, X, Trash2, Edit2, Calendar, Share2 } from 'lucide-react-native';
 import { Colors, Layout, Typography } from '../../constants/Theme';
@@ -59,7 +59,7 @@ export default function BookDetailScreen() {
     useFocusEffect(
         React.useCallback(() => {
             fetchData();
-        }, [id])
+        }, [fetchData])
     );
 
     const handleSaveItem = async () => {
@@ -79,7 +79,7 @@ export default function BookDetailScreen() {
             setItemModalVisible(false);
             resetItemForm();
             fetchData();
-        } catch (e) {
+        } catch (_e) {
             Alert.alert('Error', 'Failed to save item');
         }
     };
@@ -105,7 +105,7 @@ export default function BookDetailScreen() {
             await updateBook(Number(id), bookName, bookDesc, parseFloat(bookBudget) || 0);
             setBookModalVisible(false);
             fetchData();
-        } catch (e) {
+        } catch (_e) {
             Alert.alert('Error', 'Update failed');
         }
     }

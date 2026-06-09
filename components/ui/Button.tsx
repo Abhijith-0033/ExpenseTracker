@@ -1,8 +1,8 @@
 
 import React from 'react';
-import { Text, StyleSheet, ActivityIndicator, ViewStyle, TextStyle } from 'react-native';
+import { Text, StyleSheet, ActivityIndicator, ViewStyle, TextStyle , Pressable } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
-import { Pressable } from 'react-native';
+
 import { Colors, Layout, Typography } from '../../constants/Theme';
 
 interface ButtonProps {

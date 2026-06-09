@@ -17,7 +17,7 @@ function evaluateExpression(expr: string): number {
     const safe = expr.replace(/[^0-9+\-*/.]/g, '');
     if (!safe) return 0;
     try {
-        // eslint-disable-next-line no-new-func
+         
         const result = new Function(`return (${safe})`)();
         return typeof result === 'number' && isFinite(result) ? result : 0;
     } catch {
@@ -124,7 +124,7 @@ export default function EditTransactionScreen() {
             await refreshData();
             DeviceEventEmitter.emit('RECOMPUTE_SATISFACTION');
             router.back();
-        } catch (e) {
+        } catch (_e) {
             Alert.alert('Error', 'Failed to update transaction');
         }
     };

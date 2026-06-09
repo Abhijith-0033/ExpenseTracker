@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert, ActivityIndicator, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, Plus, TrendingUp, Users, Calendar, DollarSign, Percent, Edit, Trash2, Crown, CheckCircle } from 'lucide-react-native';
+import { ArrowLeft, Users, Calendar, DollarSign, Percent, Edit, Trash2, Crown, CheckCircle } from 'lucide-react-native';
 import { Colors, Layout, Typography, SemanticColors } from '../../constants/Theme';
 import { getChitFundById, getChitMonthlyRecords, getChitMembers, updateChitMonthlyRecord, deleteChitMonthlyRecord } from '../../services/chitfund/chitService';
 import { getAccounts, Account } from '../../services/database';
@@ -19,9 +19,9 @@ export default function ChitFundDetailScreen() {
   
   const [chitFund, setChitFund] = useState<ChitFund | null>(null);
   const [monthlyRecords, setMonthlyRecords] = useState<ChitMonthlyRecord[]>([]);
-  const [members, setMembers] = useState<any[]>([]);
+  const [_members, setMembers] = useState<any[]>([]);
   const [calculation, setCalculation] = useState<any>(null);
-  const [analysis, setAnalysis] = useState<any>(null);
+  const [_analysis, setAnalysis] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -75,7 +75,7 @@ export default function ChitFundDetailScreen() {
     if (chitFundId) {
       fetchData();
     }
-  }, [chitFundId]);
+  }, [chitFundId, fetchData]);
 
   const handleEditRecord = (record: ChitMonthlyRecord) => {
     setEditingRecord(record);
@@ -108,7 +108,7 @@ export default function ChitFundDetailScreen() {
       fetchData();
       setSnackbarMessage('Record updated successfully');
       setSnackbarVisible(true);
-    } catch (error) {
+    } catch (_error) {
       Alert.alert('Error', 'Failed to update record');
     }
   };
@@ -128,7 +128,7 @@ export default function ChitFundDetailScreen() {
               fetchData();
               setSnackbarMessage('Record deleted');
               setSnackbarVisible(true);
-            } catch (error) {
+            } catch (_error) {
               Alert.alert('Error', 'Failed to delete record');
             }
           }

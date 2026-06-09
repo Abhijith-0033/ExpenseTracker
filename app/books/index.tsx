@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Modal, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { ArrowLeft, Plus, X, Search, Filter } from 'lucide-react-native';
+import { ArrowLeft, Plus, X, Search } from 'lucide-react-native';
 import { Colors, Layout, Typography } from '../../constants/Theme';
 import { getBooks, addBook, updateBook, deleteBook, ExpenseBook } from '../../services/books';
 import { BookCard } from '../../components/BookCard';
@@ -75,7 +75,7 @@ export default function BooksScreen() {
             fetchData();
             setSnackbarMessage('Expense book created');
             setSnackbarVisible(true);
-        } catch (e) {
+        } catch (_e) {
             Alert.alert('Error', 'Failed to create book');
         }
     };
@@ -111,7 +111,7 @@ export default function BooksScreen() {
             fetchData();
             setSnackbarMessage('Expense book updated');
             setSnackbarVisible(true);
-        } catch (e) {
+        } catch (_e) {
             Alert.alert('Error', 'Failed to update book');
         }
     };
@@ -131,7 +131,7 @@ export default function BooksScreen() {
                             fetchData();
                             setSnackbarMessage('Expense book deleted');
                             setSnackbarVisible(true);
-                        } catch (e) {
+                        } catch (_e) {
                             Alert.alert('Error', 'Failed to delete book');
                         }
                     }

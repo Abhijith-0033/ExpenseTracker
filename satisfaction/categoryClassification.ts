@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { CategoryNode, getCategories } from '../services/database';
+import {  getCategories } from '../services/database';
 
 export type CategoryType = 'essential' | 'non-essential';
 

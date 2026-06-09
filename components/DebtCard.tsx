@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { TrendingUp, TrendingDown, Trash2, Clock } from 'lucide-react-native';
 import { Colors, Layout } from '../constants/Theme';

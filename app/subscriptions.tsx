@@ -1,16 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, Modal, TextInput, Dimensions, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, Modal, TextInput, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Typography, Layout } from '../constants/Theme';
-import { ArrowLeft, Plus, RefreshCw, Calendar, CreditCard, Globe, Info, ExternalLink, Pause, Play, Trash2, CheckCircle2, ChevronRight, Hash, Bell, Tag } from 'lucide-react-native';
+import { ArrowLeft, Plus, RefreshCw, Calendar, CreditCard, Globe, Trash2, CheckCircle2, ChevronRight, Bell, Tag } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { Card } from '../components/ui/Card';
-import { Subscription, getSubscriptions, getAllSubscriptions, updateSubscription, deleteSubscription, getMonthlyBurn, addSubscription, updateSubscriptionStatus, advanceRenewalDate } from '../services/subscriptions';
-import { formatCurrency } from '../utils/currency';
-import { format, differenceInDays, addDays, isAfter } from 'date-fns';
+import { Subscription, getAllSubscriptions, updateSubscription, deleteSubscription, getMonthlyBurn, addSubscription, updateSubscriptionStatus, advanceRenewalDate } from '../services/subscriptions';
+import { format, differenceInDays } from 'date-fns';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Button } from '../components/ui/Button';
-import { PieChart } from 'react-native-gifted-charts';
 import Animated, { FadeInDown, FadeInRight, FadeIn } from 'react-native-reanimated';
 import { PressableScale } from '../components/ui/PressableScale';
 import { SwipeableRow } from '../components/SwipeableRow';
@@ -22,7 +20,7 @@ export default function SubscriptionsScreen() {
     const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
     const [monthlyBurn, setMonthlyBurn] = useState(0);
     const [activeTab, setActiveTab] = useState<'active' | 'cancelled'>('active');
-    const [loading, setLoading] = useState(true);
+    const [_loading, setLoading] = useState(true);
     
     // Modal state
     const [showAddModal, setShowAddModal] = useState(false);
@@ -111,7 +109,7 @@ export default function SubscriptionsScreen() {
         try {
             await deleteSubscription(pendingDeleteSub.id);
             loadData();
-        } catch (e) {
+        } catch (_e) {
             Alert.alert("Error", "Failed to delete subscription");
         } finally {
             setPendingDeleteSub(null);

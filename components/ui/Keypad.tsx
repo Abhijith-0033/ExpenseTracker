@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
-import { Delete, Check, X } from 'lucide-react-native';
+import { Delete, Check } from 'lucide-react-native';
 import { Colors, Layout } from '../../constants/Theme';
 
 interface KeypadProps {

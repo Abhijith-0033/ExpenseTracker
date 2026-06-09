@@ -1,8 +1,8 @@
 import React, { useRef } from 'react';
-import { View, Text, TouchableOpacity, Alert, StyleSheet, Animated } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { Trash2, Edit2, Copy, Repeat } from 'lucide-react-native';
-import { Colors, Typography, Layout } from '../constants/Theme';
+import {  Typography } from '../constants/Theme';
 
 interface SwipeableRowProps {
   children: React.ReactNode;
@@ -29,7 +29,7 @@ export const SwipeableRow: React.FC<SwipeableRowProps> = ({
     progress: Animated.AnimatedInterpolation<number>,
     dragX: Animated.AnimatedInterpolation<number>
   ) => {
-    const trans = dragX.interpolate({
+    const _trans = dragX.interpolate({
       inputRange: [-144, 0],
       outputRange: [0, 144],
     });

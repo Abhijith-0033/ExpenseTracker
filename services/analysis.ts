@@ -1,5 +1,5 @@
 import { getDatabase, initDatabase } from './database';
-import { startOfMonth, endOfMonth, format, startOfDay, endOfDay } from 'date-fns';
+import { startOfMonth, endOfMonth, startOfDay, endOfDay } from 'date-fns';
 
 export interface CategoryTotal {
     category: string;
@@ -342,7 +342,7 @@ export const getDailyIncomeExpense = async (date: Date): Promise<{ income: numbe
         WHERE date >= ? AND date <= ? AND category != 'Transfer' AND category != 'Debt/Credit'
         GROUP BY CASE WHEN category = 'Income' THEN 'income' ELSE 'expense' END
     `;
-    const results = await db.getAllAsync<{ category: string, total: number }>(query, [start, end]);
+    const _results = await db.getAllAsync<{ category: string, total: number }>(query, [start, end]);
     let income = 0;
     let expense = 0;
     // Note: The GROUP BY produces 'Income' vs original categories, but actually we grouped by the CASE result.

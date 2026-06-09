@@ -14,7 +14,7 @@ async function extract() {
         if (parsed.content) {
             output += parsed.content.substring(0, 100).replace(/\n/g, '\\n') + '\n';
         }
-      } catch (e) {}
+      } catch (_e) {}
     }
   }
   fs.writeFileSync('E:/My-APp/ExpenseTracker/user_explicit.txt', output);

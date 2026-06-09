@@ -11,7 +11,7 @@ const AVAILABLE_ICONS = ['Briefcase', 'Tag', 'TrendingUp', 'Gift', 'DollarSign',
 export default function ManageIncomeSourcesScreen() {
     const router = useRouter();
     const [sources, setSources] = useState<IncomeSource[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [_loading, setLoading] = useState(true);
     const [modalVisible, setModalVisible] = useState(false);
     const [editingSource, setEditingSource] = useState<IncomeSource | null>(null);
     const [name, setName] = useState('');
@@ -60,7 +60,7 @@ export default function ManageIncomeSourcesScreen() {
             }
             setModalVisible(false);
             loadSources();
-        } catch (e) {
+        } catch (_e) {
             Alert.alert('Error', 'Failed to save. Name might be duplicate.');
         }
     };

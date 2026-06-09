@@ -1,9 +1,9 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Colors, Layout, Typography } from '../constants/Theme';
-import { BudgetStatus, getBudgetStatus, getBudgets, setBudget, deleteBudget, Budget } from '../services/budgets';
+import { BudgetStatus, getBudgetStatus, getBudgets, setBudget, deleteBudget } from '../services/budgets';
 import { getCategories, CategoryNode } from '../services/database';
 import { BudgetCard } from '../components/BudgetCard';
 import { Plus, X, ChevronLeft, ChevronRight } from 'lucide-react-native';
@@ -33,7 +33,7 @@ export default function BudgetsScreen() {
     useFocusEffect(
         useCallback(() => {
             loadData();
-        }, [selectedMonth])
+        }, [loadData])
     );
 
     const handleSave = async () => {

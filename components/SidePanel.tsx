@@ -11,7 +11,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { X, Wallet, PieChart, Target, TrendingUp, Calculator, CreditCard, Users, ChevronRight, Calendar } from 'lucide-react-native';
-import { Colors, Layout, Typography } from '../constants/Theme';
+import { Colors, Typography } from '../constants/Theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -51,7 +51,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({ visible, onClose, onNaviga
                 if (finished) runOnJS(setRender)(false);
             });
         }
-    }, [visible]);
+    }, [translateX, visible]);
 
     const panGesture = Gesture.Pan()
         .onUpdate((e) => {

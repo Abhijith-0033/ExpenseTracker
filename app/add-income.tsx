@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, StatusBar, Dimensions, ScrollView, DeviceEventEmitter } from 'react-native';
-import { useRouter } from 'expo-router';
+import { View, Text, StyleSheet, TextInput, Alert, StatusBar, Dimensions, ScrollView, DeviceEventEmitter } from 'react-native';
+import { useRouter , useFocusEffect } from 'expo-router';
 import { useApp } from '../context/AppContext';
-import { addTransaction, getCategories, getIncomeSources } from '../services/database';
+import { addTransaction, getIncomeSources } from '../services/database';
 import { playIncomeSound } from '../services/SoundService';
 import { Keypad } from '../components/ui/Keypad';
 import { Calendar as CalendarIcon, Wallet as WalletIcon, Tag as TagIcon, X, Briefcase, TrendingUp, Gift, DollarSign, Home, Globe, User, ChevronDown } from 'lucide-react-native';
@@ -11,11 +11,10 @@ import { format } from 'date-fns';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Colors, Layout, Typography } from '../constants/Theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { formatCurrency } from '../utils/currency';
 import { PressableScale } from '../components/ui/PressableScale';
 import Animated, { FadeInDown, FadeInUp, FadeIn } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useFocusEffect } from 'expo-router';
+
 import { SuccessAnimation } from '../components/SuccessAnimation';
 import { checkDuplicate } from '../services/duplicateCheck';
 import { DuplicateWarningSheet } from '../components/DuplicateWarningSheet';
@@ -35,7 +34,7 @@ export default function AddIncomeScreen() {
     const [selectedSourceIcon, setSelectedSourceIcon] = useState('Briefcase');
     const [date, setDate] = useState(new Date());
 
-    const [showSourcePicker, setShowSourcePicker] = useState(false);
+    const [_showSourcePicker, _setShowSourcePicker] = useState(false);
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
@@ -50,7 +49,7 @@ export default function AddIncomeScreen() {
             setSelectedAccount(accounts[0]);
         }
         loadIncomeSources();
-    }, [accounts, selectedAccount]);
+    }, [accounts, loadIncomeSources, selectedAccount]);
 
     useFocusEffect(
         React.useCallback(() => {
@@ -85,7 +84,7 @@ export default function AddIncomeScreen() {
         const safe = expr.replace(/[^0-9+\-*/.]/g, '');
         if (!safe) return 0;
         try {
-            // eslint-disable-next-line no-new-func
+             
             const result = new Function(`return (${safe})`)();
             return typeof result === 'number' && isFinite(result) ? result : 0;
         } catch {
@@ -131,7 +130,7 @@ export default function AddIncomeScreen() {
         setDisplay(evaluateExpression(display).toString());
     };
 
-    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [_isSubmitting, setIsSubmitting] = useState(false);
     const isSubmittingRef = React.useRef(false);
 
     const handleSave = async () => {
@@ -192,7 +191,7 @@ export default function AddIncomeScreen() {
             playIncomeSound(soundEnabled);
 
             setShowSuccess(true);
-        } catch (e) {
+        } catch (_e) {
             Alert.alert('Error', 'Failed to save income.');
         } finally {
             setIsSubmitting(false);

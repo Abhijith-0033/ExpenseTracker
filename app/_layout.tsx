@@ -1,6 +1,6 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import {  DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts, DMSans_400Regular, DMSans_500Medium, DMSans_700Bold } from '@expo-google-fonts/dm-sans';
-import { Stack } from 'expo-router';
+import { Stack , useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
@@ -12,7 +12,6 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { initNotifications } from '../services/notifications';
 import { initializeNotificationManager } from '../services/notifications/NotificationManager';
 import * as Notifications from 'expo-notifications';
-import { useRouter } from 'expo-router';
 import { runAutoPay } from '../services/emitracker/AutoPayEngine';
 import { startPolling, stopPolling, registerBackgroundTask } from '../telegram/TelegramPoller';
 
@@ -20,7 +19,7 @@ import { startPolling, stopPolling, registerBackgroundTask } from '../telegram/T
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  const _colorScheme = useColorScheme();
   const router = useRouter();
 
   const [fontsLoaded] = useFonts({
@@ -153,7 +152,7 @@ export default function RootLayout() {
     });
 
     return () => subscription.remove();
-  }, [fontsLoaded]);
+  }, [fontsLoaded, router]);
 
   if (!fontsLoaded) {
     return null;

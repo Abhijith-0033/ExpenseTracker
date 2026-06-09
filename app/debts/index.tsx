@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Modal, TextInput, Alert, ActivityIndicator } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Modal, Alert, ActivityIndicator } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { ArrowLeft, Plus, X, Search } from 'lucide-react-native';
+import { ArrowLeft, Plus, X } from 'lucide-react-native';
 import { Colors, Layout, Typography } from '../../constants/Theme';
 import { getDebts, addDebtPerson, deleteDebtPerson, Debt, getAccounts, Account } from '../../services/database';
-import { getDebtSummary, getTopDebtors, getDebtTrend } from '../../services/debts';
+import { getDebtSummary } from '../../services/debts';
 import { DebtOverviewCharts } from '../../components/DebtCharts';
 import { DebtCard } from '../../components/DebtCard';
 import { formatCurrency } from '../../utils/currency';
@@ -71,7 +70,7 @@ export default function DebtsScreen() {
             setNewNotes('');
             setSelectedAccountId(null);
             fetchData();
-        } catch (e) {
+        } catch (_e) {
             Alert.alert('Error', 'Failed to add person');
         }
     };
@@ -85,7 +84,7 @@ export default function DebtsScreen() {
         try {
             await deleteDebtPerson(pendingDeleteDebt);
             fetchData();
-        } catch (e) {
+        } catch (_e) {
             Alert.alert("Error", "Failed to delete person");
         } finally {
             setPendingDeleteDebt(null);

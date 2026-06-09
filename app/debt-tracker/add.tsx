@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, TextInput, ActivityIndicator } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Save, Eye, EyeOff, TrendingUp, Calendar } from 'lucide-react-native';
+import { ArrowLeft, Save, Eye, EyeOff, TrendingUp } from 'lucide-react-native';
 import { Colors, Layout, Typography, SemanticColors } from '../../constants/Theme';
 import { addDebtRecord } from '../../services/debttracker/debtService';
 import { calculateInterestPreview, DebtRecord } from '../../services/debttracker/DebtEngine';

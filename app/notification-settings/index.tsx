@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, Linking, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Linking, ActivityIndicator, Platform } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Bell, CheckCircle, AlertCircle, Clock, ChevronRight, Settings } from 'lucide-react-native';
+import { ArrowLeft, Bell, CheckCircle, AlertCircle, ChevronRight } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors, Layout, Typography } from '../../constants/Theme';
 import { 
@@ -41,7 +41,7 @@ export default function NotificationSettingsScreen() {
   const [telegramAlertsEnabled, setTelegramAlertsEnabled] = useState(false);
   
   // UI state
-  const [loading, setLoading] = useState(false);
+  const [_loading, _setLoading] = useState(false);
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   

@@ -56,7 +56,7 @@ export default function ManageAccountsScreen() {
             }
             await refreshData();
             setModalVisible(false);
-        } catch (e) {
+        } catch (_e) {
             Alert.alert('Error', 'Failed to save account');
         }
     };

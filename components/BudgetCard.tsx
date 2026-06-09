@@ -1,7 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Colors, Layout } from '../constants/Theme';
-import { BudgetStatus, deleteBudget } from '../services/budgets';
+import { BudgetStatus } from '../services/budgets';
 import { Trash2, Edit2 } from 'lucide-react-native';
 import { formatCurrency } from '../utils/currency';
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, StatusBar, Alert, TextInput, Modal, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, TextInput, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, TrendingUp, TrendingDown, Check, Clock, Wallet } from 'lucide-react-native';
+import { ArrowLeft, TrendingUp, TrendingDown, Check } from 'lucide-react-native';
 import { Colors, Layout, Typography } from '../../constants/Theme';
 import { getDebtById, getDebtHistory, updateDebtAmount, getAccounts, Debt, DebtHistory, Account } from '../../services/database';
 import { useApp } from '../../context/AppContext';
@@ -45,7 +45,7 @@ export default function DebtDetailScreen() {
 
     useEffect(() => {
         fetchData();
-    }, [id]);
+    }, [fetchData, id]);
 
     const handleUpdate = async () => {
         if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {

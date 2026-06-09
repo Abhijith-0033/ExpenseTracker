@@ -1,5 +1,5 @@
 // import * as FileSystem from 'expo-file-system'; // usage deprecated in strict mode
-import { writeAsStringAsync, readAsStringAsync, documentDirectory, cacheDirectory } from 'expo-file-system/legacy';
+import { writeAsStringAsync, readAsStringAsync, cacheDirectory } from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import { Alert, Platform } from 'react-native';
@@ -8,7 +8,6 @@ import {
     initDatabase,
     Transaction,
     Account,
-    CATEGORY_META_TYPE,
     IncomeSource,
     Debt,
     DebtHistory,

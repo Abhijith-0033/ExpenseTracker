@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, Save, Eye, EyeOff, TrendingUp, Trash2 } from 'lucide-react-native';
 import { Colors, Layout, Typography, SemanticColors } from '../../../constants/Theme';
@@ -64,7 +64,7 @@ export default function EditDebtScreen() {
     };
     
     loadDebt();
-  }, [debtId]);
+  }, [debtId, router]);
 
   // Calculate interest preview
   const principalAmount = parseFloat(principal) || 0;
@@ -142,7 +142,7 @@ export default function EditDebtScreen() {
               setTimeout(() => {
                 router.push('/debt-tracker' as any);
               }, 1500);
-            } catch (error) {
+            } catch (_error) {
               Alert.alert('Error', 'Failed to delete debt');
             }
           }

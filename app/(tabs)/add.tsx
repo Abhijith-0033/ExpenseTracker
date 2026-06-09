@@ -1,15 +1,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, StatusBar, ScrollView, Dimensions, Modal, DeviceEventEmitter } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useRouter , useLocalSearchParams } from 'expo-router';
 import { useApp } from '../../context/AppContext';
 import { addTransaction, addRechargeMeta, CategoryNode } from '../../services/database';
-import { initNotifications } from '../../services/notifications';
 import { schedulePaymentNotifications } from '../../services/paymentNotifications';
-import { Clock, Calendar as CalendarIcon, Wallet as WalletIcon, Tag as TagIcon, X, ChevronDown, CheckCircle2 } from 'lucide-react-native';
+import { Clock, Calendar as CalendarIcon, Wallet as WalletIcon, Tag as TagIcon, X, ChevronDown, CheckCircle2 , Sparkles } from 'lucide-react-native';
 import { format, addDays } from 'date-fns';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { useLocalSearchParams } from 'expo-router';
+
 import { Colors, Layout, Typography } from '../../constants/Theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Keypad } from '../../components/ui/Keypad';
@@ -21,7 +20,7 @@ import { parseBankSMS } from '../../services/smsParser';
 import { playIncomeSound, playExpenseSound } from '../../services/SoundService';
 import { addSubscription } from '../../services/subscriptions';
 import Animated, { FadeIn, FadeInDown, FadeInUp } from 'react-native-reanimated';
-import { Sparkles, Clipboard } from 'lucide-react-native';
+
 import { checkDuplicate, getSmartSuggestions, getLastUsedForCategory, SmartSuggestion } from '../../services/duplicateCheck';
 import { DuplicateWarningSheet } from '../../components/DuplicateWarningSheet';
 
@@ -54,7 +53,7 @@ export default function AddTransactionScreen() {
     const [validity, setValidity] = useState(28);
     const [customValidity, setCustomValidity] = useState('');
 
-    const [showValidityPicker, setShowValidityPicker] = useState(false);
+    const [_showValidityPicker, _setShowValidityPicker] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
     const [showSMSModal, setShowSMSModal] = useState(false);
     const [smsText, setSmsText] = useState('');
@@ -67,7 +66,7 @@ export default function AddTransactionScreen() {
         if (accounts.length > 0 && !selectedAccount) {
             setSelectedAccount(null); // Explicit text "Select Account"
         }
-    }, [accounts]);
+    }, [accounts, selectedAccount]);
 
     // Smart Suggestions for Amount
     useEffect(() => {
@@ -164,7 +163,7 @@ export default function AddTransactionScreen() {
         const safe = expr.replace(/[^0-9+\-*/.]/g, '');
         if (!safe) return 0;
         try {
-            // eslint-disable-next-line no-new-func
+             
             const result = new Function(`return (${safe})`)();
             return typeof result === 'number' && isFinite(result) ? result : 0;
         } catch {
@@ -366,7 +365,7 @@ export default function AddTransactionScreen() {
             setSelectedAccount(null);
 
             setShowSuccess(true);
-        } catch (e) {
+        } catch (_e) {
             Alert.alert('Error', 'Failed to save transaction.');
         } finally {
             setIsSubmitting(false);

@@ -171,7 +171,7 @@ export const getBookSummary = async (bookId: number) => {
 
 export const getBookItemDistribution = async (bookId: number) => {
     await initDatabase();
-    const db = getDatabase();
+    const _db = getDatabase();
     // Group by name for chart (or maybe custom buckets in future)
     // For now, raw items if < 10, else grouped
     const items = await getBookItems(bookId);

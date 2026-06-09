@@ -1,7 +1,6 @@
 
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ViewStyle, StyleProp } from 'react-native';
-import { useRouter } from 'expo-router';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Colors, Layout } from '../constants/Theme';
 import { BookOpen, FolderPen, Trash2 } from 'lucide-react-native';
 import { Swipeable } from 'react-native-gesture-handler';

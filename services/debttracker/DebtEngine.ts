@@ -304,7 +304,7 @@ export const analyzePaymentHistory = (debt: DebtRecord, repayments: DebtRepaymen
     new Date(a.payment_date).getTime() - new Date(b.payment_date).getTime()
   );
   
-  const balanceHistory: Array<{ date: string; balance: number; payment: number }> = [];
+  const balanceHistory: { date: string; balance: number; payment: number }[] = [];
   let runningBalance = debt.principal;
   
   // Add starting point

@@ -1,6 +1,6 @@
 import { getDatabase, initDatabase, SavingsGoal, SavingsContribution } from './database';
-export { SavingsGoal, SavingsContribution };
 import { differenceInWeeks } from 'date-fns';
+export { SavingsGoal, SavingsContribution };
 
 const ensureDb = async () => {
     const db = getDatabase();

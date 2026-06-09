@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert, ActivityIndicator, TextInput } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, Plus, TrendingDown, Calendar, DollarSign, Percent, Clock, CheckCircle } from 'lucide-react-native';
+import { ArrowLeft, Plus, Calendar, DollarSign, Percent, CheckCircle } from 'lucide-react-native';
 import { Colors, Layout, Typography, SemanticColors } from '../../constants/Theme';
 import { getDebtRecordById, getDebtRepayments, addDebtRepayment, deleteDebtRepayment } from '../../services/debttracker/debtService';
 import { getAccounts, Account } from '../../services/database';
@@ -71,7 +71,7 @@ export default function DebtDetailScreen() {
     if (debtId) {
       fetchData();
     }
-  }, [debtId]);
+  }, [debtId, fetchData]);
 
   const handleAddPayment = async () => {
     if (!paymentAmount || parseFloat(paymentAmount) <= 0) {
@@ -101,7 +101,7 @@ export default function DebtDetailScreen() {
       fetchData();
       setSnackbarMessage('Payment added successfully');
       setSnackbarVisible(true);
-    } catch (error) {
+    } catch (_error) {
       Alert.alert('Error', 'Failed to add payment');
     }
   };
@@ -116,7 +116,7 @@ export default function DebtDetailScreen() {
       fetchData();
       setSnackbarMessage('Debt marked as completed');
       setSnackbarVisible(true);
-    } catch (error) {
+    } catch (_error) {
       Alert.alert('Error', 'Failed to mark debt as completed');
     }
   };
@@ -136,7 +136,7 @@ export default function DebtDetailScreen() {
               fetchData();
               setSnackbarMessage('Payment deleted');
               setSnackbarVisible(true);
-            } catch (error) {
+            } catch (_error) {
               Alert.alert('Error', 'Failed to delete payment');
             }
           }

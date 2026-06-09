@@ -10,9 +10,9 @@ import {
 } from 'react-native';
 import { Colors, Typography, Layout } from '../constants/Theme';
 import { PressableScale } from './ui/PressableScale';
-import { Repeat, X, Calendar } from 'lucide-react-native';
+import { Repeat, X } from 'lucide-react-native';
 
-const { height } = Dimensions.get('window');
+const { _height } = Dimensions.get('window');
 
 interface RecurringBottomSheetProps {
   visible: boolean;
@@ -37,7 +37,7 @@ export const RecurringBottomSheet: React.FC<RecurringBottomSheetProps> = ({
 
   if (!transaction) return null;
 
-  const frequencies: Array<{ label: string; value: 'monthly' | 'quarterly' | 'yearly' | 'custom' }> = [
+  const frequencies: { label: string; value: 'monthly' | 'quarterly' | 'yearly' | 'custom' }[] = [
     { label: 'Custom/Daily', value: 'custom' },
     { label: 'Quarterly', value: 'quarterly' },
     { label: 'Monthly', value: 'monthly' },

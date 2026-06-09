@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, Save, Users, Calendar, DollarSign, Percent, Info, Trash2 } from 'lucide-react-native';
+import { ArrowLeft, Save, DollarSign, Info, Trash2 } from 'lucide-react-native';
 import { Colors, Layout, Typography, SemanticColors } from '../../../constants/Theme';
 import { getChitFundById, updateChitFund, deleteChitFund } from '../../../services/chitfund/chitService';
 import { ChitFund } from '../../../services/chitfund/ChitEngine';
 import { Snackbar } from '../../../components/Snackbar';
 import { FormField } from '../../../components/FormField';
 import { formatCurrency } from '../../../utils/currency';
-import { format } from 'date-fns';
 
 export default function EditChitFundScreen() {
   const router = useRouter();
@@ -62,7 +61,7 @@ export default function EditChitFundScreen() {
     };
     
     loadChitFund();
-  }, [chitFundId]);
+  }, [chitFundId, router]);
 
   // Calculate preview values
   const members = parseInt(totalMembers) || 0;
@@ -155,7 +154,7 @@ export default function EditChitFundScreen() {
               setTimeout(() => {
                 router.push('/chit-funds' as any);
               }, 1500);
-            } catch (error) {
+            } catch (_error) {
               Alert.alert('Error', 'Failed to delete chit fund');
             }
           }

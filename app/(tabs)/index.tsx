@@ -1,34 +1,28 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, StatusBar, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, StatusBar, TouchableOpacity, Dimensions , Modal } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useApp } from '../../context/AppContext';
-import { Card } from '../../components/ui/Card';
-import { Wallet, TrendingUp, TrendingDown, ArrowRight, BookOpen, ChevronLeft, ChevronRight, Activity } from 'lucide-react-native';
+import {  TrendingUp, TrendingDown, ArrowRight, BookOpen, Activity , CalendarDays, CalendarRange, Calendar, BarChart3, X , Grid } from 'lucide-react-native';
 import { Colors, Layout, Typography } from '../../constants/Theme';
 import { LinearGradient } from 'expo-linear-gradient';
 import { formatCurrency } from '../../utils/currency';
-import { addMonths, subMonths, format } from 'date-fns';
+import { _addMonths, format } from 'date-fns';
 import { getBooks } from '../../services/books';
 import { getDebtSummary, DebtSummary } from '../../services/debts';
 import { getDailyIncomeExpense, getWeeklyIncomeExpense, getMonthlyIncomeExpense, getYearlyIncomeExpense } from '../../services/analysis';
 import { getBudgetStatus, BudgetStatus } from '../../services/budgets';
 import { getEMISummary } from '../../services/emitracker/EMIEngine';
-import { AnimatedBalance } from '../../components/AnimatedBalance';
 import { MonthlyExpensePieChart } from '../../components/MonthlyExpensePieChart';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
-import { GestureHandlerRootView, Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { runOnJS } from 'react-native-reanimated';
+import Animated, { FadeInDown  } from 'react-native-reanimated';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { PressableScale } from '../../components/ui/PressableScale';
-import { CalendarDays, CalendarRange, Calendar, BarChart3, PieChart as PieChartIcon, X } from 'lucide-react-native';
-import { Modal } from 'react-native';
 import SatisfactionCard from '../../satisfaction/SatisfactionCard';
 import { formatAmount } from '../../utils/formatAmount';
 import { FlippableBalanceCard } from '../../components/FlippableBalanceCard';
 import { SidePanel } from '../../components/SidePanel';
-import { Grid } from 'lucide-react-native';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: _SCREEN_WIDTH } = Dimensions.get('window');
 
 const getGreeting = () => {
   const hour = new Date().getHours();
@@ -39,7 +33,7 @@ const getGreeting = () => {
 
 export default function Dashboard() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const _insets = useSafeAreaInsets();
   const { accounts, transactions, refreshData } = useApp();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -104,8 +98,8 @@ export default function Dashboard() {
   );
 
   const totalBalance = accounts.reduce((sum, acc) => sum + acc.balance, 0);
-  const income = transactions.filter(t => t.type === 'income' || (t.category === 'Income' && !t.type)).reduce((s, t) => s + t.amount, 0);
-  const expense = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+  const _income = transactions.filter(t => t.type === 'income' || (t.category === 'Income' && !t.type)).reduce((s, t) => s + t.amount, 0);
+  const _expense = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

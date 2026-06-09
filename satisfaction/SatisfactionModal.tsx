@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Dimensions, Switch } from 'react-native';
-import { Colors, Layout, Typography } from '../constants/Theme';
+import { Colors, Typography } from '../constants/Theme';
 import { X, ChevronDown, ChevronUp, Brain, Settings } from 'lucide-react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withDelay } from 'react-native-reanimated';
 import { SatisfactionMetrics, SatisfactionStatus } from './SatisfactionEngine';
@@ -9,7 +9,7 @@ import { formatCurrency } from '../utils/currency';
 import { getMergedClassifications, saveUserOverride, CategoryType } from './categoryClassification';
 
 
-const { width } = Dimensions.get('window');
+const { _width } = Dimensions.get('window');
 
 interface SatisfactionModalProps {
   visible: boolean;
@@ -60,7 +60,7 @@ export default function SatisfactionModal({ visible, onClose, score, status, met
       setShowAdjustments(false);
       setShowCategoryEditor(false);
     }
-  }, [visible, score, metrics]);
+  }, [visible, score, metrics, scoreAnim, savingsWidth, essentialWidth, balanceWidth, consistencyWidth]);
 
   if (!metrics || !status || score === null) return null;
 
@@ -245,6 +245,7 @@ function CategoryEditor({ onClose }: { onClose: () => void }) {
   
   useEffect(() => {
     async function load() {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { getCategories } = require('../services/database');
       const dbCats = await getCategories();
       const merged = await getMergedClassifications();

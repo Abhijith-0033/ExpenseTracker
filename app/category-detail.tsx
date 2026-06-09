@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Dimensions } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, PieChart, ArrowUpRight, ShoppingBag, Coffee, Car, Home, Film, CalendarRange, TrendingUp, Hash, Zap } from 'lucide-react-native';
+import { ArrowLeft, PieChart, ShoppingBag, Coffee, Car, Home, Film, CalendarRange, TrendingUp, Hash, Zap } from 'lucide-react-native';
 import { Colors, Layout, Typography } from '../constants/Theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BarChart } from 'react-native-gifted-charts';
@@ -42,13 +42,13 @@ export default function CategoryDetailScreen() {
             const first = categories.find(c => c.name !== 'Income' && c.name !== 'Transfer');
             if (first) setSelectedCategory(first.name);
         }
-    }, [categories]);
+    }, [categories, initialCategoryName, selectedCategory]);
 
     useEffect(() => {
         if (selectedCategory !== null) {
             loadCategoryData();
         }
-    }, [selectedCategory, period]);
+    }, [selectedCategory, period, loadCategoryData]);
 
     const loadBaseData = async () => {
         const [cats, classMap] = await Promise.all([

@@ -1,9 +1,9 @@
 
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator, Image } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { ArrowLeft, Plus, Search } from 'lucide-react-native';
-import { Colors, Layout, Typography } from '../../constants/Theme';
+import { ArrowLeft, Plus } from 'lucide-react-native';
+import { Colors, Typography } from '../../constants/Theme';
 import { getGroups, getGroupMembers, getGroupExpenses, BillGroup } from '../../services/billSplitter';
 import { BillGroupCard } from '../../components/BillGroupCard';
 

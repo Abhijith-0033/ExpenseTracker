@@ -56,7 +56,7 @@ export const MonthlyTrendSection: React.FC = () => {
 
     useEffect(() => {
         loadData();
-    }, [range]);
+    }, [loadData, range]);
 
     const renderComparison = () => {
         if (!comparison) return null;

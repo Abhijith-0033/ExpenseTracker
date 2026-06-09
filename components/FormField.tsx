@@ -8,7 +8,7 @@ import {
   TouchableOpacity, 
   KeyboardTypeOptions 
 } from 'react-native';
-import { Colors, Typography, Layout, SemanticColors } from '../constants/Theme';
+import { Colors, Typography, Layout } from '../constants/Theme';
 
 interface FormFieldProps {
   label: string;
@@ -74,7 +74,7 @@ export const FormField: React.FC<FormFieldProps> = ({
         }),
       ]).start();
     }
-  }, [error]);
+  }, [borderColor, error, errorOpacity, errorTranslateY]);
 
   const onFocus = () => {
     if (!error) {

@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, Save, Calculator, CreditCard, Calendar, DollarSign, Percent, Clock, CheckCircle, AlertCircle } from 'lucide-react-native';
+import { ArrowLeft, Save, Calculator, CreditCard, Calendar, DollarSign, Percent, Clock, CheckCircle } from 'lucide-react-native';
 import { Colors, Typography, Layout } from '../../constants/Theme';
 import { formatCurrency } from '../../utils/currency';
 import { FormField } from '../../components/FormField';
-import { getEMIRecord, updateEMIRecord, createEMIRecord, calculateEMI, generateAmortizationSchedule, EMIRecord } from '../../services/emitracker/EMIEngine';
+import { getEMIRecord, updateEMIRecord, createEMIRecord, calculateEMI, EMIRecord } from '../../services/emitracker/EMIEngine';
 import { getAccounts } from '../../services/database';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
@@ -34,17 +34,17 @@ export default function AddEMIScreen() {
     total_interest: number;
   } | null>(null);
 
-  const [accounts, setAccounts] = useState<Array<{ id: number; name: string; balance: number }>>([]);
+  const [accounts, setAccounts] = useState<{ id: number; name: string; balance: number }[]>([]);
   const [loading, setLoading] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showDueDayPicker, setShowDueDayPicker] = useState(false);
+  const [_showDueDayPicker, _setShowDueDayPicker] = useState(false);
 
   useEffect(() => {
     loadAccounts();
     if (isEdit && params.id) {
       loadEMIRecord(parseInt(params.id));
     }
-  }, [isEdit, params.id]);
+  }, [isEdit, loadEMIRecord, params.id]);
 
   const loadAccounts = async () => {
     try {

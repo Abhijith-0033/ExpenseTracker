@@ -261,7 +261,7 @@ export const deleteChitMember = async (id: number): Promise<void> => {
 
 export const getChitFundSummary = async () => {
   await initDatabase();
-  const db = getDatabase();
+  const _db = getDatabase();
   
   const chitFunds = await getChitFunds('active');
   const summary = {
