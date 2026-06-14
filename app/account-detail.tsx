@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Dimensions } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, Settings2, Wallet, TrendingUp, TrendingDown, CalendarRange } from 'lucide-react-native';
+import { ArrowLeft, Settings2, Wallet, TrendingUp, TrendingDown } from 'lucide-react-native';
 import { Colors, Layout, Typography } from '../constants/Theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { LineChart } from 'react-native-gifted-charts';
-import { getAccounts, Account, Transaction } from '../services/database';
-import { getAccountIncomeExpense, getAccountTransactions, getAccountBalanceHistory } from '../services/accountDetailQueries';
+import { getAccounts, Account } from '../services/database';
+import { getAccountIncomeExpense, getAccountBalanceHistory } from '../services/accountDetailQueries';
 import { formatCurrency } from '../utils/currency';
 import { startOfMonth, subMonths, startOfYear } from 'date-fns';
 import { TransactionList } from '../components/TransactionList';
@@ -28,12 +28,55 @@ export default function AccountDetailScreen() {
 
     const [income, setIncome] = useState(0);
     const [expense, setExpense] = useState(0);
-    const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [chartData, setChartData] = useState<any[]>([]);
+
+    const loadAccounts = React.useCallback(async () => {
+        const accs = await getAccounts();
+        setAccounts(accs);
+    }, []);
+
+    const getDateRange = React.useCallback(() => {
+        const end = new Date();
+        let start = new Date(0); // All time
+
+        if (period === 'This Month') {
+            start = startOfMonth(new Date());
+        } else if (period === 'Last 3M') {
+            start = subMonths(startOfMonth(new Date()), 2); // Current month + 2 previous
+        } else if (period === 'This Year') {
+            start = startOfYear(new Date());
+        }
+        return { start, end };
+    }, [period]);
+
+    const loadAccountData = React.useCallback(async () => {
+        if (selectedAccountId === null) return;
+        
+        const { start, end } = getDateRange();
+        const [incExp, history] = await Promise.all([
+            getAccountIncomeExpense(selectedAccountId, start, end),
+            getAccountBalanceHistory(selectedAccountId, start, end)
+        ]);
+
+        setIncome(incExp.income);
+        setExpense(incExp.expense);
+        
+        // Format chart data for LineChart
+        if (history.length > 0) {
+            const formatted = history.map(h => ({
+                value: h.value,
+                label: h.label.split(' ')[0], // Just the day number for x-axis
+                dataPointText: h.value.toString()
+            }));
+            setChartData(formatted);
+        } else {
+            setChartData([{ value: 0, label: '' }]);
+        }
+    }, [selectedAccountId, period, getDateRange]);
 
     useEffect(() => {
         loadAccounts();
-    }, []);
+    }, [loadAccounts]);
 
     useEffect(() => {
         if (accounts.length > 0 && selectedAccountId === null && !initialAccountId) {
@@ -47,49 +90,7 @@ export default function AccountDetailScreen() {
         }
     }, [selectedAccountId, period, loadAccountData]);
 
-    const loadAccounts = async () => {
-        const accs = await getAccounts();
-        setAccounts(accs);
-    };
 
-    const getDateRange = () => {
-        const end = new Date();
-        let start = new Date(0); // All time
-
-        if (period === 'This Month') {
-            start = startOfMonth(new Date());
-        } else if (period === 'Last 3M') {
-            start = subMonths(startOfMonth(new Date()), 2); // Current month + 2 previous
-        } else if (period === 'This Year') {
-            start = startOfYear(new Date());
-        }
-        return { start, end };
-    };
-
-    const loadAccountData = async () => {
-        const { start, end } = getDateRange();
-        const [incExp, txs, history] = await Promise.all([
-            getAccountIncomeExpense(selectedAccountId, start, end),
-            getAccountTransactions(selectedAccountId, start, end),
-            getAccountBalanceHistory(selectedAccountId, start, end)
-        ]);
-
-        setIncome(incExp.income);
-        setExpense(incExp.expense);
-        setTransactions(txs);
-        
-        // Format chart data for LineChart
-        if (history.length > 0) {
-            const formatted = history.map(h => ({
-                value: h.value,
-                label: h.label.split(' ')[0], // Just the day number for x-axis
-                dataPointText: h.value.toString()
-            }));
-            setChartData(formatted);
-        } else {
-            setChartData([{ value: 0, label: '' }]);
-        }
-    };
 
     const selectedAccount = accounts.find(a => a.id === selectedAccountId);
 
@@ -129,101 +130,95 @@ export default function AccountDetailScreen() {
                 </View>
             )}
 
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-                
-                {/* Hero Card */}
-                {selectedAccount && (
-                    <LinearGradient
-                        colors={['#1E293B', '#0F172A']} // Slate 800 -> Slate 900
-                        style={styles.heroCard}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                    >
-                        <View style={styles.heroTop}>
-                            <View style={styles.heroIconBox}>
-                                <Wallet size={24} color={Colors.white} />
+            <TransactionList 
+                accountId={selectedAccountId}
+                startDate={getDateRange().start}
+                endDate={getDateRange().end}
+                scrollEnabled={true}
+                showTitle={false}
+                contentContainerStyle={styles.scrollContent}
+                ListHeaderComponent={
+                    <>
+                        {/* Hero Card */}
+                        {selectedAccount && (
+                            <LinearGradient
+                                colors={['#1E293B', '#0F172A']} // Slate 800 -> Slate 900
+                                style={styles.heroCard}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                            >
+                                <View style={styles.heroTop}>
+                                    <View style={styles.heroIconBox}>
+                                        <Wallet size={24} color={Colors.white} />
+                                    </View>
+                                    <Text style={styles.heroAccountType}>{selectedAccount.type.toUpperCase()}</Text>
+                                </View>
+                                <Text style={styles.heroAccountName}>{selectedAccount.name}</Text>
+                                <Text style={styles.heroBalanceLabel}>Current Balance</Text>
+                                <Text style={styles.heroBalance}>{formatCurrency(selectedAccount.balance)}</Text>
+                            </LinearGradient>
+                        )}
+
+                        {/* Period Filter */}
+                        <View style={styles.filterContainer}>
+                            {periods.map(p => (
+                                <TouchableOpacity
+                                    key={p}
+                                    style={[styles.filterBtn, period === p && styles.filterBtnActive]}
+                                    onPress={() => setPeriod(p)}
+                                >
+                                    <Text style={[styles.filterText, period === p && styles.filterTextActive]}>{p}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+
+                        {/* Chart Section */}
+                        <View style={styles.chartCard}>
+                            <Text style={styles.sectionTitle}>Net Cash Flow</Text>
+                            <View style={{ marginTop: 20, alignItems: 'center' }}>
+                                <LineChart
+                                    data={chartData}
+                                    width={SCREEN_WIDTH - 80}
+                                    height={160}
+                                    thickness={3}
+                                    color={Colors.primary[500]}
+                                    hideDataPoints={chartData.length > 30}
+                                    dataPointsColor={Colors.primary[600]}
+                                    hideRules
+                                    hideYAxisText
+                                    xAxisColor={Colors.gray[200]}
+                                    yAxisColor="transparent"
+                                    xAxisLabelTextStyle={{ color: Colors.gray[400], fontSize: 10 }}
+                                    initialSpacing={10}
+                                    curved
+                                />
                             </View>
-                            <Text style={styles.heroAccountType}>{selectedAccount.type.toUpperCase()}</Text>
                         </View>
-                        <Text style={styles.heroAccountName}>{selectedAccount.name}</Text>
-                        <Text style={styles.heroBalanceLabel}>Current Balance</Text>
-                        <Text style={styles.heroBalance}>{formatCurrency(selectedAccount.balance)}</Text>
-                    </LinearGradient>
-                )}
 
-                {/* Period Filter */}
-                <View style={styles.filterContainer}>
-                    {periods.map(p => (
-                        <TouchableOpacity
-                            key={p}
-                            style={[styles.filterBtn, period === p && styles.filterBtnActive]}
-                            onPress={() => setPeriod(p)}
-                        >
-                            <Text style={[styles.filterText, period === p && styles.filterTextActive]}>{p}</Text>
-                        </TouchableOpacity>
-                    ))}
-                </View>
-
-                {/* Chart Section */}
-                <View style={styles.chartCard}>
-                    <Text style={styles.sectionTitle}>Net Cash Flow</Text>
-                    <View style={{ marginTop: 20, alignItems: 'center' }}>
-                        <LineChart
-                            data={chartData}
-                            width={SCREEN_WIDTH - 80}
-                            height={160}
-                            thickness={3}
-                            color={Colors.primary[500]}
-                            hideDataPoints={chartData.length > 30}
-                            dataPointsColor={Colors.primary[600]}
-                            hideRules
-                            hideYAxisText
-                            xAxisColor={Colors.gray[200]}
-                            yAxisColor="transparent"
-                            xAxisLabelTextStyle={{ color: Colors.gray[400], fontSize: 10 }}
-                            initialSpacing={10}
-                            curved
-                        />
-                    </View>
-                </View>
-
-                {/* Summary Cards */}
-                <View style={styles.summaryRow}>
-                    <View style={[styles.summaryCard, { backgroundColor: Colors.success.bg }]}>
-                        <View style={[styles.summaryIcon, { backgroundColor: Colors.success[100] }]}>
-                            <TrendingUp size={20} color={Colors.success[600]} />
+                        {/* Summary Cards */}
+                        <View style={styles.summaryRow}>
+                            <View style={[styles.summaryCard, { backgroundColor: Colors.success.bg }]}>
+                                <View style={[styles.summaryIcon, { backgroundColor: Colors.success[100] }]}>
+                                    <TrendingUp size={20} color={Colors.success[600]} />
+                                </View>
+                                <Text style={styles.summaryLabel}>Money In</Text>
+                                <Text style={[styles.summaryValue, { color: Colors.success[700] }]}>{formatCurrency(income)}</Text>
+                            </View>
+                            
+                            <View style={[styles.summaryCard, { backgroundColor: Colors.danger.bg }]}>
+                                <View style={[styles.summaryIcon, { backgroundColor: Colors.danger[100] }]}>
+                                    <TrendingDown size={20} color={Colors.danger[600]} />
+                                </View>
+                                <Text style={styles.summaryLabel}>Money Out</Text>
+                                <Text style={[styles.summaryValue, { color: Colors.danger[700] }]}>{formatCurrency(expense)}</Text>
+                            </View>
                         </View>
-                        <Text style={styles.summaryLabel}>Money In</Text>
-                        <Text style={[styles.summaryValue, { color: Colors.success[700] }]}>{formatCurrency(income)}</Text>
-                    </View>
-                    
-                    <View style={[styles.summaryCard, { backgroundColor: Colors.danger.bg }]}>
-                        <View style={[styles.summaryIcon, { backgroundColor: Colors.danger[100] }]}>
-                            <TrendingDown size={20} color={Colors.danger[600]} />
-                        </View>
-                        <Text style={styles.summaryLabel}>Money Out</Text>
-                        <Text style={[styles.summaryValue, { color: Colors.danger[700] }]}>{formatCurrency(expense)}</Text>
-                    </View>
-                </View>
 
-                {/* Transactions List */}
-                <Text style={[styles.sectionTitle, { marginBottom: 16 }]}>Transactions</Text>
-                {transactions.length > 0 ? (
-                    <TransactionList 
-                        transactions={transactions} 
-                        scrollEnabled={false} 
-                        showTitle={false} 
-                        limit={0} // show all in period
-                    />
-                ) : (
-                    <View style={styles.emptyState}>
-                        <CalendarRange size={48} color={Colors.gray[300]} />
-                        <Text style={styles.emptyText}>No activity found in this period.</Text>
-                    </View>
-                )}
-
-                <View style={{ height: 40 }} />
-            </ScrollView>
+                        {/* Transactions List */}
+                        <Text style={[styles.sectionTitle, { marginBottom: 16 }]}>Transactions</Text>
+                    </>
+                }
+            />
         </View>
     );
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Typography, Layout } from '../constants/Theme';
@@ -17,11 +17,7 @@ export default function FinancialReportScreen() {
     const [loading, setLoading] = useState(true);
     const [exporting, setExporting] = useState(false);
 
-    useEffect(() => {
-        loadData();
-    }, [loadData, selectedMonth]);
-
-    const loadData = async () => {
+    const loadData = useCallback(async () => {
         setLoading(true);
         try {
             const data = await generateMonthlyReportData(selectedMonth);
@@ -32,7 +28,11 @@ export default function FinancialReportScreen() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [selectedMonth]);
+
+    useEffect(() => {
+        loadData();
+    }, [loadData]);
 
     const handleExport = async () => {
         setExporting(true);

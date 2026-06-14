@@ -5,14 +5,11 @@ import {
   StyleSheet, 
   Modal, 
   TouchableOpacity, 
-  TouchableWithoutFeedback, 
-  Dimensions 
+  TouchableWithoutFeedback 
 } from 'react-native';
 import { Colors, Typography, Layout } from '../constants/Theme';
 import { PressableScale } from './ui/PressableScale';
 import { Repeat, X } from 'lucide-react-native';
-
-const { _height } = Dimensions.get('window');
 
 interface RecurringBottomSheetProps {
   visible: boolean;

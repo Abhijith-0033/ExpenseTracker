@@ -187,17 +187,19 @@ export const generateMonthlyRecords = async (chitId: number, startDate: string, 
   
   const start = new Date(startDate);
   
-  for (let i = 1; i <= durationMonths; i++) {
-    const monthDate = new Date(start);
-    monthDate.setMonth(start.getMonth() + i - 1);
-    const monthDateStr = monthDate.toISOString().split('T')[0];
-    
-    await db.runAsync(`
-      INSERT INTO chit_monthly_records (
-        chit_id, month_number, month_date, payment_status, created_at
-      ) VALUES (?, ?, ?, 'pending', ?)
-    `, [chitId, i, monthDateStr, new Date().toISOString()]);
-  }
+  await db.withTransactionAsync(async () => {
+    for (let i = 1; i <= durationMonths; i++) {
+      const monthDate = new Date(start);
+      monthDate.setMonth(start.getMonth() + i - 1);
+      const monthDateStr = monthDate.toISOString().split('T')[0];
+      
+      await db.runAsync(`
+        INSERT INTO chit_monthly_records (
+          chit_id, month_number, month_date, payment_status, created_at
+        ) VALUES (?, ?, ?, 'pending', ?)
+      `, [chitId, i, monthDateStr, new Date().toISOString()]);
+    }
+  });
 };
 
 // --- CHIT MEMBERS ---

@@ -39,23 +39,31 @@ export default function AddEMIScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [_showDueDayPicker, _setShowDueDayPicker] = useState(false);
 
-  useEffect(() => {
-    loadAccounts();
-    if (isEdit && params.id) {
-      loadEMIRecord(parseInt(params.id));
+  const calculateLiveEMI = useCallback((principal: number, interestRate: number, tenureMonths: number) => {
+    if (principal > 0 && tenureMonths > 0) {
+      const emi = calculateEMI(principal, interestRate, tenureMonths);
+      const totalAmount = emi * tenureMonths;
+      const totalInterest = totalAmount - principal;
+      setEMICalculation({
+        emi_amount: emi,
+        total_amount: totalAmount,
+        total_interest: totalInterest,
+      });
+    } else {
+      setEMICalculation(null);
     }
-  }, [isEdit, loadEMIRecord, params.id]);
+  }, []);
 
-  const loadAccounts = async () => {
+  const loadAccounts = useCallback(async () => {
     try {
       const accs = await getAccounts();
       setAccounts(accs.filter((a) => a.type !== 'meta_categories'));
     } catch (error) {
       console.error('Error loading accounts:', error);
     }
-  };
+  }, []);
 
-  const loadEMIRecord = async (id: number) => {
+  const loadEMIRecord = useCallback(async (id: number) => {
     try {
       const record = await getEMIRecord(id);
       if (record) {
@@ -78,22 +86,14 @@ export default function AddEMIScreen() {
       console.error('Error loading EMI record:', error);
       Alert.alert('Error', 'Failed to load EMI record');
     }
-  };
+  }, [calculateLiveEMI]);
 
-  const calculateLiveEMI = useCallback((principal: number, interestRate: number, tenureMonths: number) => {
-    if (principal > 0 && tenureMonths > 0) {
-      const emi = calculateEMI(principal, interestRate, tenureMonths);
-      const totalAmount = emi * tenureMonths;
-      const totalInterest = totalAmount - principal;
-      setEMICalculation({
-        emi_amount: emi,
-        total_amount: totalAmount,
-        total_interest: totalInterest,
-      });
-    } else {
-      setEMICalculation(null);
+  useEffect(() => {
+    loadAccounts();
+    if (isEdit && params.id) {
+      loadEMIRecord(parseInt(params.id));
     }
-  }, []);
+  }, [isEdit, loadAccounts, loadEMIRecord, params.id]);
 
   useEffect(() => {
     const principal = parseFloat(formData.principal) || 0;

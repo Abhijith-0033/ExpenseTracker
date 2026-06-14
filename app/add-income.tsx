@@ -10,6 +10,7 @@ import { Calendar as CalendarIcon, Wallet as WalletIcon, Tag as TagIcon, X, Brie
 import { format } from 'date-fns';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Colors, Layout, Typography } from '../constants/Theme';
+import { commonStyles } from '../theme/commonStyles';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PressableScale } from '../components/ui/PressableScale';
 import Animated, { FadeInDown, FadeInUp, FadeIn } from 'react-native-reanimated';
@@ -44,22 +45,7 @@ export default function AddIncomeScreen() {
     const [duplicateTransaction, setDuplicateTransaction] = useState<any>(null);
     const pendingSaveDataRef = React.useRef<number | null>(null);
 
-    useEffect(() => {
-        if (accounts.length > 0 && !selectedAccount) {
-            setSelectedAccount(accounts[0]);
-        }
-        loadIncomeSources();
-    }, [accounts, loadIncomeSources, selectedAccount]);
-
-    useFocusEffect(
-        React.useCallback(() => {
-            setShowSuccess(false);
-            setDisplay('0');
-            setDescription('');
-        }, [])
-    );
-
-    const loadIncomeSources = async () => {
+    const loadIncomeSources = React.useCallback(async () => {
         try {
             const sources = await getIncomeSources();
             if (sources.length > 0) {
@@ -78,30 +64,41 @@ export default function AddIncomeScreen() {
         } catch (e) {
             console.error("Failed to load income sources", e);
         }
-    };
+    }, [subcategory]);
+
+    useEffect(() => {
+        if (accounts.length > 0 && !selectedAccount) {
+            setSelectedAccount(accounts[0]);
+        }
+        loadIncomeSources();
+    }, [accounts, loadIncomeSources, selectedAccount]);
+
+    useFocusEffect(
+        React.useCallback(() => {
+            setShowSuccess(false);
+            setDisplay('0');
+            setDescription('');
+        }, [])
+    );
+
 
     const evaluateExpression = (expr: string): number => {
         const safe = expr.replace(/[^0-9+\-*/.]/g, '');
         if (!safe) return 0;
-        try {
-             
-            const result = new Function(`return (${safe})`)();
-            return typeof result === 'number' && isFinite(result) ? result : 0;
-        } catch {
-            const tokens = safe.match(/(\d+\.?\d*)|([-+*/])/g);
-            if (!tokens) return parseFloat(safe) || 0;
-            let result = parseFloat(tokens[0]);
-            for (let i = 1; i < tokens.length; i += 2) {
-                const op = tokens[i];
-                const val = parseFloat(tokens[i + 1]);
-                if (isNaN(val)) continue;
-                if (op === '+') result += val;
-                else if (op === '-') result -= val;
-                else if (op === '*') result *= val;
-                else if (op === '/') result = val !== 0 ? result / val : 0;
-            }
-            return result;
+        const tokens = safe.match(/(\d+\.?\d*)|([-+*/])/g);
+        if (!tokens) return parseFloat(safe) || 0;
+        let result = parseFloat(tokens[0]);
+        if (isNaN(result)) return 0;
+        for (let i = 1; i < tokens.length; i += 2) {
+            const op = tokens[i];
+            const val = parseFloat(tokens[i + 1]);
+            if (isNaN(val)) continue;
+            if (op === '+') result += val;
+            else if (op === '-') result -= val;
+            else if (op === '*') result *= val;
+            else if (op === '/') result = val !== 0 ? result / val : result;
         }
+        return isFinite(result) ? result : 0;
     };
 
     const handleKeyPress = (val: string) => {
@@ -218,7 +215,7 @@ export default function AddIncomeScreen() {
 
 
     return (
-        <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom + 16 }]}>
+        <View style={[commonStyles.screenContainer, { paddingTop: insets.top, paddingBottom: insets.bottom + 16 }]}>
             <StatusBar barStyle="dark-content" />
 
             <LinearGradient
@@ -321,7 +318,7 @@ export default function AddIncomeScreen() {
                         placeholderTextColor={Colors.gray[400]}
                         value={description}
                         onChangeText={setDescription}
-                        style={styles.input}
+                        style={commonStyles.input}
                     />
                 </Animated.View>
             </ScrollView>
@@ -381,10 +378,6 @@ export default function AddIncomeScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: Colors.gray[50],
-    },
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -522,12 +515,6 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.gray[50],
         borderRadius: 20,
         padding: 4,
-    },
-    input: {
-        padding: 16,
-        fontSize: Typography.size.md,
-        color: Colors.gray[800],
-        fontFamily: Typography.family.medium,
     },
 });
 

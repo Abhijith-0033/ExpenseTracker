@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Dimensions } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, PieChart, ShoppingBag, Coffee, Car, Home, Film, CalendarRange, TrendingUp, Hash, Zap } from 'lucide-react-native';
+import { ArrowLeft, PieChart, ShoppingBag, Coffee, Car, Home, Film, TrendingUp, Hash, Zap } from 'lucide-react-native';
 import { Colors, Layout, Typography } from '../constants/Theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BarChart } from 'react-native-gifted-charts';
-import { getCategories, CategoryNode, Transaction } from '../services/database';
-import { getCategoryTransactions, getCategoryMonthlyTotals, getCategoryStats, getSubcategoryBreakdown } from '../services/categoryDetailQueries';
+import { getCategories, CategoryNode } from '../services/database';
+import { getCategoryMonthlyTotals, getCategoryStats, getSubcategoryBreakdown } from '../services/categoryDetailQueries';
 import { getMergedClassifications } from '../satisfaction/categoryClassification';
 import { formatCurrency } from '../utils/currency';
 import { startOfMonth, subMonths, startOfYear, format, parseISO } from 'date-fns';
@@ -26,7 +26,6 @@ export default function CategoryDetailScreen() {
     const [selectedCategory, setSelectedCategory] = useState<string | null>(initialCategoryName);
     const [period, setPeriod] = useState<Period>('Last 6M');
 
-    const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [chartData, setChartData] = useState<any[]>([]);
     const [stats, setStats] = useState<any>(null);
     const [subcategoryBreakdown, setSubcategoryBreakdown] = useState<any[]>([]);
@@ -44,22 +43,7 @@ export default function CategoryDetailScreen() {
         }
     }, [categories, initialCategoryName, selectedCategory]);
 
-    useEffect(() => {
-        if (selectedCategory !== null) {
-            loadCategoryData();
-        }
-    }, [selectedCategory, period, loadCategoryData]);
-
-    const loadBaseData = async () => {
-        const [cats, classMap] = await Promise.all([
-            getCategories(),
-            getMergedClassifications()
-        ]);
-        setCategories(cats.filter(c => c.name !== 'Income' && c.name !== 'Transfer'));
-        setClassifications(classMap);
-    };
-
-    const getDateRange = () => {
+    const getDateRange = React.useCallback(() => {
         const end = new Date();
         let start = new Date(0); // All time
 
@@ -69,20 +53,18 @@ export default function CategoryDetailScreen() {
             start = startOfYear(new Date());
         }
         return { start, end };
-    };
+    }, [period]);
 
-    const loadCategoryData = async () => {
+    const loadCategoryData = React.useCallback(async () => {
         if (!selectedCategory) return;
         
         const { start, end } = getDateRange();
-        const [txs, monthly, st, subBreakdown] = await Promise.all([
-            getCategoryTransactions(selectedCategory, start, end),
+        const [monthly, st, subBreakdown] = await Promise.all([
             getCategoryMonthlyTotals(selectedCategory, start, end),
             getCategoryStats(selectedCategory),
             getSubcategoryBreakdown(selectedCategory)
         ]);
 
-        setTransactions(txs);
         setStats(st);
         setSubcategoryBreakdown(subBreakdown);
         
@@ -105,7 +87,24 @@ export default function CategoryDetailScreen() {
         } else {
             setChartData([{ value: 0, label: '' }]);
         }
+    }, [selectedCategory, period, getDateRange]);
+
+    useEffect(() => {
+        if (selectedCategory !== null) {
+            loadCategoryData();
+        }
+    }, [selectedCategory, period, loadCategoryData]);
+
+    async function loadBaseData() {
+        const [cats, classMap] = await Promise.all([
+            getCategories(),
+            getMergedClassifications()
+        ]);
+        setCategories(cats.filter(c => c.name !== 'Income' && c.name !== 'Transfer'));
+        setClassifications(classMap);
     };
+
+
 
     const getIcon = (catName: string) => {
         switch (catName) {
@@ -165,153 +164,147 @@ export default function CategoryDetailScreen() {
                 </View>
             )}
 
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-                
-                {/* Hero Card */}
-                {selectedCategory && stats && (
-                    <View style={[styles.heroCard, { backgroundColor: getIconBg(selectedCategory) }]}>
-                        <View style={styles.heroTop}>
-                            <View style={[styles.heroIconBox, { backgroundColor: Colors.white }]}>
-                                {getIcon(selectedCategory)}
-                            </View>
-                            <View style={[styles.badge, { backgroundColor: isEssential ? Colors.success[100] : Colors.gray[200] }]}>
-                                <Text style={[styles.badgeText, { color: isEssential ? Colors.success[700] : Colors.gray[600] }]}>
-                                    {isEssential ? 'ESSENTIAL' : 'NON-ESSENTIAL'}
-                                </Text>
-                            </View>
-                        </View>
-                        <Text style={styles.heroCategoryName}>{selectedCategory}</Text>
-                        
-                        <View style={styles.heroStatsRow}>
-                            <View style={styles.heroStat}>
-                                <Text style={styles.heroStatLabel}>This Month</Text>
-                                <Text style={styles.heroStatValue}>{formatCurrency(stats.totalThisMonth)}</Text>
-                            </View>
-                            <View style={styles.heroStatDivider} />
-                            <View style={styles.heroStat}>
-                                <Text style={styles.heroStatLabel}>Monthly Avg</Text>
-                                <Text style={styles.heroStatValue}>{formatCurrency(stats.monthlyAvg)}</Text>
-                            </View>
-                            <View style={styles.heroStatDivider} />
-                            <View style={styles.heroStat}>
-                                <Text style={styles.heroStatLabel}>Grand Total</Text>
-                                <Text style={styles.heroStatValue}>{formatCurrency(stats.totalAllTime)}</Text>
-                            </View>
-                        </View>
-                    </View>
-                )}
-
-                {/* Period Filter */}
-                <View style={styles.filterContainer}>
-                    {periods.map(p => (
-                        <TouchableOpacity
-                            key={p}
-                            style={[styles.filterBtn, period === p && styles.filterBtnActive]}
-                            onPress={() => setPeriod(p)}
-                        >
-                            <Text style={[styles.filterText, period === p && styles.filterTextActive]}>{p}</Text>
-                        </TouchableOpacity>
-                    ))}
-                </View>
-
-                {/* Chart Section */}
-                <View style={styles.chartCard}>
-                    <Text style={styles.sectionTitle}>Spending Trend</Text>
-                    <View style={{ marginTop: 20, alignItems: 'center' }}>
-                        <BarChart
-                            data={chartData}
-                            width={SCREEN_WIDTH - 100}
-                            height={180}
-                            barWidth={28}
-                            spacing={24}
-                            initialSpacing={10}
-                            roundedTop
-                            hideRules
-                            xAxisThickness={1}
-                            yAxisThickness={0}
-                            yAxisTextStyle={{ color: Colors.gray[400], fontSize: 10 }}
-                            xAxisLabelTextStyle={{ color: Colors.gray[500], fontSize: 12, fontFamily: Typography.family.medium }}
-                            xAxisColor={Colors.gray[200]}
-                            noOfSections={4}
-                            isAnimated
-                        />
-                    </View>
-                </View>
-
-                {/* Insights Row */}
-                {stats && (
-                    <View style={styles.insightsGrid}>
-                        <View style={styles.insightCard}>
-                            <View style={[styles.insightIcon, { backgroundColor: Colors.warning[50] }]}>
-                                <Zap size={18} color={Colors.warning[600]} />
-                            </View>
-                            <Text style={styles.insightLabel}>Highest Month</Text>
-                            <Text style={styles.insightValue} numberOfLines={1}>
-                                {stats.highestMonth.month ? format(parseISO(stats.highestMonth.month + '-01'), 'MMM yyyy') : 'N/A'}
-                            </Text>
-                            <Text style={styles.insightSub}>{formatCurrency(stats.highestMonth.total)}</Text>
-                        </View>
-                        <View style={styles.insightCard}>
-                            <View style={[styles.insightIcon, { backgroundColor: Colors.primary[50] }]}>
-                                <TrendingUp size={18} color={Colors.primary[600]} />
-                            </View>
-                            <Text style={styles.insightLabel}>Avg per Tx</Text>
-                            <Text style={styles.insightValue}>{formatCurrency(stats.avgPerTx)}</Text>
-                            <Text style={styles.insightSub}>all time</Text>
-                        </View>
-                        <View style={styles.insightCard}>
-                            <View style={[styles.insightIcon, { backgroundColor: Colors.success[50] }]}>
-                                <Hash size={18} color={Colors.success[600]} />
-                            </View>
-                            <Text style={styles.insightLabel}>Frequency</Text>
-                            <Text style={styles.insightValue}>{stats.freqThisMonth}</Text>
-                            <Text style={styles.insightSub}>this month</Text>
-                        </View>
-                    </View>
-                )}
-
-                {/* Subcategory Breakdown */}
-                {subcategoryBreakdown.length > 0 && (
-                    <View style={styles.chartCard}>
-                        <Text style={styles.sectionTitle}>Subcategory Breakdown</Text>
-                        <View style={{ marginTop: 16 }}>
-                            {subcategoryBreakdown.map((sub, index) => (
-                                <View key={sub.name} style={[
-                                    styles.subRow, 
-                                    index !== subcategoryBreakdown.length - 1 && styles.subRowBorder
-                                ]}>
-                                    <View style={styles.subLeft}>
-                                        <Text style={styles.subName}>{sub.name || 'Uncategorized'}</Text>
-                                        <Text style={styles.subMonthlyLabel}>This Month</Text>
+            <TransactionList 
+                category={selectedCategory}
+                startDate={getDateRange().start}
+                endDate={getDateRange().end}
+                scrollEnabled={true}
+                showTitle={false}
+                contentContainerStyle={styles.scrollContent}
+                ListHeaderComponent={
+                    <>
+                        {/* Hero Card */}
+                        {selectedCategory && stats && (
+                            <View style={[styles.heroCard, { backgroundColor: getIconBg(selectedCategory) }]}>
+                                <View style={styles.heroTop}>
+                                    <View style={[styles.heroIconBox, { backgroundColor: Colors.white }]}>
+                                        {getIcon(selectedCategory)}
                                     </View>
-                                    <View style={styles.subRight}>
-                                        <Text style={styles.subGrandTotal}>{formatCurrency(sub.grandTotal)}</Text>
-                                        <Text style={styles.subMonthlyTotal}>{formatCurrency(sub.monthlyTotal)}</Text>
+                                    <View style={[styles.badge, { backgroundColor: isEssential ? Colors.success[100] : Colors.gray[200] }]}>
+                                        <Text style={[styles.badgeText, { color: isEssential ? Colors.success[700] : Colors.gray[600] }]}>
+                                            {isEssential ? 'ESSENTIAL' : 'NON-ESSENTIAL'}
+                                        </Text>
                                     </View>
                                 </View>
+                                <Text style={styles.heroCategoryName}>{selectedCategory}</Text>
+                                
+                                <View style={styles.heroStatsRow}>
+                                    <View style={styles.heroStat}>
+                                        <Text style={styles.heroStatLabel}>This Month</Text>
+                                        <Text style={styles.heroStatValue}>{formatCurrency(stats.totalThisMonth)}</Text>
+                                    </View>
+                                    <View style={styles.heroStatDivider} />
+                                    <View style={styles.heroStat}>
+                                        <Text style={styles.heroStatLabel}>Monthly Avg</Text>
+                                        <Text style={styles.heroStatValue}>{formatCurrency(stats.monthlyAvg)}</Text>
+                                    </View>
+                                    <View style={styles.heroStatDivider} />
+                                    <View style={styles.heroStat}>
+                                        <Text style={styles.heroStatLabel}>Grand Total</Text>
+                                        <Text style={styles.heroStatValue}>{formatCurrency(stats.totalAllTime)}</Text>
+                                    </View>
+                                </View>
+                            </View>
+                        )}
+
+                        {/* Period Filter */}
+                        <View style={styles.filterContainer}>
+                            {periods.map(p => (
+                                <TouchableOpacity
+                                    key={p}
+                                    style={[styles.filterBtn, period === p && styles.filterBtnActive]}
+                                    onPress={() => setPeriod(p)}
+                                >
+                                    <Text style={[styles.filterText, period === p && styles.filterTextActive]}>{p}</Text>
+                                </TouchableOpacity>
                             ))}
                         </View>
-                    </View>
-                )}
 
-                {/* Transactions List */}
-                <Text style={[styles.sectionTitle, { marginBottom: 16 }]}>Category Transactions</Text>
-                {transactions.length > 0 ? (
-                    <TransactionList 
-                        transactions={transactions} 
-                        scrollEnabled={false} 
-                        showTitle={false} 
-                        limit={0} // show all in period
-                    />
-                ) : (
-                    <View style={styles.emptyState}>
-                        <CalendarRange size={48} color={Colors.gray[300]} />
-                        <Text style={styles.emptyText}>No transactions found.</Text>
-                    </View>
-                )}
+                        {/* Chart Section */}
+                        <View style={styles.chartCard}>
+                            <Text style={styles.sectionTitle}>Spending Trend</Text>
+                            <View style={{ marginTop: 20, alignItems: 'center' }}>
+                                <BarChart
+                                    data={chartData}
+                                    width={SCREEN_WIDTH - 100}
+                                    height={180}
+                                    barWidth={28}
+                                    spacing={24}
+                                    initialSpacing={10}
+                                    roundedTop
+                                    hideRules
+                                    xAxisThickness={1}
+                                    yAxisThickness={0}
+                                    yAxisTextStyle={{ color: Colors.gray[400], fontSize: 10 }}
+                                    xAxisLabelTextStyle={{ color: Colors.gray[500], fontSize: 12, fontFamily: Typography.family.medium }}
+                                    xAxisColor={Colors.gray[200]}
+                                    noOfSections={4}
+                                    isAnimated
+                                />
+                            </View>
+                        </View>
 
-                <View style={{ height: 40 }} />
-            </ScrollView>
+                        {/* Insights Row */}
+                        {stats && (
+                            <View style={styles.insightsGrid}>
+                                <View style={styles.insightCard}>
+                                    <View style={[styles.insightIcon, { backgroundColor: Colors.warning[50] }]}>
+                                        <Zap size={18} color={Colors.warning[600]} />
+                                    </View>
+                                    <Text style={styles.insightLabel}>Highest Month</Text>
+                                    <Text style={styles.insightValue} numberOfLines={1}>
+                                        {stats.highestMonth.month ? format(parseISO(stats.highestMonth.month + '-01'), 'MMM yyyy') : 'N/A'}
+                                    </Text>
+                                    <Text style={styles.insightSub}>{formatCurrency(stats.highestMonth.total)}</Text>
+                                </View>
+                                <View style={styles.insightCard}>
+                                    <View style={[styles.insightIcon, { backgroundColor: Colors.primary[50] }]}>
+                                        <TrendingUp size={18} color={Colors.primary[600]} />
+                                    </View>
+                                    <Text style={styles.insightLabel}>Avg per Tx</Text>
+                                    <Text style={styles.insightValue}>{formatCurrency(stats.avgPerTx)}</Text>
+                                    <Text style={styles.insightSub}>all time</Text>
+                                </View>
+                                <View style={styles.insightCard}>
+                                    <View style={[styles.insightIcon, { backgroundColor: Colors.success[50] }]}>
+                                        <Hash size={18} color={Colors.success[600]} />
+                                    </View>
+                                    <Text style={styles.insightLabel}>Frequency</Text>
+                                    <Text style={styles.insightValue}>{stats.freqThisMonth}</Text>
+                                    <Text style={styles.insightSub}>this month</Text>
+                                </View>
+                            </View>
+                        )}
+
+                        {/* Subcategory Breakdown */}
+                        {subcategoryBreakdown.length > 0 && (
+                            <View style={styles.chartCard}>
+                                <Text style={styles.sectionTitle}>Subcategory Breakdown</Text>
+                                <View style={{ marginTop: 16 }}>
+                                    {subcategoryBreakdown.map((sub, index) => (
+                                        <View key={sub.name} style={[
+                                            styles.subRow, 
+                                            index !== subcategoryBreakdown.length - 1 && styles.subRowBorder
+                                        ]}>
+                                            <View style={styles.subLeft}>
+                                                <Text style={styles.subName}>{sub.name || 'Uncategorized'}</Text>
+                                                <Text style={styles.subMonthlyLabel}>This Month</Text>
+                                            </View>
+                                            <View style={styles.subRight}>
+                                                <Text style={styles.subGrandTotal}>{formatCurrency(sub.grandTotal)}</Text>
+                                                <Text style={styles.subMonthlyTotal}>{formatCurrency(sub.monthlyTotal)}</Text>
+                                            </View>
+                                        </View>
+                                    ))}
+                                </View>
+                            </View>
+                        )}
+
+                        {/* Transactions List */}
+                        <Text style={[styles.sectionTitle, { marginBottom: 16 }]}>Category Transactions</Text>
+                    </>
+                }
+            />
         </View>
     );
 }

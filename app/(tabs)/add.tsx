@@ -1,5 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
+import { ErrorBoundary } from 'react-error-boundary';
+import { TabErrorFallback } from '../../components/ErrorBoundary';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, StatusBar, ScrollView, Dimensions, Modal, DeviceEventEmitter } from 'react-native';
 import { useFocusEffect, useRouter , useLocalSearchParams } from 'expo-router';
 import { useApp } from '../../context/AppContext';
@@ -26,7 +28,7 @@ import { DuplicateWarningSheet } from '../../components/DuplicateWarningSheet';
 
 
 
-export default function AddTransactionScreen() {
+function AddTransactionContent() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const params = useLocalSearchParams();
@@ -162,25 +164,54 @@ export default function AddTransactionScreen() {
     const evaluateExpression = (expr: string): number => {
         const safe = expr.replace(/[^0-9+\-*/.]/g, '');
         if (!safe) return 0;
-        try {
-             
-            const result = new Function(`return (${safe})`)();
-            return typeof result === 'number' && isFinite(result) ? result : 0;
-        } catch {
-            const tokens = safe.match(/(\d+\.?\d*)|([-+*/])/g);
-            if (!tokens) return parseFloat(safe) || 0;
-            let result = parseFloat(tokens[0]);
-            for (let i = 1; i < tokens.length; i += 2) {
-                const op = tokens[i];
-                const val = parseFloat(tokens[i + 1]);
-                if (isNaN(val)) continue;
-                if (op === '+') result += val;
-                else if (op === '-') result -= val;
-                else if (op === '*') result *= val;
-                else if (op === '/') result = val !== 0 ? result / val : 0;
+
+        // Tokenize into numbers and operators
+        const tokens = safe.match(/(\d+\.?\d*)|([-+*/])/g);
+        if (!tokens) return parseFloat(safe) || 0;
+
+        // Parse and evaluate with operator precedence: * and / first, then + and -
+        const values: number[] = [];
+        const ops: string[] = [];
+
+        let i = 0;
+        let currentNum = parseFloat(tokens[i]);
+        if (isNaN(currentNum)) currentNum = 0;
+        values.push(currentNum);
+        i++;
+
+        while (i < tokens.length) {
+            const op = tokens[i];
+            const nextValStr = tokens[i + 1];
+            let nextVal = nextValStr ? parseFloat(nextValStr) : NaN;
+            if (isNaN(nextVal)) nextVal = 0;
+
+            if (op === '*' || op === '/') {
+                const prevVal = values.pop() ?? 0;
+                if (op === '*') {
+                    values.push(prevVal * nextVal);
+                } else {
+                    values.push(nextVal !== 0 ? prevVal / nextVal : 0);
+                }
+            } else {
+                ops.push(op);
+                values.push(nextVal);
             }
-            return result;
+            i += 2;
         }
+
+        // Second pass: handle + and -
+        let result = values[0] ?? 0;
+        for (let j = 0; j < ops.length; j++) {
+            const op = ops[j];
+            const val = values[j + 1] ?? 0;
+            if (op === '+') {
+                result += val;
+            } else if (op === '-') {
+                result -= val;
+            }
+        }
+
+        return isFinite(result) ? result : 0;
     };
 
     const handleKeyPress = (val: string) => {
@@ -982,4 +1013,12 @@ const styles = StyleSheet.create({
         color: Colors.primary[700],
     },
 });
+
+export default function AddTransactionScreen() {
+    return (
+        <ErrorBoundary FallbackComponent={TabErrorFallback}>
+            <AddTransactionContent />
+        </ErrorBoundary>
+    );
+}
 

@@ -1,6 +1,7 @@
 import { getDatabase, initDatabase } from '../services/database';
 import { getMergedClassifications } from './categoryClassification';
 import { startOfMonth, endOfMonth, subMonths, subWeeks } from 'date-fns';
+import { safeDivide, clamp } from '../utils/mathUtils';
 
 export interface SatisfactionMetrics {
   totalIncome: number;
@@ -108,9 +109,9 @@ export const SatisfactionEngine = {
     }
 
     const remainingBalance = totalIncome - totalExpense;
-    const savingsRate = totalIncome > 0 ? remainingBalance / totalIncome : 0;
-    const essentialRatio = totalExpense > 0 ? essentialExpense / totalExpense : 0;
-    const luxuryRatio = totalExpense > 0 ? nonEssentialExpense / totalExpense : 0;
+    const savingsRate = safeDivide(remainingBalance, totalIncome);
+    const essentialRatio = safeDivide(essentialExpense, totalExpense);
+    const luxuryRatio = safeDivide(nonEssentialExpense, totalExpense);
 
     // 2. Consistency Score (last 4 weeks)
     // We get last 4 weeks data ending today to calculate consistency
@@ -136,10 +137,10 @@ export const SatisfactionEngine = {
     // If fewer than 2 weeks of data, default to 0.5
     const activeWeeks = weeklyExpenses.filter(w => w > 0).length;
     if (activeWeeks >= 2) {
-      const mean = weeklyExpenses.reduce((a, b) => a + b, 0) / 4;
+      const mean = safeDivide(weeklyExpenses.reduce((a, b) => a + b, 0), 4);
       if (mean > 0) {
-        const variance = weeklyExpenses.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / 4;
-        consistencyScore = 1 - Math.min(variance / (mean * mean), 1);
+        const variance = safeDivide(weeklyExpenses.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0), 4);
+        consistencyScore = 1 - Math.min(safeDivide(variance, mean * mean), 1);
       }
     }
 
@@ -169,17 +170,17 @@ export const SatisfactionEngine = {
     if (prevTransactions.length > 0 && previousMonthBalance !== 0) {
       balanceStability = currentMonthBalance >= previousMonthBalance
         ? 1
-        : Math.max(0, currentMonthBalance / previousMonthBalance);
+        : Math.max(0, safeDivide(currentMonthBalance, previousMonthBalance));
     } else if (prevTransactions.length > 0 && previousMonthBalance === 0) {
       balanceStability = currentMonthBalance >= 0 ? 1 : 0;
     }
 
     // 4. Base Score Formula
     const baseScore = 
-      (Math.min(Math.max(savingsRate, 0), 1) * 40) +
-      (essentialRatio * 20) +
-      (balanceStability * 20) +
-      (consistencyScore * 20);
+      (clamp(savingsRate, 0, 1) * 40) +
+      (clamp(essentialRatio, 0, 1) * 20) +
+      (clamp(balanceStability, 0, 1) * 20) +
+      (clamp(consistencyScore, 0, 1) * 20);
 
     // 5. Penalties and Bonuses
     let penaltyPoints = 0;
@@ -189,7 +190,7 @@ export const SatisfactionEngine = {
 
     // PENALTIES
     if (totalExpense > totalIncome && totalIncome > 0) {
-      const pts = Math.round(Math.min(((totalExpense - totalIncome) / totalIncome) * 30, 30));
+      const pts = Math.round(clamp(safeDivide((totalExpense - totalIncome), totalIncome) * 30, 0, 30));
       if (pts > 0) {
         penaltyPoints += pts;
         penalties.push({ reason: 'Overspending detected', points: pts });

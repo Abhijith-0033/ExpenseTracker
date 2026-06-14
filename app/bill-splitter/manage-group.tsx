@@ -20,13 +20,7 @@ export default function ManageGroupScreen() {
     const [loading, setLoading] = useState(false);
     const [initialLoading, setInitialLoading] = useState(isEditing);
 
-    useEffect(() => {
-        if (isEditing && groupId) {
-            loadGroupData();
-        }
-    }, [isEditing, groupId, loadGroupData]);
-
-    const loadGroupData = async () => {
+    const loadGroupData = React.useCallback(async () => {
         try {
             const group = await getGroupById(groupId!);
             const groupMembers = await getGroupMembers(groupId!);
@@ -41,7 +35,13 @@ export default function ManageGroupScreen() {
         } finally {
             setInitialLoading(false);
         }
-    };
+    }, [groupId, router]);
+
+    useEffect(() => {
+        if (isEditing && groupId) {
+            loadGroupData();
+        }
+    }, [isEditing, groupId, loadGroupData]);
 
     const handleMemberChange = (text: string, index: number) => {
         const newMembers = [...members];

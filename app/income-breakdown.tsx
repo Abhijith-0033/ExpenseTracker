@@ -1,15 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, StatusBar, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, TrendingUp, Briefcase, Gift, DollarSign, Home, Globe, User } from 'lucide-react-native';
 import { Colors, Layout, Typography } from '../constants/Theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PieChart, BarChart } from 'react-native-gifted-charts';
-import { getIncomeBySource, getIncomeMonthlyTrend, getIncomeTransactions } from '../services/incomeBreakdownQueries';
+import { getIncomeBySource, getIncomeMonthlyTrend } from '../services/incomeBreakdownQueries';
 import { formatCurrency } from '../utils/currency';
 import { startOfMonth, subMonths, startOfYear, format, parseISO } from 'date-fns';
 import { TransactionList } from '../components/TransactionList';
-import { Transaction } from '../services/database';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -48,7 +47,6 @@ export default function IncomeBreakdownScreen() {
     
     const [sourcesData, setSourcesData] = useState<{source: string, total: number, color: string, percentage: number}[]>([]);
     const [trendData, setTrendData] = useState<any[]>([]);
-    const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [selectedSource, setSelectedSource] = useState<string | null>(null);
     
     // Stats and Table State
@@ -58,11 +56,7 @@ export default function IncomeBreakdownScreen() {
     const [bestMonthName, setBestMonthName] = useState('N/A');
     const [activeMonthsCount, setActiveMonthsCount] = useState(0);
 
-    useEffect(() => {
-        loadData();
-    }, [loadData, period, selectedSource]);
-
-    const getDateRange = () => {
+    const getDateRange = React.useCallback(() => {
         const end = new Date();
         let start = new Date(0); // All time
 
@@ -74,15 +68,14 @@ export default function IncomeBreakdownScreen() {
             start = startOfYear(new Date());
         }
         return { start, end };
-    };
+    }, [period]);
 
-    const loadData = async () => {
+    const loadData = React.useCallback(async () => {
         const { start, end } = getDateRange();
         
-        const [sources, trend, txs] = await Promise.all([
+        const [sources, trend] = await Promise.all([
             getIncomeBySource(start, end),
-            getIncomeMonthlyTrend(start, end),
-            getIncomeTransactions(selectedSource, start, end)
+            getIncomeMonthlyTrend(start, end)
         ]);
 
         const totalIncome = sources.reduce((sum, s) => sum + s.total, 0);
@@ -151,9 +144,13 @@ export default function IncomeBreakdownScreen() {
         }
         tableData.reverse();
         setMonthlyTableData(tableData);
+    }, [period, getDateRange]);
 
-        setTransactions(txs);
-    };
+    useEffect(() => {
+        loadData();
+    }, [loadData, period, selectedSource]);
+
+
 
     const totalIncome = sourcesData.reduce((sum, s) => sum + s.total, 0);
     const topSource = sourcesData.length > 0 ? sourcesData[0] : null;
@@ -199,181 +196,176 @@ export default function IncomeBreakdownScreen() {
                 </View>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-                
-                {/* Hero Card */}
-                <View style={[styles.heroCard, { backgroundColor: Colors.success.bg }]}>
-                    <View style={styles.heroTop}>
-                        <View style={[styles.heroIconBox, { backgroundColor: Colors.success[100] }]}>
-                            <TrendingUp size={24} color={Colors.success[600]} />
-                        </View>
-                        {topSource && (
-                            <View style={[styles.badge, { backgroundColor: topSource.color + '20' }]}>
-                                <Text style={[styles.badgeText, { color: topSource.color }]}>Top: {topSource.source}</Text>
-                            </View>
-                        )}
-                    </View>
-                    <Text style={styles.heroLabel}>Total Income</Text>
-                    <Text style={[styles.heroValue, { color: Colors.success[700], marginBottom: period !== 'This Month' ? 12 : 0 }]}>{formatCurrency(totalIncome)}</Text>
-
-                    {/* Stats Grid */}
-                    {period !== 'This Month' && trendData.length > 0 && (
-                        <View style={styles.statsRow}>
-                            <View style={styles.statCol}>
-                                <Text style={styles.statLabel}>Avg / Month</Text>
-                                <Text style={styles.statValue}>{formatCurrency(avgMonthlyIncome)}</Text>
-                            </View>
-                            <View style={styles.statCol}>
-                                <Text style={styles.statLabel}>Best Month</Text>
-                                <Text style={styles.statValue} numberOfLines={1}>{bestMonthValue > 0 ? `${formatCurrency(bestMonthValue)} (${bestMonthName.split(' ')[0]})` : 'N/A'}</Text>
-                            </View>
-                            <View style={styles.statCol}>
-                                <Text style={styles.statLabel}>Months</Text>
-                                <Text style={styles.statValue}>{activeMonthsCount}</Text>
-                            </View>
-                        </View>
-                    )}
-                </View>
-
-                {/* Pie Chart Section */}
-                <View style={styles.chartCard}>
-                    <Text style={styles.sectionTitle}>Income Sources</Text>
-                    
-                    {totalIncome > 0 ? (
-                        <View style={styles.pieContainer}>
-                            <PieChart
-                                data={pieData}
-                                donut
-                                radius={80}
-                                innerRadius={50}
-                                showText
-                                textSize={10}
-                                showTextBackground
-                                textBackgroundColor="rgba(0,0,0,0.4)"
-                                textBackgroundRadius={10}
-                                innerCircleColor={Colors.white}
-                                centerLabelComponent={() => (
-                                    <View style={{justifyContent: 'center', alignItems: 'center'}}>
-                                        <Text style={{fontSize: 18, color: Colors.gray[900], fontWeight: 'bold'}}>
-                                            {sourcesData.length}
-                                        </Text>
-                                        <Text style={{fontSize: 10, color: Colors.gray[500]}}>Sources</Text>
+            <TransactionList 
+                category="Income"
+                subcategory={selectedSource}
+                startDate={getDateRange().start}
+                endDate={getDateRange().end}
+                scrollEnabled={true}
+                showTitle={false}
+                contentContainerStyle={styles.scrollContent}
+                ListHeaderComponent={
+                    <>
+                        {/* Hero Card */}
+                        <View style={[styles.heroCard, { backgroundColor: Colors.success.bg }]}>
+                            <View style={styles.heroTop}>
+                                <View style={[styles.heroIconBox, { backgroundColor: Colors.success[100] }]}>
+                                    <TrendingUp size={24} color={Colors.success[600]} />
+                                </View>
+                                {topSource && (
+                                    <View style={[styles.badge, { backgroundColor: topSource.color + '20' }]}>
+                                        <Text style={[styles.badgeText, { color: topSource.color }]}>Top: {topSource.source}</Text>
                                     </View>
                                 )}
-                            />
-                            
-                            <View style={styles.legendContainer}>
-                                {sourcesData.map((s) => (
-                                    <TouchableOpacity 
-                                        key={s.source} 
-                                        style={[styles.legendItem, selectedSource === s.source && styles.legendItemActive]}
-                                        onPress={() => setSelectedSource(selectedSource === s.source ? null : s.source)}
-                                    >
-                                        <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                                            <View style={[styles.legendIconBox, {backgroundColor: s.color}]}>
-                                                {getSourceIcon(s.source)}
-                                            </View>
-                                            <View>
-                                                <Text style={styles.legendLabel}>{s.source}</Text>
-                                                <Text style={styles.legendPercent}>{s.percentage.toFixed(1)}%</Text>
-                                            </View>
-                                        </View>
-                                        <Text style={styles.legendValue}>{formatCurrency(s.total)}</Text>
-                                    </TouchableOpacity>
-                                ))}
                             </View>
-                        </View>
-                    ) : (
-                        <View style={styles.emptyChart}>
-                            <Text style={styles.emptyText}>No income recorded in this period.</Text>
-                        </View>
-                    )}
-                </View>
+                            <Text style={styles.heroLabel}>Total Income</Text>
+                            <Text style={[styles.heroValue, { color: Colors.success[700], marginBottom: period !== 'This Month' ? 12 : 0 }]}>{formatCurrency(totalIncome)}</Text>
 
-                {/* Trend Chart (only show for ranges > 1 month) */}
-                {period !== 'This Month' && (
-                    <View style={styles.chartCard}>
-                        <Text style={styles.sectionTitle}>Monthly Trend</Text>
-                        <View style={{ marginTop: 20, alignItems: 'center' }}>
-                            <BarChart
-                                data={trendData}
-                                width={SCREEN_WIDTH - 100}
-                                height={160}
-                                barWidth={28}
-                                spacing={24}
-                                initialSpacing={10}
-                                roundedTop
-                                hideRules
-                                xAxisThickness={1}
-                                yAxisThickness={0}
-                                yAxisTextStyle={{ color: Colors.gray[400], fontSize: 10 }}
-                                xAxisLabelTextStyle={{ color: Colors.gray[500], fontSize: 12, fontFamily: Typography.family.medium }}
-                                xAxisColor={Colors.gray[200]}
-                                isAnimated
-                            />
-                        </View>
-                    </View>
-                )}
-
-                {/* Monthly Breakdown Table */}
-                <View style={styles.chartCard}>
-                    <Text style={styles.sectionTitle}>Monthly Breakdown</Text>
-                    <View style={styles.tableContainer}>
-                        <View style={styles.tableHeader}>
-                            <Text style={[styles.tableHeaderCell, { flex: 2 }]}>Month</Text>
-                            <Text style={[styles.tableHeaderCell, { flex: 2, textAlign: 'right' }]}>Income</Text>
-                            <Text style={[styles.tableHeaderCell, { flex: 1.5, textAlign: 'right' }]}>Change</Text>
-                        </View>
-                        {monthlyTableData.length > 0 ? (
-                            monthlyTableData.map((row, idx) => {
-                                const isPositive = row.delta !== null && row.delta > 0;
-                                const isNegative = row.delta !== null && row.delta < 0;
-                                return (
-                                    <View key={row.monthName} style={styles.tableRow}>
-                                        <Text style={[styles.tableCell, { flex: 2, fontFamily: Typography.family.bold }]}>{row.monthName}</Text>
-                                        <Text style={[styles.tableCell, { flex: 2, textAlign: 'right', color: Colors.gray[900] }]}>{formatCurrency(row.total)}</Text>
-                                        <Text style={[
-                                            styles.tableCell, 
-                                            { 
-                                                flex: 1.5, 
-                                                textAlign: 'right', 
-                                                fontFamily: Typography.family.bold,
-                                                color: isPositive ? Colors.success[600] : isNegative ? Colors.danger[600] : Colors.gray[400] 
-                                            }
-                                        ]}>
-                                            {row.delta === null ? '—' : `${isPositive ? '▲ +' : '▼ '}${row.delta.toFixed(0)}%`}
-                                        </Text>
+                            {/* Stats Grid */}
+                            {period !== 'This Month' && trendData.length > 0 && (
+                                <View style={styles.statsRow}>
+                                    <View style={styles.statCol}>
+                                        <Text style={styles.statLabel}>Avg / Month</Text>
+                                        <Text style={styles.statValue}>{formatCurrency(avgMonthlyIncome)}</Text>
                                     </View>
-                                );
-                            })
-                        ) : (
-                            <View style={styles.emptyTable}>
-                                <Text style={styles.emptyText}>No data available</Text>
+                                    <View style={styles.statCol}>
+                                        <Text style={styles.statLabel}>Best Month</Text>
+                                        <Text style={styles.statValue} numberOfLines={1}>{bestMonthValue > 0 ? `${formatCurrency(bestMonthValue)} (${bestMonthName.split(' ')[0]})` : 'N/A'}</Text>
+                                    </View>
+                                    <View style={styles.statCol}>
+                                        <Text style={styles.statLabel}>Months</Text>
+                                        <Text style={styles.statValue}>{activeMonthsCount}</Text>
+                                    </View>
+                                </View>
+                            )}
+                        </View>
+
+                        {/* Pie Chart Section */}
+                        <View style={styles.chartCard}>
+                            <Text style={styles.sectionTitle}>Income Sources</Text>
+                            
+                            {totalIncome > 0 ? (
+                                <View style={styles.pieContainer}>
+                                    <PieChart
+                                        data={pieData}
+                                        donut
+                                        radius={80}
+                                        innerRadius={50}
+                                        showText
+                                        textSize={10}
+                                        showTextBackground
+                                        textBackgroundColor="rgba(0,0,0,0.4)"
+                                        textBackgroundRadius={10}
+                                        innerCircleColor={Colors.white}
+                                        centerLabelComponent={() => (
+                                            <View style={{justifyContent: 'center', alignItems: 'center'}}>
+                                                <Text style={{fontSize: 18, color: Colors.gray[900], fontWeight: 'bold'}}>
+                                                    {sourcesData.length}
+                                                </Text>
+                                                <Text style={{fontSize: 10, color: Colors.gray[500]}}>Sources</Text>
+                                            </View>
+                                        )}
+                                    />
+                                    
+                                    <View style={styles.legendContainer}>
+                                        {sourcesData.map((s) => (
+                                            <TouchableOpacity 
+                                                key={s.source} 
+                                                style={[styles.legendItem, selectedSource === s.source && styles.legendItemActive]}
+                                                onPress={() => setSelectedSource(selectedSource === s.source ? null : s.source)}
+                                            >
+                                                <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                                                    <View style={[styles.legendIconBox, {backgroundColor: s.color}]}>
+                                                        {getSourceIcon(s.source)}
+                                                    </View>
+                                                    <View>
+                                                        <Text style={styles.legendLabel}>{s.source}</Text>
+                                                        <Text style={styles.legendPercent}>{s.percentage.toFixed(1)}%</Text>
+                                                    </View>
+                                                </View>
+                                                <Text style={styles.legendValue}>{formatCurrency(s.total)}</Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
+                                </View>
+                            ) : (
+                                <View style={styles.emptyChart}>
+                                    <Text style={styles.emptyText}>No income recorded in this period.</Text>
+                                </View>
+                            )}
+                        </View>
+
+                        {/* Trend Chart (only show for ranges > 1 month) */}
+                        {period !== 'This Month' && (
+                            <View style={styles.chartCard}>
+                                <Text style={styles.sectionTitle}>Monthly Trend</Text>
+                                <View style={{ marginTop: 20, alignItems: 'center' }}>
+                                    <BarChart
+                                        data={trendData}
+                                        width={SCREEN_WIDTH - 100}
+                                        height={160}
+                                        barWidth={28}
+                                        spacing={24}
+                                        initialSpacing={10}
+                                        roundedTop
+                                        hideRules
+                                        xAxisThickness={1}
+                                        yAxisThickness={0}
+                                        yAxisTextStyle={{ color: Colors.gray[400], fontSize: 10 }}
+                                        xAxisLabelTextStyle={{ color: Colors.gray[500], fontSize: 12, fontFamily: Typography.family.medium }}
+                                        xAxisColor={Colors.gray[200]}
+                                        isAnimated
+                                    />
+                                </View>
                             </View>
                         )}
-                    </View>
-                </View>
 
-                {/* Transactions List */}
-                <Text style={[styles.sectionTitle, { marginBottom: 16 }]}>
-                    {selectedSource ? `${selectedSource} Transactions` : 'All Income Transactions'}
-                </Text>
-                {transactions.length > 0 ? (
-                    <TransactionList 
-                        transactions={transactions} 
-                        scrollEnabled={false} 
-                        showTitle={false} 
-                        limit={0} 
-                    />
-                ) : (
-                    <View style={styles.emptyState}>
-                        <TrendingUp size={48} color={Colors.gray[300]} />
-                        <Text style={styles.emptyText}>No transactions found.</Text>
-                    </View>
-                )}
+                        {/* Monthly Breakdown Table */}
+                        <View style={styles.chartCard}>
+                            <Text style={styles.sectionTitle}>Monthly Breakdown</Text>
+                            <View style={styles.tableContainer}>
+                                <View style={styles.tableHeader}>
+                                    <Text style={[styles.tableHeaderCell, { flex: 2 }]}>Month</Text>
+                                    <Text style={[styles.tableHeaderCell, { flex: 2, textAlign: 'right' }]}>Income</Text>
+                                    <Text style={[styles.tableHeaderCell, { flex: 1.5, textAlign: 'right' }]}>Change</Text>
+                                </View>
+                                {monthlyTableData.length > 0 ? (
+                                    monthlyTableData.map((row, idx) => {
+                                        const isPositive = row.delta !== null && row.delta > 0;
+                                        const isNegative = row.delta !== null && row.delta < 0;
+                                        return (
+                                            <View key={row.monthName} style={styles.tableRow}>
+                                                <Text style={[styles.tableCell, { flex: 2, fontFamily: Typography.family.bold }]}>{row.monthName}</Text>
+                                                <Text style={[styles.tableCell, { flex: 2, textAlign: 'right', color: Colors.gray[900] }]}>{formatCurrency(row.total)}</Text>
+                                                <Text style={[
+                                                    styles.tableCell, 
+                                                    { 
+                                                        flex: 1.5, 
+                                                        textAlign: 'right', 
+                                                        fontFamily: Typography.family.bold,
+                                                        color: isPositive ? Colors.success[600] : isNegative ? Colors.danger[600] : Colors.gray[400] 
+                                                    }
+                                                ]}>
+                                                    {row.delta === null ? '—' : `${isPositive ? '▲ +' : '▼ '}${row.delta.toFixed(0)}%`}
+                                                </Text>
+                                            </View>
+                                        );
+                                    })
+                                ) : (
+                                    <View style={styles.emptyTable}>
+                                        <Text style={styles.emptyText}>No data available</Text>
+                                    </View>
+                                )}
+                            </View>
+                        </View>
 
-                <View style={{ height: 40 }} />
-            </ScrollView>
+                        {/* Transactions List */}
+                        <Text style={[styles.sectionTitle, { marginBottom: 16 }]}>
+                            {selectedSource ? `${selectedSource} Transactions` : 'All Income Transactions'}
+                        </Text>
+                    </>
+                }
+            />
         </View>
     );
 }

@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, Dimensions , Alert } from 'react-native';
-import { Transaction , deleteTransaction } from '../services/database';
+import React, { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, Dimensions, Alert, ActivityIndicator } from 'react-native';
+import { FlashList, ListRenderItem } from '@shopify/flash-list';
+import { Transaction, deleteTransaction, getTransactionsPaginated } from '../services/database';
 import { format, addDays } from 'date-fns';
 import { ArrowUpRight, ShoppingBag, Coffee, Car, Home, Film, DollarSign, X } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { Colors, Layout, Typography } from '../constants/Theme';
 import { AnimatedItem } from './ui/AnimatedItem';
 import { useApp } from '../context/AppContext';
-
+import { useInfiniteQuery } from '@tanstack/react-query';
 
 import { SwipeableRow } from './SwipeableRow';
 import { RecurringBottomSheet } from './RecurringBottomSheet';
@@ -15,14 +16,26 @@ import { addSubscription } from '../services/subscriptions';
 import { formatAmount } from '../utils/formatAmount';
 import { Snackbar } from './Snackbar';
 
+const TypedFlashList = FlashList as any;
+
 const { height: _SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface TransactionListProps {
-    transactions: Transaction[];
+    transactions?: Transaction[];
     scrollEnabled?: boolean;
     showTitle?: boolean;
     limit?: number;
+    // Infinite query parameters
+    accountId?: number | null;
+    category?: string | null;
+    subcategory?: string | null;
+    startDate?: Date | null;
+    endDate?: Date | null;
+    type?: 'income' | 'expense' | 'transfer' | 'debt' | null;
+    ListHeaderComponent?: React.ComponentType<any> | React.ReactElement | null;
+    contentContainerStyle?: any;
 }
+
 
 const DetailRow = ({ label, value }: { label: string; value: string }) => (
     <View style={styles.detailRow}>
@@ -35,14 +48,53 @@ export const TransactionList: React.FC<TransactionListProps> = ({
     transactions,
     scrollEnabled = false,
     showTitle = true,
-    limit = 10
+    limit,
+    accountId,
+    category,
+    subcategory,
+    startDate,
+    endDate,
+    type,
+    ListHeaderComponent,
+    contentContainerStyle,
 }) => {
+
     const router = useRouter();
     const { refreshData, accounts } = useApp();
     const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
     const [recurringTx, setRecurringTx] = useState<Transaction | null>(null);
     const [showRecurring, setShowRecurring] = useState(false);
     const [pendingDeleteTx, setPendingDeleteTx] = useState<Transaction | null>(null);
+
+    const isStatic = transactions !== undefined;
+
+    const {
+        data,
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage,
+        isLoading,
+    } = useInfiniteQuery({
+        queryKey: ['transactions', { accountId, category, subcategory, startDate: startDate?.toISOString(), endDate: endDate?.toISOString(), type }],
+        queryFn: async ({ pageParam = 0 }) => {
+            return getTransactionsPaginated(20, pageParam, {
+                accountId,
+                category,
+                subcategory,
+                startDate,
+                endDate,
+                type,
+            });
+        },
+        initialPageParam: 0,
+        getNextPageParam: (lastPage, allPages) => {
+            return lastPage.length === 20 ? allPages.length * 20 : undefined;
+        },
+        enabled: !isStatic,
+    });
+
+    const activeList = isStatic ? (transactions || []) : (data ? data.pages.flat() : []);
+
 
     const getIcon = (category: string) => {
         switch (category) {
@@ -110,7 +162,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
         }
     };
 
-    const renderItem = ({ item, index }: { item: Transaction, index: number }) => {
+    const renderItem: ListRenderItem<Transaction> = useCallback(({ item, index }) => {
         const amtType = item.category === 'Income' ? 'income' : item.category === 'Transfer' ? 'transfer' : 'expense';
         const { text: amtText, color: amtColor } = formatAmount(item.amount, amtType as any);
 
@@ -159,31 +211,63 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                 </SwipeableRow>
             </AnimatedItem>
         );
-    };
+    }, [router]);
 
-    const validTransactions = transactions.filter(t => t.id !== pendingDeleteTx?.id);
+    const validTransactions = activeList.filter(t => t.id !== pendingDeleteTx?.id);
     const displayedTransactions = limit ? validTransactions.slice(0, limit) : validTransactions;
 
     const accountName = selectedTx ? accounts.find(a => a.id === selectedTx.account_id)?.name || 'Default Account' : '';
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, scrollEnabled && { flex: 1 }]}>
             {showTitle && <Text style={styles.title}>Recent Activity</Text>}
-            {transactions.length === 0 ? (
+            {!isStatic && isLoading ? (
                 <View style={styles.emptyContainer}>
-                    <Text style={styles.empty}>No transactions yet</Text>
-                    <Text style={styles.emptySub}>Start by adding a new expense</Text>
+                    <ActivityIndicator size="large" color={Colors.primary[500]} />
                 </View>
-            ) : (
-                <FlatList
+            ) : scrollEnabled ? (
+                <TypedFlashList
                     data={displayedTransactions}
-                    keyExtractor={(item) => item.id.toString()}
+                    keyExtractor={(item: Transaction) => item.id.toString()}
                     renderItem={renderItem}
-                    scrollEnabled={scrollEnabled}
-                    contentContainerStyle={{ paddingBottom: 20 }}
-                    initialNumToRender={15}
-                    maxToRenderPerBatch={10}
+                    scrollEnabled={true}
+                    contentContainerStyle={contentContainerStyle || { paddingBottom: 20 }}
+                    estimatedItemSize={70}
+                    ListHeaderComponent={ListHeaderComponent}
+                    ListEmptyComponent={
+                        <View style={styles.emptyContainer}>
+                            <Text style={styles.empty}>No transactions yet</Text>
+                            <Text style={styles.emptySub}>Start by adding a new expense</Text>
+                        </View>
+                    }
+                    onEndReached={() => {
+                        if (!isStatic && hasNextPage && !isFetchingNextPage) {
+                            fetchNextPage();
+                        }
+                    }}
+                    onEndReachedThreshold={0.5}
+                    ListFooterComponent={
+                        isFetchingNextPage ? (
+                            <ActivityIndicator size="small" color={Colors.primary[500]} style={{ marginVertical: 16 }} />
+                        ) : null
+                    }
                 />
+            ) : (
+                <View style={contentContainerStyle || { paddingBottom: 20 }}>
+                    {ListHeaderComponent}
+                    {displayedTransactions.length > 0 ? (
+                        displayedTransactions.map((item, index) => (
+                            <React.Fragment key={item.id.toString()}>
+                                {renderItem({ item, index, target: 'Cell' } as any)}
+                            </React.Fragment>
+                        ))
+                    ) : (
+                        <View style={styles.emptyContainer}>
+                            <Text style={styles.empty}>No transactions yet</Text>
+                            <Text style={styles.emptySub}>Start by adding a new expense</Text>
+                        </View>
+                    )}
+                </View>
             )}
 
             {/* Detail Popup Modal */}

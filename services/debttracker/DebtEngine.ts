@@ -1,5 +1,6 @@
 // Debt Tracker Computation Engine
 // All computations are pure JavaScript - no SQLite writes
+import { calculateSimpleInterest, calculateCompoundInterest } from '../../utils/mathUtils';
 
 export interface DebtRecord {
   id: number;
@@ -58,22 +59,19 @@ export const computeInterest = (
   
   switch (type) {
     case 'simple':
-      return principal * (rate / 100) * years;
+      return calculateSimpleInterest(principal, rate, years) - principal;
       
     case 'compound_monthly':
-      const nMonthly = 12;
-      return principal * Math.pow(1 + rate / (100 * nMonthly), nMonthly * years) - principal;
+      return calculateCompoundInterest(principal, rate, 12, years) - principal;
       
     case 'compound_quarterly':
-      const nQuarterly = 4;
-      return principal * Math.pow(1 + rate / (100 * nQuarterly), nQuarterly * years) - principal;
+      return calculateCompoundInterest(principal, rate, 4, years) - principal;
       
     case 'compound_half_yearly':
-      const nHalfYearly = 2;
-      return principal * Math.pow(1 + rate / (100 * nHalfYearly), nHalfYearly * years) - principal;
+      return calculateCompoundInterest(principal, rate, 2, years) - principal;
       
     case 'compound_yearly':
-      return principal * Math.pow(1 + rate / 100, years) - principal;
+      return calculateCompoundInterest(principal, rate, 1, years) - principal;
       
     default:
       return 0;

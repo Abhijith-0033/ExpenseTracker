@@ -3,9 +3,11 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Switch
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import { ArrowLeft, Send, CheckCircle, AlertCircle, RefreshCw, LogOut } from 'lucide-react-native';
 import { Colors, Typography, Layout } from '../constants/Theme';
-import { getCategories, getDatabase } from '../services/database';
+import { getCategories } from '../services/database';
+import { getRecentTelegramTransactions } from '../services/transactionQueries';
 import { TELEGRAM_KEYS, checkServerHealth, syncCategories } from '../telegram/TelegramService';
 import { startPolling, stopPolling, unregisterBackgroundTask } from '../telegram/TelegramPoller';
 
@@ -36,7 +38,7 @@ export default function TelegramSettingsScreen() {
   const loadState = async () => {
     try {
       const [userId, sUrl, enabled, last] = await Promise.all([
-        AsyncStorage.getItem(TELEGRAM_KEYS.APP_USER_ID),
+        SecureStore.getItemAsync(TELEGRAM_KEYS.APP_USER_ID),
         AsyncStorage.getItem(TELEGRAM_KEYS.SERVER_URL),
         AsyncStorage.getItem(TELEGRAM_KEYS.ENABLED),
         AsyncStorage.getItem(TELEGRAM_KEYS.LAST_POLL),
@@ -51,14 +53,7 @@ export default function TelegramSettingsScreen() {
 
       if (linked) {
         // Load recent Telegram transactions
-        const db = getDatabase();
-        const txs = await db.getAllAsync<any>(
-          `SELECT t.amount, t.category, t.date, t.description
-           FROM transactions t
-           WHERE t.source = 'telegram'
-           ORDER BY t.created_at DESC
-           LIMIT 5`
-        );
+        const txs = await getRecentTelegramTransactions(5);
         setRecentTelegramTx(txs || []);
       }
     } catch (err) {
@@ -100,9 +95,9 @@ export default function TelegramSettingsScreen() {
       // Step 2: Save to storage
       await AsyncStorage.multiSet([
         [TELEGRAM_KEYS.SERVER_URL, formattedUrl],
-        [TELEGRAM_KEYS.APP_USER_ID, connectionCode.trim()],
         [TELEGRAM_KEYS.ENABLED, 'true'],
       ]);
+      await SecureStore.setItemAsync(TELEGRAM_KEYS.APP_USER_ID, connectionCode.trim());
 
       // Step 3: Sync category list to server for custom mapping
       const cats = await getCategories();
@@ -141,11 +136,11 @@ export default function TelegramSettingsScreen() {
             await stopPolling();
             await unregisterBackgroundTask();
             await AsyncStorage.multiRemove([
-              TELEGRAM_KEYS.APP_USER_ID,
               TELEGRAM_KEYS.SERVER_URL,
               TELEGRAM_KEYS.ENABLED,
               TELEGRAM_KEYS.LAST_POLL,
             ]);
+            await SecureStore.deleteItemAsync(TELEGRAM_KEYS.APP_USER_ID);
             setIsLinked(false);
             setStoredUserId(null);
             setStoredServerUrl(null);

@@ -1,6 +1,8 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { ErrorBoundary } from 'react-error-boundary';
+import { TabErrorFallback } from '../../components/ErrorBoundary';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, StatusBar, TouchableOpacity, Dimensions , Modal } from 'react-native';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useApp } from '../../context/AppContext';
 import {  TrendingUp, TrendingDown, ArrowRight, BookOpen, Activity , CalendarDays, CalendarRange, Calendar, BarChart3, X , Grid } from 'lucide-react-native';
 import { Colors, Layout, Typography } from '../../constants/Theme';
@@ -31,10 +33,10 @@ const getGreeting = () => {
   return 'Good Evening';
 };
 
-export default function Dashboard() {
+function DashboardContent() {
   const router = useRouter();
   const _insets = useSafeAreaInsets();
-  const { accounts, transactions, refreshData } = useApp();
+  const { accounts, refreshData, dataVersion } = useApp();
   const [refreshing, setRefreshing] = useState(false);
 
   // Dashboard Summaries State
@@ -91,15 +93,11 @@ export default function Dashboard() {
     setRefreshing(false);
   }, [refreshData]);
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchSummaries();
-    }, [])
-  );
+  useEffect(() => {
+    fetchSummaries();
+  }, [dataVersion]);
 
-  const totalBalance = accounts.reduce((sum, acc) => sum + acc.balance, 0);
-  const _income = transactions.filter(t => t.type === 'income' || (t.category === 'Income' && !t.type)).reduce((s, t) => s + t.amount, 0);
-  const _expense = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+  const totalBalance = useMemo(() => accounts.reduce((sum, acc) => sum + acc.balance, 0), [accounts]);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -789,3 +787,11 @@ const styles = StyleSheet.create({
     fontFamily: Typography.family.bold,
   },
 });
+
+export default function Dashboard() {
+  return (
+    <ErrorBoundary FallbackComponent={TabErrorFallback}>
+      <DashboardContent />
+    </ErrorBoundary>
+  );
+}

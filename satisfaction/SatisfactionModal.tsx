@@ -8,9 +8,6 @@ import { SatisfactionInsight } from './SatisfactionInsights';
 import { formatCurrency } from '../utils/currency';
 import { getMergedClassifications, saveUserOverride, CategoryType } from './categoryClassification';
 
-
-const { _width } = Dimensions.get('window');
-
 interface SatisfactionModalProps {
   visible: boolean;
   onClose: () => void;

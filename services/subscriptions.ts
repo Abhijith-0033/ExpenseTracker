@@ -133,7 +133,8 @@ export const getUpcomingRenewals = async (days: number = 7): Promise<Subscriptio
     const dateBound = endDays.toISOString().split('T')[0];
     
     return await db.getAllAsync<Subscription>(
-        `SELECT * FROM subscriptions WHERE is_active = 1 AND (status = 'active' OR status IS NULL) AND next_renewal_date <= '${dateBound}' ORDER BY next_renewal_date ASC`
+        `SELECT * FROM subscriptions WHERE is_active = 1 AND (status = 'active' OR status IS NULL) AND next_renewal_date <= ? ORDER BY next_renewal_date ASC`,
+        [dateBound]
     );
 };
 

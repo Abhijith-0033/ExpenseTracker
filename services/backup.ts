@@ -3,6 +3,7 @@ import { writeAsStringAsync, readAsStringAsync, cacheDirectory } from 'expo-file
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import { Alert, Platform } from 'react-native';
+import { z } from 'zod';
 import {
     getDatabase,
     initDatabase,
@@ -20,8 +21,8 @@ import { ExpenseBook, BookItem } from './books';
 import { BillGroup, BillGroupMember, BillExpense, BillExpenseSplit } from './billSplitter';
 
 // Schema Versioning to ensure backward/forward compatibility in future
-const CURRENT_SCHEMA_VERSION = 1;
-const EXPORT_APP_VERSION = '2.7.0';
+const CURRENT_SCHEMA_VERSION = 2;
+const EXPORT_APP_VERSION = '3.2.0';
 
 interface BackupData {
     metadata: {
@@ -58,8 +59,365 @@ interface BackupData {
         emiPayments: any[];
         notificationSchedules: any[];
         dailyReportCache: any[];
+        categories: any[];
+        categorySubcategories: any[];
     };
 }
+
+const AccountSchema = z.object({
+    id: z.number(),
+    name: z.string(),
+    balance: z.number(),
+    type: z.string(),
+});
+
+const TransactionSchema = z.object({
+    id: z.number(),
+    amount: z.number(),
+    category: z.string(),
+    subcategory: z.string().nullish().transform(val => val ?? ''),
+    account_id: z.number(),
+    date: z.string(),
+    description: z.string().nullish().transform(val => val ?? ''),
+    created_at: z.union([z.number(), z.string()]).nullish().transform(val => {
+        if (typeof val === 'number') return val;
+        if (typeof val === 'string') return Date.parse(val) || Date.now();
+        return Date.now();
+    }),
+});
+
+const IncomeSourceSchema = z.object({
+    id: z.number(),
+    name: z.string(),
+    icon: z.string().nullish().transform(val => val ?? 'Briefcase'),
+});
+
+const CategoryBudgetSchema = z.object({
+    id: z.number(),
+    category: z.string(),
+    amount: z.number(),
+    month: z.string(),
+    created_at: z.union([z.number(), z.string()]).nullish().transform(val => typeof val === 'number' ? val : (Date.parse(val || '') || Date.now())),
+});
+
+const DebtSchema = z.object({
+    id: z.number(),
+    name: z.string(),
+    type: z.enum(['debt', 'receivable'] as const),
+    amount: z.number(),
+    notes: z.string().nullish().transform(val => val ?? ''),
+    created_at: z.union([z.number(), z.string()]).nullish().transform(val => typeof val === 'number' ? val : (Date.parse(val || '') || Date.now())),
+    last_updated: z.union([z.number(), z.string()]).nullish().transform(val => typeof val === 'number' ? val : (Date.parse(val || '') || Date.now())),
+});
+
+const DebtHistorySchema = z.object({
+    id: z.number(),
+    debt_id: z.number(),
+    change_amount: z.number(),
+    action: z.enum(['increase', 'reduce'] as const),
+    notes: z.string().nullish().transform(val => val ?? ''),
+    date: z.union([z.number(), z.string()]).nullish().transform(val => typeof val === 'number' ? val : (Date.parse(val || '') || Date.now())),
+});
+
+const ExpenseBookSchema = z.object({
+    id: z.number(),
+    name: z.string(),
+    description: z.string().nullish().transform(val => val ?? undefined),
+    budget: z.number().nullish().transform(val => val ?? 0),
+    created_at: z.union([z.number(), z.string()]).nullish().transform(val => typeof val === 'number' ? val : (Date.parse(val || '') || Date.now())),
+    last_updated: z.union([z.number(), z.string()]).nullish().transform(val => typeof val === 'number' ? val : (Date.parse(val || '') || Date.now())),
+});
+
+const BookItemSchema = z.object({
+    id: z.number(),
+    book_id: z.number(),
+    name: z.string(),
+    amount: z.number(),
+    notes: z.string().nullish().transform(val => val ?? undefined),
+    date: z.union([z.number(), z.string()]).nullish().transform(val => typeof val === 'number' ? val : (Date.parse(val || '') || Date.now())),
+    type: z.enum(['expense', 'income'] as const),
+    income_source_id: z.number().nullish().transform(val => val ?? null),
+});
+
+const BillGroupSchema = z.object({
+    id: z.number(),
+    name: z.string(),
+    description: z.string().nullish().transform(val => val ?? undefined),
+    created_at: z.union([z.number(), z.string()]).nullish().transform(val => typeof val === 'number' ? val : (Date.parse(val || '') || Date.now())),
+    last_updated: z.union([z.number(), z.string()]).nullish().transform(val => typeof val === 'number' ? val : (Date.parse(val || '') || Date.now())),
+    is_archived: z.number().nullish().transform(val => val ?? 0),
+});
+
+const BillGroupMemberSchema = z.object({
+    id: z.number(),
+    group_id: z.number(),
+    name: z.string(),
+    created_at: z.union([z.number(), z.string()]).nullish().transform(val => typeof val === 'number' ? val : (Date.parse(val || '') || Date.now())),
+});
+
+const BillExpenseSchema = z.object({
+    id: z.number(),
+    group_id: z.number(),
+    title: z.string(),
+    amount: z.number(),
+    paid_by_member_id: z.number(),
+    date: z.union([z.number(), z.string()]).transform(val => typeof val === 'number' ? val : (Date.parse(val || '') || Date.now())),
+    notes: z.string().nullish().transform(val => val ?? undefined),
+    created_at: z.union([z.number(), z.string()]).nullish().transform(val => typeof val === 'number' ? val : (Date.parse(val || '') || Date.now())),
+});
+
+const BillExpenseSplitSchema = z.object({
+    id: z.number(),
+    expense_id: z.number(),
+    member_id: z.number(),
+    amount: z.number(),
+    created_at: z.union([z.number(), z.string()]).nullish().transform(val => typeof val === 'number' ? val : (Date.parse(val || '') || Date.now())),
+});
+
+const RechargeMetaSchema = z.object({
+    id: z.number(),
+    expense_id: z.number(),
+    validity_days: z.number(),
+    expiry_date: z.string(),
+    reminder_date: z.string(),
+    notification_id: z.string().nullish().transform(val => val ?? ''),
+});
+
+const SavingsGoalSchema = z.object({
+    id: z.number(),
+    name: z.string(),
+    target_amount: z.number(),
+    current_amount: z.number(),
+    deadline: z.string(),
+    linked_account_id: z.number().nullish().transform(val => val ?? null),
+    icon: z.string().nullish().transform(val => val ?? '🎯'),
+    color: z.string().nullish().transform(val => val ?? '#6941C6'),
+    created_at: z.union([z.number(), z.string()]).nullish().transform(val => typeof val === 'number' ? val : (Date.parse(val || '') || Date.now())),
+    last_updated: z.union([z.number(), z.string()]).nullish().transform(val => typeof val === 'number' ? val : (Date.parse(val || '') || Date.now())),
+    is_completed: z.number().nullish().transform(val => val ?? 0),
+});
+
+const SavingsContributionSchema = z.object({
+    id: z.number(),
+    goal_id: z.number(),
+    amount: z.number(),
+    date: z.string(),
+    notes: z.string().nullish().transform(val => val ?? ''),
+    auto_detected: z.number().nullish().transform(val => val ?? 0),
+    created_at: z.union([z.number(), z.string()]).nullish().transform(val => typeof val === 'number' ? val : (Date.parse(val || '') || Date.now())),
+});
+
+const SubscriptionSchema = z.object({
+    id: z.number(),
+    name: z.string(),
+    amount: z.number(),
+    billing_cycle: z.enum(['monthly', 'quarterly', 'yearly', 'custom'] as const),
+    next_renewal_date: z.string(),
+    category: z.string(),
+    account_id: z.number().nullish().transform(val => val ?? null),
+    icon: z.string().nullish().transform(val => val ?? '📦'),
+    color: z.string().nullish().transform(val => val ?? '#7C3AED'),
+    is_active: z.number(),
+    reminder_notification_id: z.string().nullish().transform(val => val ?? ''),
+    notes: z.string().nullish().transform(val => val ?? ''),
+    created_at: z.union([z.number(), z.string()]).nullish().transform(val => typeof val === 'number' ? val : (Date.parse(val || '') || Date.now())),
+    last_updated: z.union([z.number(), z.string()]).nullish().transform(val => typeof val === 'number' ? val : (Date.parse(val || '') || Date.now())),
+    custom_interval_value: z.number().nullish().transform(val => val ?? undefined),
+    custom_interval_unit: z.enum(['days', 'weeks', 'months'] as const).nullish().transform(val => val ?? undefined),
+    website: z.string().nullish().transform(val => val ?? undefined),
+    auto_renew: z.number().nullish().transform(val => val ?? undefined),
+    payment_method: z.string().nullish().transform(val => val ?? undefined),
+    sub_category: z.string().nullish().transform(val => val ?? undefined),
+    reminder_days_before: z.number().nullish().transform(val => val ?? undefined),
+    status: z.enum(['active', 'paused', 'cancelled'] as const).nullish().transform(val => val ?? undefined),
+});
+
+const DebtRecordSchema = z.object({
+    id: z.number(),
+    name: z.string(),
+    description: z.string().nullable().optional(),
+    principal: z.number(),
+    interest_rate: z.number(),
+    interest_type: z.string(),
+    repayment_freq: z.string(),
+    custom_freq_days: z.number().nullable().optional(),
+    start_date: z.string(),
+    expected_end_date: z.string().nullable().optional(),
+    status: z.string(),
+    direction: z.string(),
+    created_at: z.string().nullable().optional(),
+    updated_at: z.string().nullable().optional(),
+});
+
+const DebtRepaymentSchema = z.object({
+    id: z.number(),
+    debt_id: z.number(),
+    amount: z.number(),
+    payment_date: z.string(),
+    payment_type: z.string(),
+    note: z.string().nullable().optional(),
+    account_id: z.number(),
+    created_at: z.string().nullable().optional(),
+});
+
+const ChitFundSchema = z.object({
+    id: z.number(),
+    name: z.string(),
+    total_members: z.number(),
+    monthly_amount: z.number(),
+    total_pot: z.number(),
+    duration_months: z.number(),
+    start_date: z.string(),
+    foreman_commission: z.number(),
+    status: z.string(),
+    my_turn_month: z.number().nullable().optional(),
+    notes: z.string().nullable().optional(),
+    created_at: z.string().nullable().optional(),
+});
+
+const ChitMonthlyRecordSchema = z.object({
+    id: z.number(),
+    chit_id: z.number(),
+    month_number: z.number(),
+    month_date: z.string(),
+    amount_paid: z.number(),
+    payment_date: z.string().nullable().optional(),
+    payment_status: z.string(),
+    winner_name: z.string().nullable().optional(),
+    winner_is_me: z.number().nullable().optional(),
+    bid_amount: z.number().nullable().optional(),
+    pot_amount: z.number().nullable().optional(),
+    commission_deducted: z.number().nullable().optional(),
+    net_received: z.number().nullable().optional(),
+    dividend_received: z.number().nullable().optional(),
+    account_id: z.number().nullable().optional(),
+    notes: z.string().nullable().optional(),
+    created_at: z.string().nullable().optional(),
+});
+
+const ChitMemberSchema = z.object({
+    id: z.number(),
+    chit_id: z.number(),
+    member_name: z.string(),
+    member_turn_month: z.number().nullable().optional(),
+    notes: z.string().nullable().optional(),
+});
+
+const EmiRecordSchema = z.object({
+    id: z.number(),
+    name: z.string(),
+    lender_name: z.string().nullable().optional(),
+    principal: z.number(),
+    total_amount: z.number(),
+    emi_amount: z.number(),
+    interest_rate: z.number(),
+    tenure_months: z.number(),
+    start_date: z.string(),
+    due_day: z.number(),
+    is_autopay: z.number(),
+    autopay_account_id: z.number().nullable().optional(),
+    status: z.string(),
+    category: z.string(),
+    notes: z.string().nullable().optional(),
+    created_at: z.string().nullable().optional(),
+    updated_at: z.string().nullable().optional(),
+});
+
+const EmiPaymentSchema = z.object({
+    id: z.number(),
+    emi_id: z.number(),
+    month_number: z.number(),
+    due_date: z.string(),
+    paid_date: z.string().nullable().optional(),
+    amount_paid: z.number(),
+    principal_component: z.number(),
+    interest_component: z.number(),
+    outstanding_balance: z.number(),
+    payment_status: z.string(),
+    payment_mode: z.string().nullable().optional(),
+    account_id: z.number().nullable().optional(),
+    transaction_id: z.number().nullable().optional(),
+    notes: z.string().nullable().optional(),
+    created_at: z.string().nullable().optional(),
+});
+
+const NotificationScheduleSchema = z.object({
+    id: z.number(),
+    item_type: z.string(),
+    item_id: z.number(),
+    notification_id: z.string(),
+    trigger_type: z.string(),
+    scheduled_for: z.string(),
+    created_at: z.string().nullable().optional(),
+});
+
+const DailyReportCacheSchema = z.object({
+    id: z.number(),
+    report_date: z.string(),
+    total_expense: z.number(),
+    total_income: z.number(),
+    top_category: z.string().nullable().optional(),
+    top_category_amount: z.number().nullable().optional(),
+    transaction_count: z.number(),
+    month_expense_to_date: z.number(),
+    current_balance: z.number(),
+    last_updated: z.string().nullable().optional(),
+});
+
+const CategorySchema = z.object({
+    id: z.number(),
+    name: z.string(),
+    is_recurring: z.number().nullish().transform(val => val ?? 0),
+    default_validity: z.number().nullish().transform(val => val ?? null),
+    sort_order: z.number().nullish().transform(val => val ?? null),
+});
+
+const CategorySubcategorySchema = z.object({
+    id: z.number(),
+    category_id: z.number(),
+    name: z.string(),
+    is_recurring: z.number().nullish().transform(val => val ?? 0),
+    default_validity: z.number().nullish().transform(val => val ?? null),
+});
+
+const BackupDataSchema = z.object({
+    metadata: z.object({
+        timestamp: z.number(),
+        date: z.string(),
+        schemaVersion: z.number(),
+        appVersion: z.string(),
+        platform: z.string(),
+    }),
+    data: z.object({
+        accounts: z.array(AccountSchema),
+        transactions: z.array(TransactionSchema),
+        incomeSources: z.array(IncomeSourceSchema).optional().default([]),
+        debts: z.array(DebtSchema).optional().default([]),
+        debtHistory: z.array(DebtHistorySchema).optional().default([]),
+        expenseBooks: z.array(ExpenseBookSchema).optional().default([]),
+        expenseBookItems: z.array(BookItemSchema).optional().default([]),
+        categoryBudgets: z.array(CategoryBudgetSchema).optional().default([]),
+        billGroups: z.array(BillGroupSchema).optional().default([]),
+        billGroupMembers: z.array(BillGroupMemberSchema).optional().default([]),
+        billExpenses: z.array(BillExpenseSchema).optional().default([]),
+        billExpenseSplits: z.array(BillExpenseSplitSchema).optional().default([]),
+        rechargeMeta: z.array(RechargeMetaSchema).optional().default([]),
+        savingsGoals: z.array(SavingsGoalSchema).optional().default([]),
+        savingsContributions: z.array(SavingsContributionSchema).optional().default([]),
+        subscriptions: z.array(SubscriptionSchema).optional().default([]),
+        debtRecords: z.array(DebtRecordSchema).optional().default([]),
+        debtRepayments: z.array(DebtRepaymentSchema).optional().default([]),
+        chitFunds: z.array(ChitFundSchema).optional().default([]),
+        chitMonthlyRecords: z.array(ChitMonthlyRecordSchema).optional().default([]),
+        chitMembers: z.array(ChitMemberSchema).optional().default([]),
+        emiRecords: z.array(EmiRecordSchema).optional().default([]),
+        emiPayments: z.array(EmiPaymentSchema).optional().default([]),
+        notificationSchedules: z.array(NotificationScheduleSchema).optional().default([]),
+        dailyReportCache: z.array(DailyReportCacheSchema).optional().default([]),
+        categories: z.array(CategorySchema).optional().default([]),
+        categorySubcategories: z.array(CategorySubcategorySchema).optional().default([]),
+    }),
+});
 
 // Helper to sanitize filename
 const getSafeFilename = (prefix: string, ext: string) => {
@@ -99,7 +457,9 @@ export const exportData = async () => {
             emiRecords,
             emiPayments,
             notificationSchedules,
-            dailyReportCache
+            dailyReportCache,
+            categories,
+            categorySubcategories
         ] = await Promise.all([
             db.getAllAsync<Transaction>('SELECT * FROM transactions'),
             db.getAllAsync<Account>('SELECT * FROM accounts'), // Includes meta categories
@@ -126,6 +486,8 @@ export const exportData = async () => {
             db.getAllAsync<any>('SELECT * FROM emi_payments'),
             db.getAllAsync<any>('SELECT * FROM notification_schedules'),
             db.getAllAsync<any>('SELECT * FROM daily_report_cache'),
+            db.getAllAsync<any>('SELECT * FROM categories'),
+            db.getAllAsync<any>('SELECT * FROM category_subcategories'),
         ]);
 
         // 2. Construct Backup Object
@@ -162,7 +524,9 @@ export const exportData = async () => {
                 emiRecords,
                 emiPayments,
                 notificationSchedules,
-                dailyReportCache
+                dailyReportCache,
+                categories,
+                categorySubcategories
             }
         };
 
@@ -246,12 +610,15 @@ export const restoreData = async () => {
 
         // 2. Read and Parse
         const fileContent = await readAsStringAsync(fileUri);
-        const backup: BackupData = JSON.parse(fileContent);
+        const parsedJson = JSON.parse(fileContent);
 
-        // 3. Validate
-        if (!backup.metadata || !backup.data || !backup.metadata.schemaVersion) {
-            throw new Error("Invalid backup file format. Missing metadata.");
+        // 3. Validate Zod Schema
+        const validation = BackupDataSchema.safeParse(parsedJson);
+        if (!validation.success) {
+            console.error('Backup validation failed:', validation.error.format());
+            throw new Error("Invalid backup file format. Schema validation failed.");
         }
+        const backup = validation.data;
 
         if (backup.metadata.schemaVersion > CURRENT_SCHEMA_VERSION) {
             Alert.alert(
@@ -312,6 +679,8 @@ const performRestore = async (data: BackupData['data']) => {
             await db.runAsync('DELETE FROM notification_schedules');
             await db.runAsync('DELETE FROM daily_report_cache');
             await db.runAsync('DELETE FROM transactions');
+            await db.runAsync('DELETE FROM category_subcategories');
+            await db.runAsync('DELETE FROM categories');
             await db.runAsync('DELETE FROM accounts');
 
             // 2. Insert Data (Strict Order)
@@ -322,6 +691,26 @@ const performRestore = async (data: BackupData['data']) => {
                     'INSERT INTO accounts (id, name, balance, type) VALUES (?, ?, ?, ?)',
                     [acc.id, acc.name, acc.balance, acc.type]
                 );
+            }
+
+            // Categories
+            if (data.categories) {
+                for (const cat of data.categories) {
+                    await db.runAsync(
+                        'INSERT INTO categories (id, name, is_recurring, default_validity, sort_order) VALUES (?, ?, ?, ?, ?)',
+                        [cat.id, cat.name, cat.is_recurring, cat.default_validity, cat.sort_order]
+                    );
+                }
+            }
+
+            // Category Subcategories
+            if (data.categorySubcategories) {
+                for (const subcat of data.categorySubcategories) {
+                    await db.runAsync(
+                        'INSERT INTO category_subcategories (id, category_id, name, is_recurring, default_validity) VALUES (?, ?, ?, ?, ?)',
+                        [subcat.id, subcat.category_id, subcat.name, subcat.is_recurring, subcat.default_validity]
+                    );
+                }
             }
 
             // Income Sources

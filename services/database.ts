@@ -1,5 +1,6 @@
 
 import * as SQLite from 'expo-sqlite';
+import { Platform } from 'react-native';
 
 const DB_NAME = 'expense_tracker.db';
 
@@ -44,9 +45,7 @@ export interface IncomeSource {
 }
 
 let db: SQLite.SQLiteDatabase | null = null;
-let isInitializing = false;
-
-let lastTransactionTime = 0;
+let dbInitPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
 const getAccountBalanceDelta = (tx: Pick<Transaction, 'amount' | 'category' | 'subcategory'>) => {
   if (tx.category === 'Income') return tx.amount;
@@ -61,25 +60,21 @@ const getAccountBalanceDelta = (tx: Pick<Transaction, 'amount' | 'category' | 's
   return -tx.amount;
 };
 
-export const initDatabase = async () => {
-  if (db) return;
+const getDbVersion = async (db: SQLite.SQLiteDatabase): Promise<number> => {
+  const result = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version;');
+  return result ? result.user_version : 0;
+};
 
-  if (isInitializing) {
-    while (isInitializing) {
-      await new Promise(resolve => setTimeout(resolve, 50));
-      if (db) return;
-    }
-  }
+const setDbVersion = async (db: SQLite.SQLiteDatabase, version: number): Promise<void> => {
+  await db.execAsync(`PRAGMA user_version = ${version};`);
+};
 
-  isInitializing = true;
+const runMigrations = async (db: SQLite.SQLiteDatabase) => {
+  let version = await getDbVersion(db);
+  console.log(`Current DB version: ${version}`);
 
-  try {
-    db = await SQLite.openDatabaseAsync(DB_NAME);
-
-    // Enable WAL mode
-    await db.execAsync('PRAGMA journal_mode = WAL;');
-
-    // Creates
+  if (version < 1) {
+    // Version 1: Create all tables (safe schema initialization)
     await db.execAsync(`
       CREATE TABLE IF NOT EXISTS transactions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -89,20 +84,17 @@ export const initDatabase = async () => {
         account_id INTEGER NOT NULL,
         date TEXT NOT NULL,
         description TEXT,
-        created_at INTEGER NOT NULL
+        created_at INTEGER NOT NULL,
+        source TEXT DEFAULT 'manual'
       );
-    `);
 
-    await db.execAsync(`
       CREATE TABLE IF NOT EXISTS accounts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         balance REAL NOT NULL,
         type TEXT NOT NULL
       );
-    `);
 
-    await db.execAsync(`
       CREATE TABLE IF NOT EXISTS category_budgets (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         category TEXT NOT NULL,
@@ -111,41 +103,33 @@ export const initDatabase = async () => {
         created_at INTEGER NOT NULL,
         UNIQUE(category, month)
       );
-    `);
 
-    await db.execAsync(`
       CREATE TABLE IF NOT EXISTS income_sources (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT UNIQUE NOT NULL,
         icon TEXT NOT NULL
       );
-    `);
 
-    await db.execAsync(`
       CREATE TABLE IF NOT EXISTS debts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
-        type TEXT NOT NULL, -- 'debt' or 'receivable'
+        type TEXT NOT NULL,
         amount REAL DEFAULT 0,
         notes TEXT,
         created_at INTEGER,
         last_updated INTEGER
       );
-    `);
 
-    await db.execAsync(`
       CREATE TABLE IF NOT EXISTS debt_history (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         debt_id INTEGER NOT NULL,
         change_amount REAL NOT NULL,
-        action TEXT NOT NULL, -- 'increase' or 'reduce'
+        action TEXT NOT NULL,
         notes TEXT,
         date INTEGER,
         FOREIGN KEY (debt_id) REFERENCES debts (id) ON DELETE CASCADE
       );
-    `);
 
-    await db.execAsync(`
       CREATE TABLE IF NOT EXISTS expense_books (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
@@ -154,9 +138,7 @@ export const initDatabase = async () => {
         created_at INTEGER NOT NULL,
         last_updated INTEGER NOT NULL
       );
-    `);
 
-    await db.execAsync(`
       CREATE TABLE IF NOT EXISTS expense_book_items (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         book_id INTEGER NOT NULL,
@@ -168,22 +150,7 @@ export const initDatabase = async () => {
         income_source_id INTEGER,
         FOREIGN KEY (book_id) REFERENCES expense_books(id) ON DELETE CASCADE
       );
-    `);
 
-    // Safe Migration for existing installations
-    const tableInfo = await db.getAllAsync<{ name: string }>("PRAGMA table_info(expense_book_items)");
-    const columnNames = tableInfo.map(c => c.name);
-
-    if (!columnNames.includes('type')) {
-      await db.execAsync("ALTER TABLE expense_book_items ADD COLUMN type TEXT DEFAULT 'expense'");
-    }
-    if (!columnNames.includes('income_source_id')) {
-      await db.execAsync("ALTER TABLE expense_book_items ADD COLUMN income_source_id INTEGER");
-    }
-
-    // --- Bill Splitter (Group Expenses) Tables ---
-
-    await db.execAsync(`
       CREATE TABLE IF NOT EXISTS bill_groups (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
@@ -192,9 +159,7 @@ export const initDatabase = async () => {
         last_updated INTEGER NOT NULL,
         is_archived INTEGER DEFAULT 0
       );
-    `);
 
-    await db.execAsync(`
       CREATE TABLE IF NOT EXISTS bill_group_members (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         group_id INTEGER NOT NULL,
@@ -202,9 +167,7 @@ export const initDatabase = async () => {
         created_at INTEGER NOT NULL,
         FOREIGN KEY (group_id) REFERENCES bill_groups(id) ON DELETE CASCADE
       );
-    `);
 
-    await db.execAsync(`
       CREATE TABLE IF NOT EXISTS bill_expenses (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         group_id INTEGER NOT NULL,
@@ -217,9 +180,7 @@ export const initDatabase = async () => {
         FOREIGN KEY (group_id) REFERENCES bill_groups(id) ON DELETE CASCADE,
         FOREIGN KEY (paid_by_member_id) REFERENCES bill_group_members(id) ON DELETE CASCADE
       );
-    `);
 
-    await db.execAsync(`
       CREATE TABLE IF NOT EXISTS bill_expense_splits (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         expense_id INTEGER NOT NULL,
@@ -229,10 +190,7 @@ export const initDatabase = async () => {
         FOREIGN KEY (expense_id) REFERENCES bill_expenses(id) ON DELETE CASCADE,
         FOREIGN KEY (member_id) REFERENCES bill_group_members(id) ON DELETE CASCADE
       );
-    `);
 
-    // --- Recharge Tracking ---
-    await db.execAsync(`
       CREATE TABLE IF NOT EXISTS recharge_meta (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         expense_id INTEGER NOT NULL,
@@ -242,10 +200,7 @@ export const initDatabase = async () => {
         notification_id TEXT,
         FOREIGN KEY (expense_id) REFERENCES transactions(id) ON DELETE CASCADE
       );
-    `);
 
-    // --- Savings Goals ---
-    await db.execAsync(`
       CREATE TABLE IF NOT EXISTS savings_goals (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
@@ -260,9 +215,7 @@ export const initDatabase = async () => {
         is_completed INTEGER DEFAULT 0,
         FOREIGN KEY (linked_account_id) REFERENCES accounts(id)
       );
-    `);
 
-    await db.execAsync(`
       CREATE TABLE IF NOT EXISTS savings_contributions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         goal_id INTEGER NOT NULL,
@@ -273,12 +226,7 @@ export const initDatabase = async () => {
         created_at INTEGER NOT NULL,
         FOREIGN KEY (goal_id) REFERENCES savings_goals(id) ON DELETE CASCADE
       );
-    `);
 
-    await db.execAsync('DROP TABLE IF EXISTS payee_mappings;');
-
-    // --- Subscription Tracker ---
-    await db.execAsync(`
       CREATE TABLE IF NOT EXISTS subscriptions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
@@ -304,51 +252,17 @@ export const initDatabase = async () => {
         status TEXT DEFAULT 'active',
         FOREIGN KEY (account_id) REFERENCES accounts(id)
       );
-    `);
 
-    // Migration for subscriptions table
-    const subTableInfo = await db.getAllAsync<{ name: string }>("PRAGMA table_info(subscriptions)");
-    const subColumnNames = subTableInfo.map(c => c.name);
-
-    if (!subColumnNames.includes('custom_interval_value')) {
-      await db.execAsync("ALTER TABLE subscriptions ADD COLUMN custom_interval_value INTEGER DEFAULT NULL");
-    }
-    if (!subColumnNames.includes('custom_interval_unit')) {
-      await db.execAsync("ALTER TABLE subscriptions ADD COLUMN custom_interval_unit TEXT DEFAULT NULL");
-    }
-    if (!subColumnNames.includes('website')) {
-      await db.execAsync("ALTER TABLE subscriptions ADD COLUMN website TEXT DEFAULT NULL");
-    }
-    if (!subColumnNames.includes('auto_renew')) {
-      await db.execAsync("ALTER TABLE subscriptions ADD COLUMN auto_renew INTEGER DEFAULT 1");
-    }
-    if (!subColumnNames.includes('payment_method')) {
-      await db.execAsync("ALTER TABLE subscriptions ADD COLUMN payment_method TEXT DEFAULT NULL");
-    }
-    if (!subColumnNames.includes('sub_category')) {
-      await db.execAsync("ALTER TABLE subscriptions ADD COLUMN sub_category TEXT DEFAULT NULL");
-    }
-    if (!subColumnNames.includes('reminder_days_before')) {
-      await db.execAsync("ALTER TABLE subscriptions ADD COLUMN reminder_days_before INTEGER DEFAULT 3");
-    }
-    if (!subColumnNames.includes('status')) {
-      await db.execAsync("ALTER TABLE subscriptions ADD COLUMN status TEXT DEFAULT 'active'");
-    }
-
-    // --- Notification & Report Tables ---
-    await db.execAsync(`
       CREATE TABLE IF NOT EXISTS notification_schedules (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        item_type TEXT NOT NULL,       -- 'subscription' | 'recharge' | 'bill'
+        item_type TEXT NOT NULL,
         item_id INTEGER NOT NULL,
-        notification_id TEXT NOT NULL,  -- expo notification identifier
-        trigger_type TEXT NOT NULL,     -- '7d' | '3d' | '2d' | '1d' | '0d' | '0d_eve' | 'overdue' | 'daily_YYYY-MM-DD'
-        scheduled_for TEXT NOT NULL,    -- ISO date string
+        notification_id TEXT NOT NULL,
+        trigger_type TEXT NOT NULL,
+        scheduled_for TEXT NOT NULL,
         created_at INTEGER NOT NULL
       );
-    `);
 
-    await db.execAsync(`
       CREATE TABLE IF NOT EXISTS daily_report_cache (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         report_date TEXT NOT NULL UNIQUE,
@@ -361,10 +275,7 @@ export const initDatabase = async () => {
         current_balance REAL DEFAULT 0,
         last_updated INTEGER NOT NULL
       );
-    `);
 
-    // --- Debt Tracker Tables ---
-    await db.execAsync(`
       CREATE TABLE IF NOT EXISTS debt_records (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
@@ -381,9 +292,7 @@ export const initDatabase = async () => {
         created_at TEXT DEFAULT (datetime('now')),
         updated_at TEXT DEFAULT (datetime('now'))
       );
-    `);
 
-    await db.execAsync(`
       CREATE TABLE IF NOT EXISTS debt_repayments (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         debt_id INTEGER NOT NULL,
@@ -395,10 +304,7 @@ export const initDatabase = async () => {
         created_at TEXT DEFAULT (datetime('now')),
         FOREIGN KEY (debt_id) REFERENCES debt_records(id) ON DELETE CASCADE
       );
-    `);
 
-    // --- Chit Fund Tables ---
-    await db.execAsync(`
       CREATE TABLE IF NOT EXISTS chit_funds (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
@@ -413,9 +319,7 @@ export const initDatabase = async () => {
         notes TEXT DEFAULT NULL,
         created_at TEXT DEFAULT (datetime('now'))
       );
-    `);
 
-    await db.execAsync(`
       CREATE TABLE IF NOT EXISTS chit_monthly_records (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         chit_id INTEGER NOT NULL,
@@ -436,9 +340,7 @@ export const initDatabase = async () => {
         created_at TEXT DEFAULT (datetime('now')),
         FOREIGN KEY (chit_id) REFERENCES chit_funds(id) ON DELETE CASCADE
       );
-    `);
 
-    await db.execAsync(`
       CREATE TABLE IF NOT EXISTS chit_members (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         chit_id INTEGER NOT NULL,
@@ -447,10 +349,7 @@ export const initDatabase = async () => {
         notes TEXT DEFAULT NULL,
         FOREIGN KEY (chit_id) REFERENCES chit_funds(id) ON DELETE CASCADE
       );
-    `);
 
-    // --- EMI Tracker Tables ---
-    await db.execAsync(`
       CREATE TABLE IF NOT EXISTS emi_records (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
@@ -470,9 +369,7 @@ export const initDatabase = async () => {
         created_at TEXT DEFAULT (datetime('now')),
         updated_at TEXT DEFAULT (datetime('now'))
       );
-    `);
 
-    await db.execAsync(`
       CREATE TABLE IF NOT EXISTS emi_payments (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         emi_id INTEGER NOT NULL,
@@ -493,37 +390,7 @@ export const initDatabase = async () => {
       );
     `);
 
-    // Seed Initial Categories
-    const metaCheck = await db.getAllAsync<{ id: number }>('SELECT id FROM accounts WHERE type = ?', [CATEGORY_META_TYPE]);
-    if (metaCheck.length === 0) {
-      const defaultCategories: CategoryNode[] = [
-        { id: '1', name: 'Food', subcategories: ['Groceries', 'Dining Out', 'Snacks'] },
-        { id: '2', name: 'Transport', subcategories: ['Fuel', 'Public Transport', 'Maintenance'] },
-        { id: '3', name: 'Housing', subcategories: ['Rent', 'Utilities', 'Repairs'] },
-        { id: '4', name: 'Entertainment', subcategories: ['Movies', 'Games', 'Subscriptions'] },
-        { id: '5', name: 'Income', subcategories: ['Salary', 'Freelance', 'Investment'] },
-        { id: '6', name: 'Subscription', subcategories: ['Streaming', 'Cloud Storage', 'Music', 'Software', 'Gaming', 'Other'] },
-      ];
-      await db.runAsync('INSERT INTO accounts (name, balance, type) VALUES (?, ?, ?)', [JSON.stringify(defaultCategories), 0, CATEGORY_META_TYPE]);
-    } else {
-      // Migration: Add "Subscription" category for existing users who don't have it
-      const metaRow = await db.getFirstAsync<{ name: string }>('SELECT name FROM accounts WHERE type = ?', [CATEGORY_META_TYPE]);
-      if (metaRow && metaRow.name) {
-        const existingCats: CategoryNode[] = JSON.parse(metaRow.name);
-        const hasSubscription = existingCats.some(c => c.name === 'Subscription');
-        if (!hasSubscription) {
-          const maxId = Math.max(...existingCats.map(c => parseInt(c.id) || 0), 0);
-          existingCats.push({
-            id: (maxId + 1).toString(),
-            name: 'Subscription',
-            subcategories: ['Streaming', 'Cloud Storage', 'Music', 'Software', 'Gaming', 'Other'],
-          });
-          await db.runAsync('UPDATE accounts SET name = ? WHERE type = ?', [JSON.stringify(existingCats), CATEGORY_META_TYPE]);
-        }
-      }
-    }
-
-    // Seed Initial Account
+    // Seed Initial Accounts
     const accCheck = await db.getAllAsync<{ id: number }>('SELECT id FROM accounts WHERE type != ?', [CATEGORY_META_TYPE]);
     if (accCheck.length === 0) {
       await db.runAsync('INSERT INTO accounts (name, balance, type) VALUES (?, ?, ?)', ['Cash', 0, 'Cash']);
@@ -544,33 +411,135 @@ export const initDatabase = async () => {
         await db.runAsync('INSERT INTO income_sources (name, icon) VALUES (?, ?)', [d.name, d.icon]);
       }
     }
-    
-    // Migrations for account_id in debt and chit tables
-    const debtRepaymentInfo = await db.getAllAsync<{ name: string }>("PRAGMA table_info(debt_repayments)");
-    if (!debtRepaymentInfo.some(c => c.name === 'account_id')) {
-      await db.execAsync("ALTER TABLE debt_repayments ADD COLUMN account_id INTEGER DEFAULT NULL");
-    }
-    
-    const chitMonthlyInfo = await db.getAllAsync<{ name: string }>("PRAGMA table_info(chit_monthly_records)");
-    if (!chitMonthlyInfo.some(c => c.name === 'account_id')) {
-      await db.execAsync("ALTER TABLE chit_monthly_records ADD COLUMN account_id INTEGER DEFAULT NULL");
-    }
 
-    // --- Telegram Source Column Migration ---
-    const txTableInfo = await db.getAllAsync<{ name: string }>("PRAGMA table_info(transactions)");
-    const txColumnNames = txTableInfo.map(c => c.name);
-    if (!txColumnNames.includes('source')) {
-      await db.execAsync("ALTER TABLE transactions ADD COLUMN source TEXT DEFAULT 'manual'");
-    }
+    // Create Indexes
+    await db.execAsync(`
+      CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date);
+      CREATE INDEX IF NOT EXISTS idx_transactions_category ON transactions(category);
+      CREATE INDEX IF NOT EXISTS idx_transactions_account_id ON transactions(account_id);
+      CREATE INDEX IF NOT EXISTS idx_transactions_source ON transactions(source);
+    `);
 
-    console.log('Database initialized successfully');
-  } catch (error) {
-    console.error('Database initialization failed:', error);
-    db = null;
-    throw error;
-  } finally {
-    isInitializing = false;
+    version = 1;
+    await setDbVersion(db, version);
   }
+
+  if (version < 2) {
+    // Version 2: Categories schema migration
+    // Create new tables
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS categories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT UNIQUE NOT NULL,
+        is_recurring INTEGER DEFAULT 0,
+        default_validity INTEGER DEFAULT NULL,
+        sort_order INTEGER DEFAULT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS category_subcategories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        category_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        is_recurring INTEGER DEFAULT 0,
+        default_validity INTEGER DEFAULT NULL,
+        FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE,
+        UNIQUE(category_id, name)
+      );
+    `);
+
+    // Migrate from accounts meta row if exists
+    const metaCheck = await db.getFirstAsync<{ name: string; id: number }>('SELECT id, name FROM accounts WHERE type = ?', [CATEGORY_META_TYPE]);
+    let migrated = false;
+    if (metaCheck && metaCheck.name) {
+      try {
+        const parsedCats: CategoryNode[] = JSON.parse(metaCheck.name);
+        for (const cat of parsedCats) {
+          const catResult = await db.runAsync(
+            'INSERT INTO categories (name, is_recurring, default_validity) VALUES (?, ?, ?)',
+            [cat.name, cat.is_recurring ? 1 : 0, cat.default_validity ?? null]
+          );
+          const catId = catResult.lastInsertRowId;
+
+          for (const subName of cat.subcategories) {
+            const subSettings = cat.subcategory_settings?.[subName];
+            const isRecur = subSettings?.is_recurring ? 1 : 0;
+            const validity = subSettings?.default_validity ?? null;
+
+            await db.runAsync(
+              'INSERT INTO category_subcategories (category_id, name, is_recurring, default_validity) VALUES (?, ?, ?, ?)',
+              [catId, subName, isRecur, validity]
+            );
+          }
+        }
+        // Delete the meta row
+        await db.runAsync('DELETE FROM accounts WHERE id = ?', [metaCheck.id]);
+        migrated = true;
+      } catch (e) {
+        console.error('Failed to parse categories JSON during migration:', e);
+      }
+    }
+
+    // Seed default categories if not migrated
+    if (!migrated) {
+      const defaultCategories: CategoryNode[] = [
+        { id: '1', name: 'Food', subcategories: ['Groceries', 'Dining Out', 'Snacks'] },
+        { id: '2', name: 'Transport', subcategories: ['Fuel', 'Public Transport', 'Maintenance'] },
+        { id: '3', name: 'Housing', subcategories: ['Rent', 'Utilities', 'Repairs'] },
+        { id: '4', name: 'Entertainment', subcategories: ['Movies', 'Games', 'Subscriptions'] },
+        { id: '5', name: 'Income', subcategories: ['Salary', 'Freelance', 'Investment'] },
+        { id: '6', name: 'Subscription', subcategories: ['Streaming', 'Cloud Storage', 'Music', 'Software', 'Gaming', 'Other'] },
+      ];
+      for (const cat of defaultCategories) {
+        const catResult = await db.runAsync(
+          'INSERT INTO categories (name) VALUES (?)',
+          [cat.name]
+        );
+        const catId = catResult.lastInsertRowId;
+        for (const sub of cat.subcategories) {
+          await db.runAsync(
+            'INSERT INTO category_subcategories (category_id, name) VALUES (?, ?)',
+            [catId, sub]
+          );
+        }
+      }
+    }
+
+    version = 2;
+    await setDbVersion(db, version);
+  }
+
+  console.log(`Database migrated successfully to version ${version}`);
+};
+
+export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
+  if (db) return db;
+
+  if (!dbInitPromise) {
+    dbInitPromise = (async () => {
+      try {
+        const openedDb = await SQLite.openDatabaseAsync(DB_NAME);
+        db = openedDb;
+
+        // Enable WAL mode only on native platforms
+        if (Platform.OS !== 'web') {
+          await db.execAsync('PRAGMA journal_mode = WAL;');
+          await db.execAsync('PRAGMA foreign_keys = ON;');
+        }
+
+        await runMigrations(db);
+
+        console.log('Database initialized successfully');
+        return db;
+      } catch (error) {
+        console.error('Database initialization failed:', error);
+        dbInitPromise = null; // Allow retrying on next attempt
+        db = null;
+        throw error;
+      }
+    })();
+  }
+
+  return dbInitPromise;
 };
 
 export const getDatabase = () => {
@@ -585,12 +554,6 @@ export const addTransaction = async (tx: Omit<Transaction, 'id' | 'created_at'>)
   await initDatabase();
   const db = getDatabase();
   const timestamp = Date.now();
-
-  // Safeguard: Prevent adding more than one transaction within 5 seconds
-  if (timestamp - lastTransactionTime < 5000) {
-    throw new Error("Please wait a moment before adding another transaction (1 transaction per 5 seconds).");
-  }
-  lastTransactionTime = timestamp;
 
   try {
     let insertedId = 0;
@@ -662,13 +625,7 @@ export const getTransactions = async (): Promise<Transaction[]> => {
 export const updateTransaction = async (id: number, updated: Omit<Transaction, 'id' | 'created_at'>): Promise<void> => {
   await initDatabase();
   const db = getDatabase();
-
-  // Throttle check (Same as addTransaction)
   const timestamp = Date.now();
-  if (timestamp - lastTransactionTime < 5000) {
-    throw new Error("Please wait a moment before updating (1 transaction per 5 seconds).");
-  }
-  lastTransactionTime = timestamp;
 
   try {
     await db.withTransactionAsync(async () => {
@@ -778,18 +735,78 @@ export const updateAccount = async (id: number, name: string, balance: number, t
 export const getCategories = async (): Promise<CategoryNode[]> => {
   await initDatabase();
   const db = getDatabase();
-  const res = await db.getFirstAsync<{ name: string }>('SELECT name FROM accounts WHERE type = ?', [CATEGORY_META_TYPE]);
-  if (res && res.name) {
-    return JSON.parse(res.name);
-  }
-  return [];
+  
+  // Fetch all categories
+  const categories = await db.getAllAsync<{
+    id: number;
+    name: string;
+    is_recurring: number;
+    default_validity: number | null;
+  }>('SELECT * FROM categories ORDER BY id ASC');
+
+  // Fetch all subcategories
+  const subcategories = await db.getAllAsync<{
+    id: number;
+    category_id: number;
+    name: string;
+    is_recurring: number;
+    default_validity: number | null;
+  }>('SELECT * FROM category_subcategories ORDER BY id ASC');
+
+  // Map to CategoryNode[]
+  const nodes: CategoryNode[] = categories.map(cat => {
+    const catSubs = subcategories.filter(sub => sub.category_id === cat.id);
+    const subcategoryNames = catSubs.map(sub => sub.name);
+    
+    const subcategorySettings: Record<string, { is_recurring: boolean; default_validity?: number }> = {};
+    catSubs.forEach(sub => {
+      subcategorySettings[sub.name] = {
+        is_recurring: sub.is_recurring === 1,
+        default_validity: sub.default_validity !== null ? sub.default_validity : undefined,
+      };
+    });
+
+    return {
+      id: cat.id.toString(),
+      name: cat.name,
+      subcategories: subcategoryNames,
+      is_recurring: cat.is_recurring === 1,
+      default_validity: cat.default_validity !== null ? cat.default_validity : undefined,
+      subcategory_settings: subcategorySettings,
+    };
+  });
+
+  return nodes;
 };
 
 export const saveCategories = async (categories: CategoryNode[]) => {
   await initDatabase();
   const db = getDatabase();
-  await db.runAsync('UPDATE accounts SET name = ? WHERE type = ?', [JSON.stringify(categories), CATEGORY_META_TYPE]);
-}
+  
+  await db.withTransactionAsync(async () => {
+    await db.runAsync('DELETE FROM category_subcategories');
+    await db.runAsync('DELETE FROM categories');
+
+    for (const cat of categories) {
+      const catResult = await db.runAsync(
+        'INSERT INTO categories (name, is_recurring, default_validity) VALUES (?, ?, ?)',
+        [cat.name, cat.is_recurring ? 1 : 0, cat.default_validity ?? null]
+      );
+      const catId = catResult.lastInsertRowId;
+
+      for (const subName of cat.subcategories) {
+        const subSettings = cat.subcategory_settings?.[subName];
+        const isRecur = subSettings?.is_recurring ? 1 : 0;
+        const validity = subSettings?.default_validity ?? null;
+
+        await db.runAsync(
+          'INSERT INTO category_subcategories (category_id, name, is_recurring, default_validity) VALUES (?, ?, ?, ?)',
+          [catId, subName, isRecur, validity]
+        );
+      }
+    }
+  });
+};
 
 // ... Income Sources (Unchanged) ...
 export const getIncomeSources = async (): Promise<IncomeSource[]> => {
@@ -908,12 +925,6 @@ export const updateDebtAmount = async (
   await initDatabase();
   const db = getDatabase();
   const timestamp = Date.now();
-
-  // Safeguard: Prevent adding more than one transaction within 5 seconds
-  if (timestamp - lastTransactionTime < 5000) {
-    throw new Error("Please wait a moment before adding another transaction (1 transaction per 5 seconds).");
-  }
-  lastTransactionTime = timestamp;
 
   try {
     await db.withTransactionAsync(async () => {
@@ -1156,7 +1167,116 @@ export const updateBillTransaction = async (expenseId: number, updates: {amount:
 };
 
 export const updateCategories = async (categories: CategoryNode[]) => {
+  await saveCategories(categories);
+};
+
+export const getTransactionById = async (id: number): Promise<Transaction | null> => {
   await initDatabase();
   const db = getDatabase();
-  await db.runAsync('UPDATE accounts SET name = ? WHERE type = ?', [JSON.stringify(categories), CATEGORY_META_TYPE]);
+  const t = await db.getFirstAsync<Transaction>('SELECT * FROM transactions WHERE id = ?', [id]);
+  if (t) {
+    return {
+      ...t,
+      type: t.category === 'Income' ? 'income' : (t.category === 'Transfer' ? 'transfer' : (t.category === 'Debt/Credit' ? 'debt' : 'expense'))
+    };
+  }
+  return null;
 };
+
+export const getTransactionsForMonth = async (date: Date): Promise<Transaction[]> => {
+  await initDatabase();
+  const db = getDatabase();
+  const start = new Date(date.getFullYear(), date.getMonth(), 1).toISOString();
+  const end = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999).toISOString();
+  const txs = await db.getAllAsync<Transaction>(
+    'SELECT * FROM transactions WHERE date >= ? AND date <= ? ORDER BY date DESC',
+    [start, end]
+  );
+  return txs.map(t => ({
+    ...t,
+    type: t.category === 'Income' ? 'income' : (t.category === 'Transfer' ? 'transfer' : (t.category === 'Debt/Credit' ? 'debt' : 'expense'))
+  }));
+};
+
+export const getTransactionsForDay = async (date: Date): Promise<Transaction[]> => {
+  await initDatabase();
+  const db = getDatabase();
+  const start = new Date(date.getFullYear(), date.getMonth(), date.getDate()).toISOString();
+  const end = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999).toISOString();
+  const txs = await db.getAllAsync<Transaction>(
+    'SELECT * FROM transactions WHERE date >= ? AND date <= ? ORDER BY date DESC',
+    [start, end]
+  );
+  return txs.map(t => ({
+    ...t,
+    type: t.category === 'Income' ? 'income' : (t.category === 'Transfer' ? 'transfer' : (t.category === 'Debt/Credit' ? 'debt' : 'expense'))
+  }));
+};
+
+export const getTransactionsPaginated = async (
+  limit: number,
+  offset: number,
+  filters?: {
+    accountId?: number | null;
+    category?: string | null;
+    subcategory?: string | null;
+    startDate?: Date | null;
+    endDate?: Date | null;
+    type?: 'income' | 'expense' | 'transfer' | 'debt' | null;
+  }
+): Promise<Transaction[]> => {
+  await initDatabase();
+  const db = getDatabase();
+
+  let query = 'SELECT * FROM transactions';
+  const conditions: string[] = [];
+  const params: any[] = [];
+
+  if (filters) {
+    if (filters.accountId !== undefined && filters.accountId !== null) {
+      conditions.push('account_id = ?');
+      params.push(filters.accountId);
+    }
+    if (filters.category) {
+      conditions.push('category = ?');
+      params.push(filters.category);
+    }
+    if (filters.subcategory) {
+      conditions.push('subcategory = ?');
+      params.push(filters.subcategory);
+    }
+    if (filters.startDate) {
+      conditions.push('date >= ?');
+      params.push(filters.startDate.toISOString());
+    }
+    if (filters.endDate) {
+      conditions.push('date <= ?');
+      params.push(filters.endDate.toISOString());
+    }
+    if (filters.type) {
+      if (filters.type === 'income') {
+        conditions.push("category = 'Income'");
+      } else if (filters.type === 'transfer') {
+        conditions.push("category = 'Transfer'");
+      } else if (filters.type === 'debt') {
+        conditions.push("category = 'Debt/Credit'");
+      } else if (filters.type === 'expense') {
+        conditions.push("category NOT IN ('Income', 'Transfer', 'Debt/Credit')");
+      }
+    }
+  }
+
+  if (conditions.length > 0) {
+    query += ' WHERE ' + conditions.join(' AND ');
+  }
+
+  query += ' ORDER BY date DESC LIMIT ? OFFSET ?';
+  params.push(limit, offset);
+
+  const txs = await db.getAllAsync<Transaction>(query, params);
+  return txs.map(t => ({
+    ...t,
+    type: t.category === 'Income' ? 'income' : (t.category === 'Transfer' ? 'transfer' : (t.category === 'Debt/Credit' ? 'debt' : 'expense'))
+  }));
+};
+

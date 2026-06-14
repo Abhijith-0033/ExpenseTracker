@@ -97,13 +97,31 @@ export const calculateChitFundPosition = (
   // Determine my turn status
   let myTurnStatus: ChitCalculation['myTurnStatus'] = 'not_assigned';
   if (chitFund.my_turn_month !== null) {
-    const currentMonth = new Date().getMonth() + 1;
-    if (chitFund.my_turn_month < currentMonth) {
-      myTurnStatus = 'passed';
-    } else if (chitFund.my_turn_month === currentMonth) {
-      myTurnStatus = 'upcoming';
+    const start = new Date(chitFund.start_date);
+    if (!isNaN(start.getTime())) {
+      const myTurnDate = new Date(start);
+      myTurnDate.setMonth(start.getMonth() + chitFund.my_turn_month - 1);
+      
+      const now = new Date();
+      const nowYear = now.getFullYear();
+      const nowMonth = now.getMonth();
+      const turnYear = myTurnDate.getFullYear();
+      const turnMonth = myTurnDate.getMonth();
+      
+      if (turnYear < nowYear || (turnYear === nowYear && turnMonth < nowMonth)) {
+        myTurnStatus = 'passed';
+      } else if (turnYear === nowYear && turnMonth === nowMonth) {
+        myTurnStatus = 'upcoming';
+      } else {
+        myTurnStatus = 'upcoming';
+      }
     } else {
-      myTurnStatus = 'upcoming';
+      const currentMonth = new Date().getMonth() + 1;
+      if (chitFund.my_turn_month < currentMonth) {
+        myTurnStatus = 'passed';
+      } else {
+        myTurnStatus = 'upcoming';
+      }
     }
     
     // Check if I already won
@@ -179,7 +197,7 @@ export const calculateWinnerNetAmount = (
   bidAmount: number | null,
   winnerPaidAmount: number | null
 ): { grossReceived: number; commissionDeducted: number; netReceived: number; dividend: number } => {
-  const { _grossPot, _commission, netPot } = calculateMonthlyPot(chitFund, monthNumber, bidAmount);
+  const { netPot } = calculateMonthlyPot(chitFund, monthNumber, bidAmount);
   
   let grossReceived = netPot;
   let commissionDeducted = 0;

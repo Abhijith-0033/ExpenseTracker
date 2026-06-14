@@ -23,6 +23,8 @@ export default function DebtDetailScreen() {
     const [notes, setNotes] = useState('');
     const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
     const { refreshData } = useApp();
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const isSubmittingRef = React.useRef(false);
 
     const fetchData = async () => {
         if (!id) return;
@@ -48,6 +50,7 @@ export default function DebtDetailScreen() {
     }, [fetchData, id]);
 
     const handleUpdate = async () => {
+        if (isSubmittingRef.current) return;
         if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
             Alert.alert('Error', 'Please enter a valid amount');
             return;
@@ -58,6 +61,8 @@ export default function DebtDetailScreen() {
         }
 
         try {
+            setIsSubmitting(true);
+            isSubmittingRef.current = true;
             await updateDebtAmount(Number(id), parseFloat(amount), actionType, notes, selectedAccountId);
             setModalVisible(false);
             setAmount('');
@@ -70,6 +75,9 @@ export default function DebtDetailScreen() {
             } else {
                 Alert.alert('Error', 'Update failed. Please try again.');
             }
+        } finally {
+            setIsSubmitting(false);
+            isSubmittingRef.current = false;
         }
     };
 
@@ -237,11 +245,19 @@ export default function DebtDetailScreen() {
                         ) : null}
 
                         <View style={styles.modalButtons}>
-                            <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalVisible(false)}>
+                            <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalVisible(false)} disabled={isSubmitting}>
                                 <Text>Cancel</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity style={[styles.confirmBtn, { backgroundColor: mainColor }]} onPress={handleUpdate}>
-                                <Text style={{ color: 'white', fontWeight: 'bold' }}>Confirm</Text>
+                            <TouchableOpacity 
+                                style={[styles.confirmBtn, { backgroundColor: mainColor }]} 
+                                onPress={handleUpdate}
+                                disabled={isSubmitting}
+                            >
+                                {isSubmitting ? (
+                                    <ActivityIndicator size="small" color="white" />
+                                ) : (
+                                    <Text style={{ color: 'white', fontWeight: 'bold' }}>Confirm</Text>
+                                )}
                             </TouchableOpacity>
                         </View>
                         </ScrollView>

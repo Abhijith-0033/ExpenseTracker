@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 // AsyncStorage keys — all prefixed with 'telegram_' to avoid collision
 export const TELEGRAM_KEYS = {
@@ -62,10 +63,10 @@ export async function fetchPending(appUserId: string): Promise<{ transactions: a
     if (response.status === 401) {
       // Bad credentials — clear stored data
       await AsyncStorage.multiRemove([
-        TELEGRAM_KEYS.APP_USER_ID,
         TELEGRAM_KEYS.SERVER_URL,
         TELEGRAM_KEYS.ENABLED,
       ]);
+      await SecureStore.deleteItemAsync(TELEGRAM_KEYS.APP_USER_ID);
       console.warn('[Telegram] 401 — credentials cleared');
       return null;
     }

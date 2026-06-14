@@ -31,11 +31,7 @@ export default function AddGroupExpenseScreen() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
 
-    useEffect(() => {
-        loadData();
-    }, [groupId, loadData]);
-
-    const loadData = async () => {
+    const loadData = React.useCallback(async () => {
         try {
             const m = await getGroupMembers(groupId);
             setMembers(m);
@@ -80,7 +76,11 @@ export default function AddGroupExpenseScreen() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [groupId, isEditing, expenseId]);
+
+    useEffect(() => {
+        loadData();
+    }, [groupId, loadData]);
 
     // Derived Logic
     const toggleMemberSelection = (id: number) => {

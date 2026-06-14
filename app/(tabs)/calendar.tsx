@@ -1,10 +1,13 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
+import { getTransactionsForMonth, getTransactionsForDay, Transaction } from '../../services/database';
+import { ErrorBoundary } from 'react-error-boundary';
+import { TabErrorFallback } from '../../components/ErrorBoundary';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar } from 'react-native';
 import { useApp } from '../../context/AppContext';
 import { TransactionList } from '../../components/TransactionList';
 import { HeatmapCalendar } from '../../components/HeatmapCalendar';
-import { format, isSameDay, addMonths, subMonths, isSameMonth } from 'date-fns';
+import { format, addMonths, subMonths } from 'date-fns';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, TrendingUp } from 'lucide-react-native';
 import { Colors, Layout, Typography } from '../../constants/Theme';
 import { formatCurrency } from '../../utils/currency';
@@ -12,21 +15,21 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 
-export default function CalendarScreen() {
+function CalendarContent() {
     const _insets = useSafeAreaInsets();
-    const { transactions } = useApp();
+    const { dataVersion } = useApp();
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState(new Date());
+    const [txsForMonth, setTxsForMonth] = useState<Transaction[]>([]);
+    const [txsForSelectedDate, setTxsForSelectedDate] = useState<Transaction[]>([]);
 
-    const txsForMonth = useMemo(() => {
-        return transactions.filter(t => isSameMonth(new Date(t.date), currentMonth));
-    }, [transactions, currentMonth]);
+    useEffect(() => {
+        getTransactionsForMonth(currentMonth).then(setTxsForMonth).catch(console.error);
+    }, [currentMonth, dataVersion]);
 
-    const txsForSelectedDate = useMemo(() => {
-        const selected = transactions.filter(t => isSameDay(new Date(t.date), selectedDate));
-        // Sort newest first
-        return selected.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    }, [transactions, selectedDate]);
+    useEffect(() => {
+        getTransactionsForDay(selectedDate).then(setTxsForSelectedDate).catch(console.error);
+    }, [selectedDate, dataVersion]);
 
     const dailyIncome = txsForSelectedDate.filter(t => t.type === 'income' || (t.category === 'Income' && !t.type)).reduce((sum, t) => sum + t.amount, 0);
     const dailyExpense = txsForSelectedDate.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
@@ -299,4 +302,12 @@ const styles = StyleSheet.create({
         fontSize: Typography.size.sm,
     }
 });
+
+export default function CalendarScreen() {
+    return (
+        <ErrorBoundary FallbackComponent={TabErrorFallback}>
+            <CalendarContent />
+        </ErrorBoundary>
+    );
+}
 

@@ -8,15 +8,20 @@ import { useColorScheme, View } from 'react-native';
 import { AppProvider } from '../context/AppContext';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-
+import { ErrorBoundary } from 'react-error-boundary';
+import { RootErrorFallback } from '../components/ErrorBoundary';
 import { initNotifications } from '../services/notifications';
 import { initializeNotificationManager } from '../services/notifications/NotificationManager';
 import * as Notifications from 'expo-notifications';
 import { runAutoPay } from '../services/emitracker/AutoPayEngine';
 import { startPolling, stopPolling, registerBackgroundTask } from '../telegram/TelegramPoller';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
+
+const queryClient = new QueryClient();
+
 
 export default function RootLayout() {
   const _colorScheme = useColorScheme();
@@ -160,38 +165,49 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <AppProvider>
-        <SafeAreaProvider>
-          {/* Force DefaultTheme per absolute rules (light theme only) */}
-          <ThemeProvider value={DefaultTheme}>
-            <View style={{ flex: 1 }}>
-              <Stack>
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                <Stack.Screen name="budgets" options={{ headerShown: false }} />
-                <Stack.Screen name="add-transfer" options={{ headerShown: false }} />
-                <Stack.Screen name="savings-goals" options={{ headerShown: false }} />
-                <Stack.Screen name="cash-flow" options={{ headerShown: false }} />
-                <Stack.Screen name="subscriptions" options={{ headerShown: false }} />
-                <Stack.Screen name="financial-report" options={{ headerShown: false }} />
-                <Stack.Screen name="account-detail" options={{ headerShown: false }} />
-                <Stack.Screen name="category-detail" options={{ headerShown: false }} />
-                <Stack.Screen name="income-breakdown" options={{ headerShown: false }} />
-                <Stack.Screen name="debt-calculator" options={{ headerShown: false }} />
-                <Stack.Screen name="debt-tracker" options={{ headerShown: false }} />
-                <Stack.Screen name="debt-tracker/add" options={{ headerShown: false }} />
-                <Stack.Screen name="debt-tracker/edit" options={{ headerShown: false }} />
-                <Stack.Screen name="chit-funds" options={{ headerShown: false }} />
-                <Stack.Screen name="chit-funds/add" options={{ headerShown: false }} />
-                <Stack.Screen name="chit-funds/edit" options={{ headerShown: false }} />
-                <Stack.Screen name="notification-settings" options={{ headerShown: false }} />
-                <Stack.Screen name="manage-accounts" options={{ headerShown: false }} />
-                <Stack.Screen name="telegram-settings" options={{ headerShown: false }} />
-                <Stack.Screen name="+not-found" />
-              </Stack>
-            </View>
-          </ThemeProvider>
-        </SafeAreaProvider>
-      </AppProvider>
+      <QueryClientProvider client={queryClient}>
+        <AppProvider>
+          <SafeAreaProvider>
+            {/* Force DefaultTheme per absolute rules (light theme only) */}
+            <ThemeProvider value={DefaultTheme}>
+              <View style={{ flex: 1 }}>
+                <ErrorBoundary
+                  FallbackComponent={RootErrorFallback}
+                  onReset={() => {
+                    router.replace('/');
+                  }}
+                >
+                  <Stack>
+                    <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                    <Stack.Screen name="budgets" options={{ headerShown: false }} />
+                    <Stack.Screen name="add-transfer" options={{ headerShown: false }} />
+                    <Stack.Screen name="savings-goals" options={{ headerShown: false }} />
+                    <Stack.Screen name="cash-flow" options={{ headerShown: false }} />
+                    <Stack.Screen name="subscriptions" options={{ headerShown: false }} />
+                    <Stack.Screen name="financial-report" options={{ headerShown: false }} />
+                    <Stack.Screen name="account-detail" options={{ headerShown: false }} />
+                    <Stack.Screen name="category-detail" options={{ headerShown: false }} />
+                    <Stack.Screen name="income-breakdown" options={{ headerShown: false }} />
+                    <Stack.Screen name="debt-calculator" options={{ headerShown: false }} />
+                    <Stack.Screen name="debt-tracker/index" options={{ headerShown: false }} />
+                    <Stack.Screen name="debt-tracker/add" options={{ headerShown: false }} />
+                    <Stack.Screen name="debt-tracker/[id]" options={{ headerShown: false }} />
+                    <Stack.Screen name="debt-tracker/edit/[id]" options={{ headerShown: false }} />
+                    <Stack.Screen name="chit-funds/index" options={{ headerShown: false }} />
+                    <Stack.Screen name="chit-funds/add" options={{ headerShown: false }} />
+                    <Stack.Screen name="chit-funds/[id]" options={{ headerShown: false }} />
+                    <Stack.Screen name="chit-funds/edit/[id]" options={{ headerShown: false }} />
+                    <Stack.Screen name="notification-settings/index" options={{ headerShown: false }} />
+                    <Stack.Screen name="manage-accounts" options={{ headerShown: false }} />
+                    <Stack.Screen name="telegram-settings" options={{ headerShown: false }} />
+                    <Stack.Screen name="+not-found" />
+                  </Stack>
+                </ErrorBoundary>
+              </View>
+            </ThemeProvider>
+          </SafeAreaProvider>
+        </AppProvider>
+      </QueryClientProvider>
     </GestureHandlerRootView>
   );
 }

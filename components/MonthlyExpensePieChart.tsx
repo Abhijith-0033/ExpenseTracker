@@ -8,7 +8,8 @@ import { format, addMonths, subMonths, isSameMonth, parseISO } from 'date-fns';
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { formatCurrency } from '../utils/currency';
 import { getValueColor } from './AnalysisCharts';
-import { useApp } from '../context/AppContext';
+import { useQuery } from '@tanstack/react-query';
+import { getTransactionsForMonth, Transaction } from '../services/database';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
@@ -26,8 +27,11 @@ interface MonthlyExpensePieChartProps {
 }
 
 export const MonthlyExpensePieChart: React.FC<MonthlyExpensePieChartProps> = ({ initialMonth, isDashboardView, variant = 'default' }) => {
-    const { transactions } = useApp();
     const [currentMonth, setCurrentMonth] = useState(initialMonth);
+    const { data: transactions = [] } = useQuery<Transaction[]>({
+        queryKey: ['transactions', 'month', currentMonth.getFullYear(), currentMonth.getMonth()],
+        queryFn: () => getTransactionsForMonth(currentMonth)
+    });
     const [selectedCategoryIndex, setSelectedCategoryIndex] = useState<number | null>(null);
 
     // Animation values
@@ -51,13 +55,13 @@ export const MonthlyExpensePieChart: React.FC<MonthlyExpensePieChartProps> = ({ 
         const totalsMap = new Map<string, number>();
 
         // Filter expenses for the current month
-        const monthExpenses = transactions.filter(t => {
+        const monthExpenses = transactions.filter((t: Transaction) => {
             const isExpense = t.type === 'expense';
             const txDate = typeof t.date === 'string' ? parseISO(t.date) : t.date;
             return isExpense && isSameMonth(txDate, currentMonth);
         });
 
-        monthExpenses.forEach(t => {
+        monthExpenses.forEach((t: Transaction) => {
             const currentTotal = totalsMap.get(t.category) || 0;
             totalsMap.set(t.category, currentTotal + t.amount);
         });

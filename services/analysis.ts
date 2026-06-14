@@ -198,92 +198,7 @@ export const getMonthlySpendingTrend = async (year: number): Promise<{ month: st
     return await db.getAllAsync<{ month: string, total: number }>(query, [start, end]);
 };
 
-export const getExpenseDistribution = async (month?: DateFilter): Promise<ExpenseDistribution[]> => {
-    const db = await ensureDb();
-    let query = `SELECT amount FROM transactions WHERE category != 'Income' AND category != 'Transfer' AND category != 'Debt/Credit'`;
-    const params: any[] = [];
 
-    if (month) {
-        let start, end;
-        if (month instanceof Date) {
-            start = startOfMonth(month).toISOString();
-            end = endOfMonth(month).toISOString();
-        } else {
-            start = startOfDay(month.start).toISOString();
-            end = endOfDay(month.end).toISOString();
-        }
-        query += ` AND date >= ? AND date <= ?`;
-        params.push(start, end);
-    }
-
-    const transactions = await db.getAllAsync<{ amount: number }>(query, params);
-
-    // Bucketing logic (done in JS as SQLite doesn't have easy width_bucket without extensions)
-    if (transactions.length === 0) return [];
-
-    const amounts = transactions.map(t => t.amount);
-    const max = Math.max(...amounts);
-    const min = Math.min(...amounts);
-    const bucketCount = 5;
-    const range = (max - min) || 1; // avoid division by zero
-    const step = range / bucketCount;
-
-    const distribution: ExpenseDistribution[] = [];
-
-    for (let i = 0; i < bucketCount; i++) {
-        const bucketMin = min + (i * step);
-        const bucketMax = min + ((i + 1) * step);
-        const count = amounts.filter(a => a >= bucketMin && (i === bucketCount - 1 ? a <= bucketMax : a < bucketMax)).length;
-
-        distribution.push({
-            range: `${Math.floor(bucketMin)} - ${Math.floor(bucketMax)}`,
-            min: Math.floor(bucketMin),
-            max: Math.floor(bucketMax),
-            count
-        });
-    }
-
-    return distribution;
-};
-
-export interface MonthlyCategoryTotal {
-    month: string;
-    category: string;
-    total: number;
-}
-
-export const getMonthlyCategoryTrend = async (year: number): Promise<MonthlyCategoryTotal[]> => {
-    const db = await ensureDb();
-    const start = `${year}-01-01`;
-    const end = `${year}-12-31`;
-
-    const query = `
-        SELECT substr(date, 1, 7) as month, category, SUM(amount) as total
-        FROM transactions
-        WHERE category != 'Income' AND category != 'Transfer' AND category != 'Debt/Credit' AND date >= ? AND date <= ?
-        GROUP BY substr(date, 1, 7), category
-        ORDER BY month ASC
-    `;
-
-    return await db.getAllAsync<MonthlyCategoryTotal>(query, [start, end]);
-};
-
-export const getMonthlyTrendInRange = async (startDate: Date, endDate: Date): Promise<{ month: string, total: number }[]> => {
-    const db = await ensureDb();
-    const start = startDate.toISOString().substr(0, 10);
-    const end = endDate.toISOString().substr(0, 10);
-
-    // Query groups by YYYY-MM
-    const query = `
-        SELECT substr(date, 1, 7) as month, SUM(amount) as total
-        FROM transactions
-        WHERE category != 'Income' AND category != 'Transfer' AND category != 'Debt/Credit' AND date >= ? AND date <= ?
-        GROUP BY substr(date, 1, 7)
-        ORDER BY month ASC
-    `;
-
-    return await db.getAllAsync<{ month: string, total: number }>(query, [start, end]);
-};
 
 export interface MonthlyComparison {
     month: string;
@@ -423,4 +338,79 @@ export const getYearlyIncomeExpense = async (year: number): Promise<{ income: nu
         else expense += r.amount;
     });
     return { income, expense };
+};
+
+export interface MonthlyCategoryTotal {
+    month: string;
+    category: string;
+    total: number;
+}
+
+export const getExpenseDistribution = async (month?: DateFilter): Promise<ExpenseDistribution[]> => {
+    const db = await ensureDb();
+    let query = `SELECT amount FROM transactions WHERE category != 'Income' AND category != 'Transfer' AND category != 'Debt/Credit'`;
+    const params: any[] = [];
+
+    if (month) {
+        let start, end;
+        if (month instanceof Date) {
+            start = startOfMonth(month).toISOString();
+            end = endOfMonth(month).toISOString();
+        } else {
+            start = startOfDay(month.start).toISOString();
+            end = endOfDay(month.end).toISOString();
+        }
+        query += ` AND date >= ? AND date <= ?`;
+        params.push(start, end);
+    }
+
+    const txs = await db.getAllAsync<{ amount: number }>(query, params);
+
+    const buckets = [
+        { range: '₹0-500', min: 0, max: 500, count: 0 },
+        { range: '₹500-1K', min: 501, max: 1000, count: 0 },
+        { range: '₹1K-5K', min: 1001, max: 5000, count: 0 },
+        { range: '₹5K-10K', min: 5001, max: 10000, count: 0 },
+        { range: '₹10K+', min: 10001, max: Infinity, count: 0 },
+    ];
+
+    txs.forEach(tx => {
+        for (const bucket of buckets) {
+            if (tx.amount >= bucket.min && tx.amount <= bucket.max) {
+                bucket.count++;
+                break;
+            }
+        }
+    });
+
+    return buckets.filter(b => b.count > 0);
+};
+
+export const getMonthlyCategoryTrend = async (year: number): Promise<MonthlyCategoryTotal[]> => {
+    const db = await ensureDb();
+    const start = `${year}-01-01`;
+    const end = `${year}-12-31`;
+
+    const query = `
+        SELECT substr(date, 1, 7) as month, category, SUM(amount) as total
+        FROM transactions
+        WHERE category != 'Income' AND category != 'Transfer' AND category != 'Debt/Credit' AND date >= ? AND date <= ?
+        GROUP BY substr(date, 1, 7), category
+        ORDER BY month ASC
+    `;
+
+    return await db.getAllAsync<MonthlyCategoryTotal>(query, [start, end]);
+};
+
+export const getMonthlyTrendInRange = async (start: Date, end: Date): Promise<{ month: string, total: number }[]> => {
+    const db = await ensureDb();
+    const query = `
+        SELECT substr(date, 1, 7) as month, SUM(amount) as total
+        FROM transactions
+        WHERE category != 'Income' AND category != 'Transfer' AND category != 'Debt/Credit' AND date >= ? AND date <= ?
+        GROUP BY substr(date, 1, 7)
+        ORDER BY month ASC
+    `;
+
+    return await db.getAllAsync<{ month: string, total: number }>(query, [start.toISOString(), end.toISOString()]);
 };

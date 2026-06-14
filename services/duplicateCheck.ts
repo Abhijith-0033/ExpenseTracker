@@ -1,12 +1,8 @@
 import { getDatabase, initDatabase, Transaction } from './database';
 
 const ensureDb = async () => {
-    const db = getDatabase();
-    if (!db) {
-        await initDatabase();
-        return getDatabase();
-    }
-    return db;
+    await initDatabase();
+    return getDatabase();
 };
 
 export async function checkDuplicate(

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { TrendLineChart } from './AnalysisCharts';
 import { getMonthlyTrendInRange } from '../services/analysis';
@@ -12,7 +12,7 @@ export const MonthlyTrendSection: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [comparison, setComparison] = useState<{ diff: number, percent: number, direction: 'up' | 'down' | 'same' } | null>(null);
 
-    const loadData = async () => {
+    const loadData = useCallback(async () => {
         setLoading(true);
         const now = new Date();
         let start: Date;
@@ -52,11 +52,11 @@ export const MonthlyTrendSection: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [range]);
 
     useEffect(() => {
         loadData();
-    }, [loadData, range]);
+    }, [loadData]);
 
     const renderComparison = () => {
         if (!comparison) return null;

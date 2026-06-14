@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import * as Notifications from 'expo-notifications';
 import { TELEGRAM_KEYS, fetchPending, markProcessed, sendCommandResponse } from './TelegramService';
 import { processPendingTransaction, processCommand, processUndo } from './TelegramProcessor';
@@ -54,10 +55,8 @@ async function fireNotification(title: string, body: string, id: string) {
  */
 export async function pollOnce(): Promise<void> {
   try {
-    const [enabled, appUserId] = await Promise.all([
-      AsyncStorage.getItem(TELEGRAM_KEYS.ENABLED),
-      AsyncStorage.getItem(TELEGRAM_KEYS.APP_USER_ID),
-    ]);
+    const enabled = await AsyncStorage.getItem(TELEGRAM_KEYS.ENABLED);
+    const appUserId = await SecureStore.getItemAsync(TELEGRAM_KEYS.APP_USER_ID);
 
     console.log(`[Telegram] pollOnce: enabled=${enabled}, appUserId=${appUserId}`);
 
@@ -146,7 +145,7 @@ export async function startPolling(refreshCallback?: () => void): Promise<void> 
 
   const [enabled, appUserId] = await Promise.all([
     AsyncStorage.getItem(TELEGRAM_KEYS.ENABLED),
-    AsyncStorage.getItem(TELEGRAM_KEYS.APP_USER_ID),
+    SecureStore.getItemAsync(TELEGRAM_KEYS.APP_USER_ID),
   ]);
 
   if (enabled !== 'true' || !appUserId) return;

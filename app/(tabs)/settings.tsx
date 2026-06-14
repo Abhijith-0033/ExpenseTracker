@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { ErrorBoundary } from 'react-error-boundary';
+import { TabErrorFallback } from '../../components/ErrorBoundary';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Switch } from 'react-native';
 import { useRouter, Link } from 'expo-router';
 import { ChevronRight, Wallet, Tag, Database, Bell, FileUp, FileDown, FileText, Info, Calendar, Users, Target, CalendarClock, RefreshCw, FileBarChart, Send } from 'lucide-react-native';
@@ -8,7 +10,7 @@ import { checkReminderStatus, scheduleDailyReminder } from '../../services/notif
 import { exportData, exportCSV, restoreData } from '../../services/backup';
 import { UpcomingExpenses } from '../../components/UpcomingExpenses';
 
-export default function SettingsScreen() {
+function SettingsContent() {
     const router = useRouter();
     const { soundEnabled, setSoundEnabled } = useApp();
     const [reminderEnabled, setReminderEnabled] = useState(true);
@@ -309,3 +311,11 @@ const styles = StyleSheet.create({
         marginTop: 2,
     },
 });
+
+export default function SettingsScreen() {
+    return (
+        <ErrorBoundary FallbackComponent={TabErrorFallback}>
+            <SettingsContent />
+        </ErrorBoundary>
+    );
+}

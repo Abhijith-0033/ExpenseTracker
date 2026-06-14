@@ -14,11 +14,11 @@ export const NOTIFICATION_IDS = {
   BILL_PREFIX: 'bill_',
   SUBSCRIPTION_PREFIX: 'sub_',
   RECURRING_PREFIX: 'recur_',
-  DEBT_OVERDUE_PREFIX: 'debt_',
-  DEBT_DUE_SOON_PREFIX: 'debt_',
-  DEBT_PAYMENT_REMINDER_PREFIX: 'debt_',
-  CHIT_MONTHLY_PREFIX: 'chit_',
-  CHIT_WINNING_PREFIX: 'chit_',
+  DEBT_OVERDUE_PREFIX: 'debt_overdue_',
+  DEBT_DUE_SOON_PREFIX: 'debt_due_',
+  DEBT_PAYMENT_REMINDER_PREFIX: 'debt_pay_',
+  CHIT_MONTHLY_PREFIX: 'chit_monthly_',
+  CHIT_WINNING_PREFIX: 'chit_win_',
   SAVINGS_GOAL_PREFIX: 'goal_',
   BUDGET_ALERT_PREFIX: 'budget_',
   EMI_PREFIX: 'emi_',
@@ -1165,28 +1165,8 @@ export const migrateExistingNotifications = async (): Promise<void> => {
     }
 
     // Schedule existing payment notifications
-    const { schedulePaymentNotifications } = await import('../paymentNotifications');
     const db = getDatabase();
     if (db) {
-      interface Bill {
-        id: number;
-        name: string;
-        amount: number;
-        due_date: string;
-      }
-
-      const bills = await db.getAllAsync<Bill>(
-        'SELECT * FROM bill_groups'
-      );
-      for (const bill of bills) {
-        await schedulePaymentNotifications({
-          id: bill.id,
-          type: 'bill',
-          name: bill.name,
-          amount: bill.amount,
-          dueDate: bill.due_date,
-        });
-      }
 
       // Schedule EMI notifications
       const emiRecords = await db.getAllAsync<{ id: number }>(

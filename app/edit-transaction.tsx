@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform, DeviceEventEmitter } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useApp } from '../context/AppContext';
-import { updateTransaction, deleteTransaction } from '../services/database';
+import { updateTransaction, deleteTransaction, getTransactionById } from '../services/database';
 import { Keypad } from '../components/ui/Keypad';
 import { CategoryPicker } from '../components/CategoryPicker';
 import { Calendar as CalendarIcon, Wallet as WalletIcon, Tag as TagIcon, Trash2 } from 'lucide-react-native';
@@ -16,36 +16,33 @@ import { Colors, Typography, Layout } from '../constants/Theme';
 function evaluateExpression(expr: string): number {
     const safe = expr.replace(/[^0-9+\-*/.]/g, '');
     if (!safe) return 0;
-    try {
-         
-        const result = new Function(`return (${safe})`)();
-        return typeof result === 'number' && isFinite(result) ? result : 0;
-    } catch {
-        const tokens = safe.match(/(\d+\.?\d*)|([-+*/])/g);
-        if (!tokens) return parseFloat(safe) || 0;
-        let result = parseFloat(tokens[0]);
-        for (let i = 1; i < tokens.length; i += 2) {
-            const op = tokens[i];
-            const val = parseFloat(tokens[i + 1]);
-            if (isNaN(val)) continue;
-            if (op === '+') result += val;
-            else if (op === '-') result -= val;
-            else if (op === '*') result *= val;
-            else if (op === '/') result = val !== 0 ? result / val : 0;
-        }
-        return result;
+    const tokens = safe.match(/(\d+\.?\d*)|([-+*/])/g);
+    if (!tokens) return parseFloat(safe) || 0;
+    let result = parseFloat(tokens[0]);
+    if (isNaN(result)) return 0;
+    for (let i = 1; i < tokens.length; i += 2) {
+        const op = tokens[i];
+        const val = parseFloat(tokens[i + 1]);
+        if (isNaN(val)) continue;
+        if (op === '+') result += val;
+        else if (op === '-') result -= val;
+        else if (op === '*') result *= val;
+        else if (op === '/') result = val !== 0 ? result / val : result;
     }
+    return isFinite(result) ? result : 0;
 }
 
 export default function EditTransactionScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { id } = useLocalSearchParams();
-    const { transactions, accounts, refreshData } = useApp();
+    const { accounts, refreshData } = useApp();
 
     // State
     const [loading, setLoading] = useState(true);
     const [originalTx, setOriginalTx] = useState<any>(null);
+
+    const isSubmittingRef = React.useRef(false);
 
     const [amount, setAmount] = useState('0');
     const [description, setDescription] = useState('');
@@ -59,21 +56,25 @@ export default function EditTransactionScreen() {
     const [errors, setErrors] = useState<Record<string, string>>({});
 
     useEffect(() => {
-        if (id && transactions.length > 0) {
-            const tx = transactions.find(t => t.id.toString() === id);
-            if (tx) {
-                setOriginalTx(tx);
-                setAmount(tx.amount.toString());
-                setDescription(tx.description || '');
-                setCategory(tx.category);
-                setSubcategory(tx.subcategory);
-                setDate(new Date(tx.date));
-                const acc = accounts.find(a => a.id === tx.account_id);
-                setSelectedAccount(acc || accounts[0]);
-                setLoading(false);
-            }
+        if (id) {
+            getTransactionById(Number(id)).then(tx => {
+                if (tx) {
+                    setOriginalTx(tx);
+                    setAmount(tx.amount.toString());
+                    setDescription(tx.description || '');
+                    setCategory(tx.category);
+                    setSubcategory(tx.subcategory);
+                    setDate(new Date(tx.date));
+                    const acc = accounts.find(a => a.id === tx.account_id);
+                    setSelectedAccount(acc || accounts[0]);
+                    setLoading(false);
+                }
+            }).catch(err => {
+                console.error("Failed to load transaction", err);
+                Alert.alert("Error", "Failed to load transaction details.");
+            });
         }
-    }, [id, transactions, accounts]);
+    }, [id, accounts]);
 
     const handleKeyPress = (val: string) => {
         const operators = ['+', '-', '*', '/'];
@@ -98,6 +99,8 @@ export default function EditTransactionScreen() {
     };
 
     const handleSave = async () => {
+        if (isSubmittingRef.current) return;
+
         const finalAmount = evaluateExpression(amount);
         const newErrors: Record<string, string> = {};
         if (!amount || finalAmount <= 0) newErrors.amount = 'Valid amount is required';
@@ -111,6 +114,9 @@ export default function EditTransactionScreen() {
         setErrors({});
 
         try {
+
+            isSubmittingRef.current = true;
+
             // Use the new atomic updateTransaction service to prevent data loss
             await updateTransaction(originalTx.id, {
                 amount: finalAmount,
@@ -126,6 +132,9 @@ export default function EditTransactionScreen() {
             router.back();
         } catch (_e) {
             Alert.alert('Error', 'Failed to update transaction');
+        } finally {
+
+            isSubmittingRef.current = false;
         }
     };
 

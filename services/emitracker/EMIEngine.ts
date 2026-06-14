@@ -64,26 +64,8 @@ export interface EMICalculationResult {
 // EMI CALCULATION FUNCTIONS
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/**
- * Calculate EMI using the standard formula
- * EMI = [P x R x (1+R)^N] / [(1+R)^N - 1]
- * where P = Principal, R = Monthly Interest Rate, N = Tenure in months
- */
-export const calculateEMI = (
-  principal: number,
-  annualInterestRate: number,
-  tenureMonths: number
-): number => {
-  if (annualInterestRate === 0 || tenureMonths === 0) {
-    return principal / tenureMonths;
-  }
-
-  const monthlyRate = annualInterestRate / 12 / 100;
-  const numerator = principal * monthlyRate * Math.pow(1 + monthlyRate, tenureMonths);
-  const denominator = Math.pow(1 + monthlyRate, tenureMonths) - 1;
-  
-  return numerator / denominator;
-};
+import { calculateEMI } from '../../utils/mathUtils';
+export { calculateEMI };
 
 /**
  * Generate complete amortization schedule
@@ -175,51 +157,55 @@ export const createEMIRecord = async (
     record.due_day
   );
 
-  // Insert EMI record
-  const result = await db.runAsync(
-    `INSERT INTO emi_records 
-    (name, lender_name, principal, total_amount, emi_amount, interest_rate, tenure_months, 
-     start_date, due_day, is_autopay, autopay_account_id, status, category, notes, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
-    [
-      record.name,
-      record.lender_name,
-      record.principal,
-      calculation.total_amount,
-      calculation.emi_amount,
-      record.interest_rate,
-      record.tenure_months,
-      record.start_date,
-      record.due_day,
-      record.is_autopay,
-      record.autopay_account_id,
-      record.status,
-      record.category,
-      record.notes,
-    ]
-  );
+  let emiId = 0;
 
-  const emiId = result.lastInsertRowId;
-
-  // Insert payment schedule
-  for (const payment of calculation.amortization_schedule) {
-    await db.runAsync(
-      `INSERT INTO emi_payments 
-      (emi_id, month_number, due_date, amount_paid, principal_component, interest_component, 
-       outstanding_balance, payment_status, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+  await db.withTransactionAsync(async () => {
+    // Insert EMI record
+    const result = await db.runAsync(
+      `INSERT INTO emi_records 
+      (name, lender_name, principal, total_amount, emi_amount, interest_rate, tenure_months, 
+       start_date, due_day, is_autopay, autopay_account_id, status, category, notes, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
       [
-        emiId,
-        payment.month_number,
-        payment.due_date,
-        payment.emi_amount,
-        payment.principal_component,
-        payment.interest_component,
-        payment.outstanding_balance,
-        payment.payment_status,
+        record.name,
+        record.lender_name,
+        record.principal,
+        calculation.total_amount,
+        calculation.emi_amount,
+        record.interest_rate,
+        record.tenure_months,
+        record.start_date,
+        record.due_day,
+        record.is_autopay,
+        record.autopay_account_id,
+        record.status,
+        record.category,
+        record.notes,
       ]
     );
-  }
+
+    emiId = result.lastInsertRowId;
+
+    // Insert payment schedule
+    for (const payment of calculation.amortization_schedule) {
+      await db.runAsync(
+        `INSERT INTO emi_payments 
+        (emi_id, month_number, due_date, amount_paid, principal_component, interest_component, 
+         outstanding_balance, payment_status, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+        [
+          emiId,
+          payment.month_number,
+          payment.due_date,
+          payment.emi_amount,
+          payment.principal_component,
+          payment.interest_component,
+          payment.outstanding_balance,
+          payment.payment_status,
+        ]
+      );
+    }
+  });
 
   return emiId;
 };

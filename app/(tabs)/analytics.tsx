@@ -1,5 +1,7 @@
 
 import React, { useState, useCallback } from 'react';
+import { ErrorBoundary } from 'react-error-boundary';
+import { TabErrorFallback } from '../../components/ErrorBoundary';
 import { View, Text, StyleSheet, ScrollView, Dimensions, StatusBar, TouchableOpacity, ActivityIndicator, Modal } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -38,12 +40,13 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { formatCurrency } from '../../utils/currency';
 import { CategoryBreakdownList } from '../../components/CategoryBreakdownList';
 import { MonthlyTrendSection } from '../../components/MonthlyTrendSection';
+import { FinanceLabSection } from '../../financelab/FinanceLabSection';
 
 const screenWidth = Dimensions.get('window').width;
 
 
 
-export default function AnalyticsScreen() {
+function AnalyticsContent() {
     const router = useRouter();
     const [loading, setLoading] = useState(true);
     const [loadingSubcats, setLoadingSubcats] = useState(false);
@@ -73,7 +76,11 @@ export default function AnalyticsScreen() {
     const [activeChart, setActiveChart] = useState<'trend' | 'distribution' | 'stacked'>('trend');
     const [showForecastModal, setShowForecastModal] = useState(false);
 
-    const loadData = async () => {
+    const isFetching = React.useRef(false);
+
+    const loadData = useCallback(async () => {
+        if (isFetching.current) return;
+        isFetching.current = true;
         setLoading(true);
         try {
             // v2.0.0: Flexible date filter
@@ -123,8 +130,9 @@ export default function AnalyticsScreen() {
             console.error("Error loading analysis", e);
         } finally {
             setLoading(false);
+            isFetching.current = false;
         }
-    };
+    }, [viewMode, selectedMonth, customRange]);
 
     useFocusEffect(
         useCallback(() => {
@@ -400,6 +408,12 @@ export default function AnalyticsScreen() {
                     data={comparisonData}
                 />
             </Card>
+
+            {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+            {/* 🧠 FINANCIAL INTELLIGENCE MODULE v3.2.0  */}
+            {/* Pure read-only — no existing section modified */}
+            {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+            <FinanceLabSection />
 
             <View style={{ height: 80 }} />
 
@@ -826,3 +840,11 @@ const styles = StyleSheet.create({
         lineHeight: 20,
     },
 });
+
+export default function AnalyticsScreen() {
+    return (
+        <ErrorBoundary FallbackComponent={TabErrorFallback}>
+            <AnalyticsContent />
+        </ErrorBoundary>
+    );
+}

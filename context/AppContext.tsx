@@ -2,51 +2,52 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
     initDatabase,
-    getTransactions,
     getAccounts,
     getCategories,
-    Transaction,
     Account,
     CategoryNode
 } from '../services/database';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface AppContextType {
-    transactions: Transaction[];
     accounts: Account[];
     categories: CategoryNode[];
     loading: boolean;
     soundEnabled: boolean;
+    dataVersion: number;
     refreshData: () => Promise<void>;
     setSoundEnabled: (enabled: boolean) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType>({
-    transactions: [],
     accounts: [],
     categories: [],
     loading: true,
     soundEnabled: true,
+    dataVersion: 0,
     refreshData: async () => { },
     setSoundEnabled: async () => { },
 });
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [categories, setCategories] = useState<CategoryNode[]>([]);
     const [loading, setLoading] = useState(true);
     const [soundEnabled, setSoundEnabledState] = useState(true);
+    const [dataVersion, setDataVersion] = useState(0);
+
+    const queryClient = useQueryClient();
 
     const refreshData = async () => {
         try {
-            const [txs, accs, cats] = await Promise.all([
-                getTransactions(),
+            const [accs, cats] = await Promise.all([
                 getAccounts(),
                 getCategories()
             ]);
-            setTransactions(txs);
             setAccounts(accs);
             setCategories(cats);
+            queryClient.invalidateQueries();
+            setDataVersion(v => v + 1);
         } catch (error) {
             console.error("Failed to fetch data", error);
         }
@@ -83,11 +84,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     return (
         <AppContext.Provider value={{
-            transactions,
             accounts,
             categories,
             loading,
             soundEnabled,
+            dataVersion,
             refreshData,
             setSoundEnabled
         }}>

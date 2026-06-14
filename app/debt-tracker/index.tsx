@@ -8,7 +8,6 @@ import { calculateCurrentBalance, DebtRecord } from '../../services/debttracker/
 import { formatCurrency } from '../../utils/currency';
 import { Snackbar } from '../../components/Snackbar';
 import { Swipeable } from 'react-native-gesture-handler';
-import  { _useSharedValue, _withSpring } from 'react-native-reanimated';
 
 type FilterType = 'all' | 'borrowed' | 'lent' | 'completed';
 
