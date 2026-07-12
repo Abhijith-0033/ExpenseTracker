@@ -9,7 +9,12 @@ import { SwipeableRow } from '../../components/SwipeableRow';
 import { initDatabase } from '../../services/database';
 
 
+import { useSubscription } from '../../src/subscription/useSubscription';
+import PaywallScreen from '../../src/subscription/PaywallScreen';
+import { ConfirmActionSheet } from '../../components/ConfirmActionSheet';
+
 export default function EMITrackerScreen() {
+  const { isPremium, isTrialActive } = useSubscription();
   const router = useRouter();
   const [emiRecords, setEMIRecords] = useState<EMIRecord[]>([]);
   const [paymentStats, setPaymentStats] = useState<{ pending: number; overdue: number; paid: number }>({
@@ -19,6 +24,14 @@ export default function EMITrackerScreen() {
   });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  const [confirmSheet, setConfirmSheet] = useState<{
+    title: string;
+    description: string;
+    confirmLabel: string;
+    actionType: 'delete' | 'edit' | 'approve' | 'pay' | 'warning';
+    onConfirm: () => void;
+  } | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -65,32 +78,32 @@ export default function EMITrackerScreen() {
     }, [loadData])
   );
 
+  if (!isPremium && !isTrialActive) {
+    return <PaywallScreen showClose={true} />;
+  }
+
   const onRefresh = () => {
     setRefreshing(true);
     loadData();
   };
 
   const handleDelete = async (id: number, name: string) => {
-    Alert.alert(
-      'Delete EMI',
-      `Are you sure you want to delete "${name}"? This will also delete all payment history.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteEMIRecord(id);
-              loadData();
-            } catch (error) {
-              console.error('Error deleting EMI:', error);
-              Alert.alert('Error', 'Failed to delete EMI');
-            }
-          },
-        },
-      ]
-    );
+    setConfirmSheet({
+      title: 'Delete EMI?',
+      description: `Are you sure you want to delete "${name}"? This will also delete all payment history.`,
+      confirmLabel: 'Delete',
+      actionType: 'delete',
+      onConfirm: async () => {
+        setConfirmSheet(null);
+        try {
+          await deleteEMIRecord(id);
+          loadData();
+        } catch (error) {
+          console.error('Error deleting EMI:', error);
+          Alert.alert('Error', 'Failed to delete EMI');
+        }
+      }
+    });
   };
 
   const handleEdit = (id: number) => {
@@ -284,6 +297,18 @@ export default function EMITrackerScreen() {
       >
         <Plus size={24} color={Colors.white} />
       </TouchableOpacity>
+
+      {confirmSheet && (
+        <ConfirmActionSheet
+          visible={!!confirmSheet}
+          title={confirmSheet.title}
+          description={confirmSheet.description}
+          confirmLabel={confirmSheet.confirmLabel}
+          actionType={confirmSheet.actionType}
+          onConfirm={confirmSheet.onConfirm}
+          onCancel={() => setConfirmSheet(null)}
+        />
+      )}
     </View>
   );
 }

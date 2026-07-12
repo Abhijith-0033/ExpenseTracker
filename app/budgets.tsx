@@ -8,8 +8,12 @@ import { getCategories, CategoryNode } from '../services/database';
 import { BudgetCard } from '../components/BudgetCard';
 import { Plus, X, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { format, addMonths, subMonths } from 'date-fns';
+import { useSubscription } from '../src/subscription/useSubscription';
+import PaywallScreen from '../src/subscription/PaywallScreen';
 
 export default function BudgetsScreen() {
+    const { isPremium, isTrialActive } = useSubscription();
+
     const router = useRouter();
     const [budgets, setBudgets] = useState<BudgetStatus[]>([]);
     const [categories, setCategories] = useState<CategoryNode[]>([]);
@@ -35,6 +39,10 @@ export default function BudgetsScreen() {
             loadData();
         }, [loadData])
     );
+
+    if (!isPremium && !isTrialActive) {
+        return <PaywallScreen showClose={true} />;
+    }
 
     const handleSave = async () => {
         if (!selectedCategory || !budgetAmount) return;

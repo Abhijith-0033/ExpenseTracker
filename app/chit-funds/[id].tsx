@@ -11,8 +11,13 @@ import { Snackbar } from '../../components/Snackbar';
 import { AccountSelector } from '../../components/AccountSelector';
 import { LineChart, BarChart } from 'react-native-gifted-charts';
 import { format } from 'date-fns';
+import { useSubscription } from '../../src/subscription/useSubscription';
+import PaywallScreen from '../../src/subscription/PaywallScreen';
+import { ConfirmActionSheet } from '../../components/ConfirmActionSheet';
 
 export default function ChitFundDetailScreen() {
+  const { isPremium, isTrialActive } = useSubscription();
+
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const chitFundId = parseInt(id);
@@ -32,6 +37,14 @@ export default function ChitFundDetailScreen() {
   // Snackbar state
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
+
+  const [confirmSheet, setConfirmSheet] = useState<{
+    title: string;
+    description: string;
+    confirmLabel: string;
+    actionType: 'delete' | 'edit' | 'approve' | 'pay' | 'warning';
+    onConfirm: () => void;
+  } | null>(null);
 
   // Form state for editing monthly record
   const [paymentAmount, setPaymentAmount] = useState('');
@@ -77,6 +90,10 @@ export default function ChitFundDetailScreen() {
     }
   }, [chitFundId, fetchData]);
 
+  if (!isPremium && !isTrialActive) {
+    return <PaywallScreen showClose={true} />;
+  }
+
   const handleEditRecord = (record: ChitMonthlyRecord) => {
     setEditingRecord(record);
     setPaymentAmount(record.amount_paid?.toString() || '');
@@ -114,27 +131,23 @@ export default function ChitFundDetailScreen() {
   };
 
   const handleDeleteRecord = async (recordId: number) => {
-    Alert.alert(
-      'Delete Record',
-      'This record will be permanently deleted. This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteChitMonthlyRecord(recordId);
-              fetchData();
-              setSnackbarMessage('Record deleted');
-              setSnackbarVisible(true);
-            } catch (_error) {
-              Alert.alert('Error', 'Failed to delete record');
-            }
-          }
+    setConfirmSheet({
+      title: 'Delete Record?',
+      description: 'This record will be permanently deleted from your chit fund history.',
+      confirmLabel: 'Delete',
+      actionType: 'delete',
+      onConfirm: async () => {
+        setConfirmSheet(null);
+        try {
+          await deleteChitMonthlyRecord(recordId);
+          fetchData();
+          setSnackbarMessage('Record deleted');
+          setSnackbarVisible(true);
+        } catch (_error) {
+          Alert.alert('Error', 'Failed to delete record');
         }
-      ]
-    );
+      }
+    });
   };
 
   if (loading) {
@@ -538,6 +551,18 @@ export default function ChitFundDetailScreen() {
         message={snackbarMessage}
         onDismiss={() => setSnackbarVisible(false)}
       />
+
+      {confirmSheet && (
+        <ConfirmActionSheet
+          visible={!!confirmSheet}
+          title={confirmSheet.title}
+          description={confirmSheet.description}
+          confirmLabel={confirmSheet.confirmLabel}
+          actionType={confirmSheet.actionType}
+          onConfirm={confirmSheet.onConfirm}
+          onCancel={() => setConfirmSheet(null)}
+        />
+      )}
     </View>
   );
 }

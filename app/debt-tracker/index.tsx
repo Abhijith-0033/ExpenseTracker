@@ -9,12 +9,25 @@ import { formatCurrency } from '../../utils/currency';
 import { Snackbar } from '../../components/Snackbar';
 import { Swipeable } from 'react-native-gesture-handler';
 
+import { useSubscription } from '../../src/subscription/useSubscription';
+import PaywallScreen from '../../src/subscription/PaywallScreen';
+import { ConfirmActionSheet } from '../../components/ConfirmActionSheet';
+
 type FilterType = 'all' | 'borrowed' | 'lent' | 'completed';
 
 export default function DebtTrackerScreen() {
+  const { isPremium, isTrialActive } = useSubscription();
   const router = useRouter();
   const [debts, setDebts] = useState<DebtRecord[]>([]);
   const [filteredDebts, setFilteredDebts] = useState<DebtRecord[]>([]);
+
+  const [confirmSheet, setConfirmSheet] = useState<{
+    title: string;
+    description: string;
+    confirmLabel: string;
+    actionType: 'delete' | 'edit' | 'approve' | 'pay' | 'warning';
+    onConfirm: () => void;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
@@ -87,28 +100,28 @@ export default function DebtTrackerScreen() {
     setFilteredDebts(filtered);
   }, [activeFilter, debts]);
 
+  if (!isPremium && !isTrialActive) {
+    return <PaywallScreen showClose={true} />;
+  }
+
   const handleDelete = (debt: DebtRecord) => {
-    Alert.alert(
-      'Delete Debt',
-      `This will permanently delete '${debt.name}' and all its repayment history. This cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteDebtRecord(debt.id);
-              fetchData();
-              setSnackbarMessage('Debt deleted');
-              setSnackbarVisible(true);
-            } catch (_error) {
-              Alert.alert('Error', 'Failed to delete debt');
-            }
-          }
+    setConfirmSheet({
+      title: 'Delete Debt?',
+      description: `This will permanently delete '${debt.name}' and all its repayment history.`,
+      confirmLabel: 'Delete',
+      actionType: 'delete',
+      onConfirm: async () => {
+        setConfirmSheet(null);
+        try {
+          await deleteDebtRecord(debt.id);
+          fetchData();
+          setSnackbarMessage('Debt deleted');
+          setSnackbarVisible(true);
+        } catch (_error) {
+          Alert.alert('Error', 'Failed to delete debt');
         }
-      ]
-    );
+      }
+    });
   };
 
   const DebtCard = ({ debt }: { debt: DebtRecord }) => {
@@ -359,6 +372,18 @@ export default function DebtTrackerScreen() {
         message={snackbarMessage}
         onDismiss={() => setSnackbarVisible(false)}
       />
+
+      {confirmSheet && (
+        <ConfirmActionSheet
+          visible={!!confirmSheet}
+          title={confirmSheet.title}
+          description={confirmSheet.description}
+          confirmLabel={confirmSheet.confirmLabel}
+          actionType={confirmSheet.actionType}
+          onConfirm={confirmSheet.onConfirm}
+          onCancel={() => setConfirmSheet(null)}
+        />
+      )}
     </View>
   );
 }

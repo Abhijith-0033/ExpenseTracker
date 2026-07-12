@@ -8,6 +8,7 @@ import { updateTransaction, deleteTransaction, getTransactionById } from '../ser
 import { Keypad } from '../components/ui/Keypad';
 import { CategoryPicker } from '../components/CategoryPicker';
 import { Calendar as CalendarIcon, Wallet as WalletIcon, Tag as TagIcon, Trash2 } from 'lucide-react-native';
+import { ConfirmActionSheet } from '../components/ConfirmActionSheet';
 import { format } from 'date-fns';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -113,44 +114,58 @@ export default function EditTransactionScreen() {
         }
         setErrors({});
 
-        try {
-
-            isSubmittingRef.current = true;
-
-            // Use the new atomic updateTransaction service to prevent data loss
-            await updateTransaction(originalTx.id, {
-                amount: finalAmount,
-                category,
-                subcategory,
-                account_id: selectedAccount.id,
-                date: date.toISOString(),
-                description
-            });
-
-            await refreshData();
-            DeviceEventEmitter.emit('RECOMPUTE_SATISFACTION');
-            router.back();
-        } catch (_e) {
-            Alert.alert('Error', 'Failed to update transaction');
-        } finally {
-
-            isSubmittingRef.current = false;
-        }
-    };
-
-    const handleDeleteTx = async () => {
-        Alert.alert('Confirm Delete', 'Are you sure?', [
-            { text: 'Cancel', style: 'cancel' },
-            {
-                text: 'Delete', style: 'destructive', onPress: async () => {
-                    // Include category to ensure proper balance reversal
-                    await deleteTransaction(originalTx.id, originalTx.account_id, originalTx.amount, originalTx.category);
+        setConfirmSheet({
+            title: 'Save Changes?',
+            description: 'Are you sure you want to save these changes? This action cannot be undone.',
+            confirmLabel: 'Edit',
+            actionType: 'edit',
+            onConfirm: async () => {
+                setConfirmSheet(null);
+                try {
+                    isSubmittingRef.current = true;
+                    await updateTransaction(originalTx.id, {
+                        amount: finalAmount,
+                        category,
+                        subcategory,
+                        account_id: selectedAccount.id,
+                        date: date.toISOString(),
+                        description
+                    });
                     await refreshData();
                     DeviceEventEmitter.emit('RECOMPUTE_SATISFACTION');
                     router.back();
+                } catch (_e) {
+                    Alert.alert('Error', 'Failed to update transaction');
+                } finally {
+                    isSubmittingRef.current = false;
                 }
             }
-        ]);
+        });
+    };
+
+    const [confirmSheet, setConfirmSheet] = useState<{
+        title: string;
+        description: string;
+        confirmLabel: string;
+        actionType: 'delete' | 'edit' | 'approve' | 'pay' | 'warning';
+        onConfirm: () => void;
+    } | null>(null);
+
+    const handleDeleteTx = async () => {
+        setConfirmSheet({
+            title: 'Delete Transaction?',
+            description: 'This transaction will be permanently removed and your account balance adjusted.',
+            confirmLabel: 'Delete',
+            actionType: 'delete',
+            onConfirm: async () => {
+                setConfirmSheet(null);
+                // Include category to ensure proper balance reversal
+                await deleteTransaction(originalTx.id, originalTx.account_id, originalTx.amount, originalTx.category);
+                await refreshData();
+                DeviceEventEmitter.emit('RECOMPUTE_SATISFACTION');
+                router.back();
+            }
+        });
     };
 
     if (loading) return <ActivityIndicator style={{ marginTop: 50 }} />;
@@ -257,6 +272,18 @@ export default function EditTransactionScreen() {
                         setShowDatePicker(false);
                         if (selectedDate) setDate(selectedDate);
                     }}
+                />
+            )}
+
+            {confirmSheet && (
+                <ConfirmActionSheet
+                    visible={!!confirmSheet}
+                    title={confirmSheet.title}
+                    description={confirmSheet.description}
+                    confirmLabel={confirmSheet.confirmLabel}
+                    actionType={confirmSheet.actionType}
+                    onConfirm={confirmSheet.onConfirm}
+                    onCancel={() => setConfirmSheet(null)}
                 />
             )}
         </SafeAreaView>

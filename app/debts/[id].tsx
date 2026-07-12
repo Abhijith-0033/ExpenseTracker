@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, TextInput, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, TrendingUp, TrendingDown, Check } from 'lucide-react-native';
@@ -26,7 +26,7 @@ export default function DebtDetailScreen() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const isSubmittingRef = React.useRef(false);
 
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         if (!id) return;
         setLoading(true);
         try {
@@ -43,7 +43,7 @@ export default function DebtDetailScreen() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [id]);
 
     useEffect(() => {
         fetchData();

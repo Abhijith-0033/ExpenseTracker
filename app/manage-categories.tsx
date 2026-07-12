@@ -2,9 +2,10 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Alert, Modal, Switch } from 'react-native';
 import { useApp } from '../context/AppContext';
-import { saveCategories } from '../services/database';
+import { saveCategories, checkTransactionsExistForCategory } from '../services/database';
 import { Plus, X, Trash2 } from 'lucide-react-native';
 import { Colors, Layout, Typography } from '../constants/Theme';
+import { ConfirmActionSheet, ConfirmActionType } from '../components/ConfirmActionSheet';
 
 export default function ManageCategoriesScreen() {
     const { categories, refreshData } = useApp();
@@ -17,6 +18,32 @@ export default function ManageCategoriesScreen() {
     const [editingSubName, setEditingSubName] = useState<string | null>(null);
     const [isRepetitive, setIsRepetitive] = useState(false);
     const [defaultValidity, setDefaultValidity] = useState('28');
+
+    const [confirmSheet, setConfirmSheet] = useState<{
+        title: string;
+        description: string;
+        confirmLabel: string;
+        actionType: ConfirmActionType;
+        onConfirm: () => void;
+    } | null>(null);
+
+    const requestSave = () => {
+        if (!newCatName.trim()) return;
+        if (editingCatId || editingSubName) {
+            setConfirmSheet({
+                title: 'Save Changes?',
+                description: 'Are you sure you want to save these changes?',
+                confirmLabel: 'Edit',
+                actionType: 'edit',
+                onConfirm: () => {
+                    setConfirmSheet(null);
+                    handleSave();
+                }
+            });
+        } else {
+            handleSave();
+        }
+    };
 
     const handleSave = async () => {
         if (!newCatName.trim()) return;
@@ -118,6 +145,19 @@ export default function ManageCategoriesScreen() {
         await refreshData();
     };
 
+    const requestDelete = (catName: string, subName?: string) => {
+        setConfirmSheet({
+            title: `Delete ${subName || catName}?`,
+            description: 'This action cannot be undone.',
+            confirmLabel: 'Delete',
+            actionType: 'delete',
+            onConfirm: () => {
+                setConfirmSheet(null);
+                handleDelete(catName, subName);
+            }
+        });
+    };
+
     return (
         <View style={styles.container}>
             <View style={styles.header}>
@@ -149,7 +189,7 @@ export default function ManageCategoriesScreen() {
                                 }} style={{ marginRight: 16 }}>
                                     <Text style={{ color: Colors.primary[600], fontFamily: Typography.family.bold, fontSize: Typography.size.sm }}>Edit</Text>
                                 </TouchableOpacity>
-                                <TouchableOpacity onPress={() => handleDelete(item.name)}>
+                                <TouchableOpacity onPress={() => requestDelete(item.name)}>
                                     <Trash2 size={20} color="#ef4444" />
                                 </TouchableOpacity>
                             </View>
@@ -171,7 +211,7 @@ export default function ManageCategoriesScreen() {
                                             }} style={{ marginRight: 12 }}>
                                                 <Text style={{ color: Colors.primary[600], fontFamily: Typography.family.medium, fontSize: Typography.size.xs }}>Edit</Text>
                                             </TouchableOpacity>
-                                            <TouchableOpacity onPress={() => handleDelete(item.name, sub)}>
+                                            <TouchableOpacity onPress={() => requestDelete(item.name, sub)}>
                                                 <X size={16} color="#9ca3af" />
                                             </TouchableOpacity>
                                         </View>
@@ -248,12 +288,24 @@ export default function ManageCategoriesScreen() {
                             </View>
                         )}
 
-                        <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
+                        <TouchableOpacity style={styles.saveBtn} onPress={requestSave}>
                             <Text style={styles.saveText}>Save</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
             </Modal>
+
+            {confirmSheet && (
+                <ConfirmActionSheet
+                    visible={!!confirmSheet}
+                    title={confirmSheet.title}
+                    description={confirmSheet.description}
+                    confirmLabel={confirmSheet.confirmLabel}
+                    actionType={confirmSheet.actionType}
+                    onConfirm={confirmSheet.onConfirm}
+                    onCancel={() => setConfirmSheet(null)}
+                />
+            )}
         </View>
     );
 }

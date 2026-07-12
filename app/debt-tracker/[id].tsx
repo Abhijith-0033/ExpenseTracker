@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert, ActivityIndicator, TextInput } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, Plus, Calendar, DollarSign, Percent, CheckCircle } from 'lucide-react-native';
@@ -11,8 +11,13 @@ import { Snackbar } from '../../components/Snackbar';
 import { AccountSelector } from '../../components/AccountSelector';
 import { LineChart, BarChart } from 'react-native-gifted-charts';
 import { format } from 'date-fns';
+import { useSubscription } from '../../src/subscription/useSubscription';
+import PaywallScreen from '../../src/subscription/PaywallScreen';
+import { ConfirmActionSheet } from '../../components/ConfirmActionSheet';
 
 export default function DebtDetailScreen() {
+  const { isPremium, isTrialActive } = useSubscription();
+
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const debtId = parseInt(id);
@@ -28,6 +33,14 @@ export default function DebtDetailScreen() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
 
+  const [confirmSheet, setConfirmSheet] = useState<{
+    title: string;
+    description: string;
+    confirmLabel: string;
+    actionType: 'delete' | 'edit' | 'approve' | 'pay' | 'warning';
+    onConfirm: () => void;
+  } | null>(null);
+
   // Snackbar state
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
@@ -38,7 +51,7 @@ export default function DebtDetailScreen() {
   const [paymentType, setPaymentType] = useState<'principal' | 'interest' | 'both'>('principal');
   const [paymentNote, setPaymentNote] = useState('');
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const debtData = await getDebtRecordById(debtId);
       if (!debtData) {
@@ -65,13 +78,43 @@ export default function DebtDetailScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [debtId]);
 
   useEffect(() => {
     if (debtId) {
       fetchData();
     }
   }, [debtId, fetchData]);
+
+  const progressPercentage = useMemo(() => 
+    debt && calculation && debt.principal > 0 
+      ? (calculation.totalRepaid / (calculation.totalAccrued || 1)) * 100 
+      : 0,
+    [debt, calculation]
+  );
+
+  // Prepare chart data
+  const balanceChartData = useMemo(() => 
+    paymentHistory?.balanceHistory?.map((item: any, index: number) => ({
+      value: item.balance,
+      label: index % 3 === 0 ? format(new Date(item.date), 'MMM') : '',
+      dataPointText: index === paymentHistory.balanceHistory.length - 1 ? formatCurrency(item.balance) : ''
+    })) || [],
+    [paymentHistory]
+  );
+
+  const monthlyPaymentData = useMemo(() => 
+    Object.entries(paymentHistory?.monthlyPayments || {}).map(([month, amount]) => ({
+      value: amount as number,
+      label: format(new Date(month + '-01'), 'MMM'),
+      dataPointText: formatCurrency(amount as number)
+    })),
+    [paymentHistory]
+  );
+
+  if (!isPremium && !isTrialActive) {
+    return <PaywallScreen showClose={true} />;
+  }
 
   const handleAddPayment = async () => {
     if (!paymentAmount || parseFloat(paymentAmount) <= 0) {
@@ -122,27 +165,23 @@ export default function DebtDetailScreen() {
   };
 
   const handleDeletePayment = async (paymentId: number) => {
-    Alert.alert(
-      'Delete Payment',
-      'This payment will be permanently deleted. This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteDebtRepayment(paymentId);
-              fetchData();
-              setSnackbarMessage('Payment deleted');
-              setSnackbarVisible(true);
-            } catch (_error) {
-              Alert.alert('Error', 'Failed to delete payment');
-            }
-          }
+    setConfirmSheet({
+      title: 'Delete Payment?',
+      description: 'This payment will be permanently deleted and balance adjusted.',
+      confirmLabel: 'Delete',
+      actionType: 'delete',
+      onConfirm: async () => {
+        setConfirmSheet(null);
+        try {
+          await deleteDebtRepayment(paymentId);
+          fetchData();
+          setSnackbarMessage('Payment deleted');
+          setSnackbarVisible(true);
+        } catch (_error) {
+          Alert.alert('Error', 'Failed to delete payment');
         }
-      ]
-    );
+      }
+    });
   };
 
   if (loading) {
@@ -160,21 +199,7 @@ export default function DebtDetailScreen() {
       </View>
     );
   }
-
-  const progressPercentage = debt.principal > 0 ? (calculation.totalRepaid / (calculation.totalAccrued || 1)) * 100 : 0;
-
-  // Prepare chart data
-  const balanceChartData = paymentHistory?.balanceHistory?.map((item: any, index: number) => ({
-    value: item.balance,
-    label: index % 3 === 0 ? format(new Date(item.date), 'MMM') : '',
-    dataPointText: index === paymentHistory.balanceHistory.length - 1 ? formatCurrency(item.balance) : ''
-  })) || [];
-
-  const monthlyPaymentData = Object.entries(paymentHistory?.monthlyPayments || {}).map(([month, amount]) => ({
-    value: amount as number,
-    label: format(new Date(month + '-01'), 'MMM'),
-    dataPointText: formatCurrency(amount as number)
-  }));
+  // Chart data moved above
 
   return (
     <View style={styles.container}>
@@ -502,6 +527,18 @@ export default function DebtDetailScreen() {
         message={snackbarMessage}
         onDismiss={() => setSnackbarVisible(false)}
       />
+
+      {confirmSheet && (
+        <ConfirmActionSheet
+          visible={!!confirmSheet}
+          title={confirmSheet.title}
+          description={confirmSheet.description}
+          confirmLabel={confirmSheet.confirmLabel}
+          actionType={confirmSheet.actionType}
+          onConfirm={confirmSheet.onConfirm}
+          onCancel={() => setConfirmSheet(null)}
+        />
+      )}
     </View>
   );
 }

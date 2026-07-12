@@ -10,8 +10,11 @@ import Svg, { Circle } from 'react-native-svg';
 import { SavingsGoal, SavingsContribution, getGoals, addGoal, addContribution, calculateWeeklyTarget, getGoalProgress, getCompletedGoals, updateGoal, deleteGoal, getContributions, updateContribution, deleteContribution, getGoalById } from '../services/savingsGoals';
 import { formatCurrency } from '../utils/currency';
 import { format } from 'date-fns';
+import { ConfirmActionSheet, ConfirmActionType } from '../components/ConfirmActionSheet';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { BarChart } from 'react-native-gifted-charts';
+import { useSubscription } from '../src/subscription/useSubscription';
+import PaywallScreen from '../src/subscription/PaywallScreen';
 
 const ProgressRing = ({ progress, size = 60, strokeWidth = 6, color = Colors.primary[500] }: { progress: number, size?: number, strokeWidth?: number, color?: string }) => {
     const radius = (size - strokeWidth) / 2;
@@ -28,6 +31,8 @@ const ProgressRing = ({ progress, size = 60, strokeWidth = 6, color = Colors.pri
 };
 
 export default function SavingsGoalsScreen() {
+    const { isPremium, isTrialActive } = useSubscription();
+
     const [goals, setGoals] = useState<SavingsGoal[]>([]);
     const [completedGoals, setCompletedGoals] = useState<SavingsGoal[]>([]);
     const [showAddModal, setShowAddModal] = useState(false);
@@ -37,6 +42,13 @@ export default function SavingsGoalsScreen() {
     const [showGoalDetailsModal, setShowGoalDetailsModal] = useState(false);
     const [contributions, setContributions] = useState<SavingsContribution[]>([]);
     const [editingContribution, setEditingContribution] = useState<SavingsContribution | null>(null);
+    const [confirmSheet, setConfirmSheet] = useState<{
+        title: string;
+        description: string;
+        confirmLabel: string;
+        actionType: ConfirmActionType;
+        onConfirm: () => void;
+    } | null>(null);
 
     // Add Goal Form
     const [newName, setNewName] = useState('');
@@ -53,6 +65,10 @@ export default function SavingsGoalsScreen() {
         loadData();
     }, []);
 
+    if (!isPremium && !isTrialActive) {
+        return <PaywallScreen showClose={true} />;
+    }
+
     const loadData = async () => {
         const [active, completed] = await Promise.all([
             getGoals(),
@@ -62,7 +78,7 @@ export default function SavingsGoalsScreen() {
         setCompletedGoals(completed);
     };
 
-    const handleAddGoal = async () => {
+    const requestAddGoal = () => {
         const newErrors: Record<string, string> = {};
         if (!newName.trim()) newErrors.name = 'Goal name is required';
         if (!newTarget.trim() || isNaN(parseFloat(newTarget))) newErrors.target = 'Valid target amount is required';
@@ -72,7 +88,24 @@ export default function SavingsGoalsScreen() {
             return;
         }
         setErrors({});
-        
+
+        if (editingGoal) {
+            setConfirmSheet({
+                title: 'Save Changes?',
+                description: 'Are you sure you want to save these changes?',
+                confirmLabel: 'Edit',
+                actionType: 'edit',
+                onConfirm: () => {
+                    setConfirmSheet(null);
+                    commitAddGoal();
+                }
+            });
+        } else {
+            commitAddGoal();
+        }
+    };
+
+    const commitAddGoal = async () => {
         if (editingGoal) {
             await updateGoal(editingGoal.id, {
                 name: newName,
@@ -122,39 +155,56 @@ export default function SavingsGoalsScreen() {
     };
 
     const handleDeleteGoal = async (goal: SavingsGoal) => {
-        Alert.alert('Delete Goal', `Delete "${goal.name}" and all its contributions?`, [
-            { text: 'Cancel', style: 'cancel' },
-            {
-                text: 'Delete',
-                style: 'destructive',
-                onPress: async () => {
-                    await deleteGoal(goal.id);
-                    if (selectedGoal?.id === goal.id) {
-                        setShowGoalDetailsModal(false);
-                        setSelectedGoal(null);
-                    }
-                    closeGoalModal();
-                    loadData();
+        setConfirmSheet({
+            title: 'Delete Goal?',
+            description: `Delete "${goal.name}" and all its contributions? This action cannot be undone.`,
+            confirmLabel: 'Delete',
+            actionType: 'delete',
+            onConfirm: async () => {
+                setConfirmSheet(null);
+                await deleteGoal(goal.id);
+                if (selectedGoal?.id === goal.id) {
+                    setShowGoalDetailsModal(false);
+                    setSelectedGoal(null);
                 }
+                closeGoalModal();
+                loadData();
             }
-        ]);
+        });
     };
 
-    const handleAddContribution = async () => {
+    const requestAddContribution = () => {
         if (!selectedGoal || !contribAmount.trim()) return;
         const amount = parseFloat(contribAmount);
         if (!amount || amount <= 0) return;
 
         if (editingContribution) {
+            setConfirmSheet({
+                title: 'Save Changes?',
+                description: 'Are you sure you want to save these changes?',
+                confirmLabel: 'Edit',
+                actionType: 'edit',
+                onConfirm: () => {
+                    setConfirmSheet(null);
+                    commitAddContribution(amount);
+                }
+            });
+        } else {
+            commitAddContribution(amount);
+        }
+    };
+
+    const commitAddContribution = async (amount: number) => {
+        if (editingContribution) {
             await updateContribution(editingContribution.id, amount, contribNotes);
         } else {
-            await addContribution(selectedGoal.id, amount, contribNotes || 'Manual contribution');
+            await addContribution(selectedGoal!.id, amount, contribNotes || 'Manual contribution');
         }
         setShowContributeModal(false);
         setContribAmount('');
         setContribNotes('');
         setEditingContribution(null);
-        await refreshSelectedGoal(selectedGoal.id);
+        await refreshSelectedGoal(selectedGoal!.id);
     };
 
     const openContributionModal = (goal: SavingsGoal, contribution?: SavingsContribution) => {
@@ -173,17 +223,17 @@ export default function SavingsGoalsScreen() {
     };
 
     const handleDeleteContribution = async (contribution: SavingsContribution) => {
-        Alert.alert('Delete Contribution', 'Remove this contribution from the goal?', [
-            { text: 'Cancel', style: 'cancel' },
-            {
-                text: 'Delete',
-                style: 'destructive',
-                onPress: async () => {
-                    await deleteContribution(contribution.id);
-                    if (selectedGoal) await refreshSelectedGoal(selectedGoal.id);
-                }
+        setConfirmSheet({
+            title: 'Delete Contribution?',
+            description: 'Remove this contribution from the goal? This action cannot be undone.',
+            confirmLabel: 'Delete',
+            actionType: 'delete',
+            onConfirm: async () => {
+                setConfirmSheet(null);
+                await deleteContribution(contribution.id);
+                if (selectedGoal) await refreshSelectedGoal(selectedGoal.id);
             }
-        ]);
+        });
     };
 
     return (
@@ -362,7 +412,7 @@ export default function SavingsGoalsScreen() {
                                 </TouchableOpacity>
                             )}
                             <Button title="Cancel" variant="ghost" onPress={closeGoalModal} style={{flex: 1}} />
-                            <Button title={editingGoal ? "Update Goal" : "Save Goal"} onPress={handleAddGoal} style={{flex: 1, marginLeft: 8}} />
+                            <Button title={editingGoal ? "Update Goal" : "Save Goal"} onPress={requestAddGoal} style={{flex: 1, marginLeft: 8}} />
                         </View>
                     </View>
                 </View>
@@ -449,12 +499,23 @@ export default function SavingsGoalsScreen() {
 
                         <View style={styles.modalButtons}>
                             <Button title="Close" variant="ghost" onPress={closeContributionModal} style={{flex: 1}} />
-                            <Button title={editingContribution ? 'Save' : 'Add'} onPress={handleAddContribution} style={{flex: 1, marginLeft: 8}} />
+                            <Button title={editingContribution ? 'Save' : 'Add'} onPress={requestAddContribution} style={{flex: 1, marginLeft: 8}} />
                         </View>
                     </View>
                 </View>
             </Modal>
 
+            {confirmSheet && (
+                <ConfirmActionSheet
+                    visible={!!confirmSheet}
+                    title={confirmSheet.title}
+                    description={confirmSheet.description}
+                    confirmLabel={confirmSheet.confirmLabel}
+                    actionType={confirmSheet.actionType}
+                    onConfirm={confirmSheet.onConfirm}
+                    onCancel={() => setConfirmSheet(null)}
+                />
+            )}
         </SafeAreaView>
     );
 }

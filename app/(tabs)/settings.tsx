@@ -3,17 +3,43 @@ import { ErrorBoundary } from 'react-error-boundary';
 import { TabErrorFallback } from '../../components/ErrorBoundary';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Switch } from 'react-native';
 import { useRouter, Link } from 'expo-router';
-import { ChevronRight, Wallet, Tag, Database, Bell, FileUp, FileDown, FileText, Info, Calendar, Users, Target, CalendarClock, RefreshCw, FileBarChart, Send } from 'lucide-react-native';
+import { ChevronRight, Wallet, Tag, Database, Bell, FileUp, FileDown, FileText, Info, Calendar, Users, Target, CalendarClock, RefreshCw, FileBarChart, Send, Lock, PiggyBank, Trash2 } from 'lucide-react-native';
 import { useApp } from '../../context/AppContext';
 import { Colors, Typography, Layout } from '../../constants/Theme';
 import { checkReminderStatus, scheduleDailyReminder } from '../../services/notifications';
 import { exportData, exportCSV, restoreData } from '../../services/backup';
-import { UpcomingExpenses } from '../../components/UpcomingExpenses';
+import { useSubscription } from '../../src/subscription/useSubscription';
 
 function SettingsContent() {
     const router = useRouter();
     const { soundEnabled, setSoundEnabled } = useApp();
     const [reminderEnabled, setReminderEnabled] = useState(true);
+    const { isPremium, isTrialActive, trialHoursRemaining, restorePurchases } = useSubscription();
+    const isFreeUser = !isPremium && !isTrialActive;
+
+    const handleBackupJSON = () => {
+        if (isFreeUser) {
+            router.push('/paywall');
+        } else {
+            exportData();
+        }
+    };
+
+    const handleExportCSV = () => {
+        if (isFreeUser) {
+            router.push('/paywall');
+        } else {
+            exportCSV();
+        }
+    };
+
+    const handleRestore = () => {
+        if (isFreeUser) {
+            router.push('/paywall');
+        } else {
+            restoreData();
+        }
+    };
 
     useEffect(() => {
         checkReminderStatus().then(setReminderEnabled);
@@ -38,12 +64,77 @@ function SettingsContent() {
         <ScrollView style={styles.container}>
             <Text style={styles.headerTitle}>Settings</Text>
 
-            <View style={{ marginBottom: 20 }}>
-                <UpcomingExpenses />
+            {/* Premium Billing Card */}
+            <View style={styles.premiumCardContainer}>
+                {isPremium ? (
+                    <View style={[styles.premiumCard, styles.premiumCardActive]}>
+                        <View style={styles.premiumHeader}>
+                            <Lock size={20} color="#FFD700" style={{ marginRight: 8 }} />
+                            <Text style={[styles.premiumTitle, { color: '#FFD700' }]}>Premium Active</Text>
+                        </View>
+                        <Text style={[styles.premiumDesc, { color: Colors.white, opacity: 0.9 }]}>
+                            Thank you for supporting us! You have full access to advanced analytics, multiple accounts, cloud backup, and scheduled expenses.
+                        </Text>
+                        <TouchableOpacity style={styles.restoreBtn} onPress={restorePurchases}>
+                            <Text style={styles.restoreBtnText}>Sync / Restore Purchase</Text>
+                        </TouchableOpacity>
+                    </View>
+                ) : isTrialActive ? (
+                    <View style={[styles.premiumCard, styles.premiumCardTrial]}>
+                        <View style={styles.premiumHeader}>
+                            <Lock size={20} color={Colors.primary[500]} style={{ marginRight: 8 }} />
+                            <Text style={[styles.premiumTitle, { color: Colors.primary[700] }]}>Free Trial Active</Text>
+                        </View>
+                        <Text style={styles.premiumDesc}>
+                            You have {Math.max(1, Math.round(trialHoursRemaining))} hours remaining on your free trial. Upgrade now to keep premium features forever!
+                        </Text>
+                        <View style={styles.premiumActionRow}>
+                            <TouchableOpacity style={styles.upgradeBtn} onPress={() => router.push('/paywall')}>
+                                <Text style={styles.upgradeBtnText}>Upgrade Now</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.restoreBtnLink} onPress={restorePurchases}>
+                                <Text style={styles.restoreBtnLinkText}>Restore</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                ) : (
+                    <View style={styles.premiumCard}>
+                        <View style={styles.premiumHeader}>
+                            <Lock size={20} color={Colors.primary[600]} style={{ marginRight: 8 }} />
+                            <Text style={styles.premiumTitle}>Unlock Premium Features</Text>
+                        </View>
+                        <Text style={styles.premiumDesc}>
+                            Get access to Cloud Backup/Restore, Advanced Analytics, Unlimited Accounts, and Scheduled Expenses.
+                        </Text>
+                        <View style={styles.premiumActionRow}>
+                            <TouchableOpacity style={styles.upgradeBtn} onPress={() => router.push('/paywall')}>
+                                <Text style={styles.upgradeBtnText}>Upgrade to Premium</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.restoreBtnLink} onPress={restorePurchases}>
+                                <Text style={styles.restoreBtnLinkText}>Restore</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                )}
             </View>
+
 
             <View style={styles.section}>
                 <Text style={styles.sectionTitle}>General</Text>
+
+                <TouchableOpacity
+                    style={styles.row}
+                    onPress={() => router.push('/security/app-lock-settings' as any)}
+                >
+                    <View style={[styles.rowIcon, { backgroundColor: 'rgba(16,24,40,0.08)' }]}>
+                        <Lock size={20} color={Colors.gray[900]} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.rowText}>App Lock</Text>
+                        <Text style={styles.rowSubtext}>PIN and biometric security</Text>
+                    </View>
+                    <ChevronRight size={20} color="#9ca3af" />
+                </TouchableOpacity>
 
                 <TouchableOpacity
                     style={styles.row}
@@ -148,6 +239,67 @@ function SettingsContent() {
                     <Text style={styles.rowText}>Financial Report</Text>
                     <ChevronRight size={20} color="#9ca3af" />
                 </TouchableOpacity>
+
+                <TouchableOpacity style={styles.row} onPress={() => router.push('/tax-planner' as any)}>
+                    <View style={[styles.rowIcon, { backgroundColor: 'rgba(5,150,105,0.1)' }]}>
+                        <FileText size={20} color="#059669" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.rowText}>Tax Planner</Text>
+                        <Text style={styles.rowSubtext}>Plan deductions, estimate liability</Text>
+                    </View>
+                    <ChevronRight size={20} color="#9ca3af" />
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.row} onPress={() => router.push('/future-calendar' as any)}>
+                    <View style={[styles.rowIcon, { backgroundColor: 'rgba(11,165,236,0.1)' }]}>
+                        <Calendar size={20} color="#0BA5EC" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.rowText}>Future Calendar</Text>
+                        <Text style={styles.rowSubtext}>See upcoming expenses before they happen</Text>
+                    </View>
+                    <ChevronRight size={20} color="#9ca3af" />
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.row} onPress={() => router.push('/upcoming-bills' as any)}>
+                    <View style={[styles.rowIcon, { backgroundColor: Colors.primary[50] }]}>
+                        <Calendar size={20} color={Colors.primary[600]} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <Text style={styles.rowText}>Upcoming Bills</Text>
+                            {isFreeUser && <Lock size={12} color={Colors.primary[500]} style={{ marginLeft: 6 }} />}
+                        </View>
+                        <Text style={styles.rowSubtext}>Manage utility bills, rent, and credit cards</Text>
+                    </View>
+                    <ChevronRight size={20} color="#9ca3af" />
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.row} onPress={() => router.push('/scheduled-expenses' as any)}>
+                    <View style={[styles.rowIcon, { backgroundColor: 'rgba(99,102,241,0.1)' }]}>
+                        <CalendarClock size={20} color="#6366F1" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <Text style={styles.rowText}>Scheduled Expenses</Text>
+                            {isFreeUser && <Lock size={12} color={Colors.primary[500]} style={{ marginLeft: 6 }} />}
+                        </View>
+                        <Text style={styles.rowSubtext}>Automate or approve recurring transactions</Text>
+                    </View>
+                    <ChevronRight size={20} color="#9ca3af" />
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.row} onPress={() => router.push('/sinking-funds' as any)}>
+                    <View style={[styles.rowIcon, { backgroundColor: 'rgba(20,184,166,0.1)' }]}>
+                        <PiggyBank size={20} color="#14B8A6" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.rowText}>Sinking Funds</Text>
+                        <Text style={styles.rowSubtext}>Save monthly for predictable big expenses</Text>
+                    </View>
+                    <ChevronRight size={20} color="#9ca3af" />
+                </TouchableOpacity>
             </View>
 
             {/* Integrations Section */}
@@ -203,48 +355,80 @@ function SettingsContent() {
             <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Data Management</Text>
 
-                <TouchableOpacity style={styles.row} onPress={exportData}>
+                <TouchableOpacity style={styles.row} onPress={handleBackupJSON}>
                     <View style={[styles.rowIcon, { backgroundColor: Colors.primary[50] }]}>
                         <Database size={20} color={Colors.primary[600]} />
                     </View>
                     <View style={{ flex: 1 }}>
-                        <Text style={styles.rowText}>Backup Data (JSON)</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <Text style={styles.rowText}>Backup Data (JSON)</Text>
+                            {isFreeUser && <Lock size={12} color={Colors.primary[500]} style={{ marginLeft: 6 }} />}
+                        </View>
                         <Text style={{ fontSize: Typography.size.xs, color: Colors.gray[500], fontFamily: Typography.family.regular }}>Full backup of all your data</Text>
                     </View>
                     <FileDown size={20} color={Colors.gray[400]} />
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.row} onPress={exportCSV}>
+                <TouchableOpacity style={styles.row} onPress={handleExportCSV}>
                     <View style={[styles.rowIcon, { backgroundColor: Colors.success[50] }]}>
                         <FileText size={20} color={Colors.success[600]} />
                     </View>
                     <View style={{ flex: 1 }}>
-                        <Text style={styles.rowText}>Export to CSV</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <Text style={styles.rowText}>Export to CSV</Text>
+                            {isFreeUser && <Lock size={12} color={Colors.primary[500]} style={{ marginLeft: 6 }} />}
+                        </View>
                         <Text style={{ fontSize: Typography.size.xs, color: Colors.gray[500], fontFamily: Typography.family.regular }}>Transactions for Excel</Text>
                     </View>
                     <FileDown size={20} color={Colors.gray[400]} />
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.row} onPress={restoreData}>
+                <TouchableOpacity style={styles.row} onPress={handleRestore}>
                     <View style={[styles.rowIcon, { backgroundColor: Colors.danger[50] }]}>
                         <FileUp size={20} color={Colors.danger[500]} />
                     </View>
                     <View style={{ flex: 1 }}>
-                        <Text style={[styles.rowText, { color: Colors.danger[600] }]}>Restore from Backup</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <Text style={[styles.rowText, { color: Colors.danger[600] }]}>Restore from Backup</Text>
+                            {isFreeUser && <Lock size={12} color={Colors.primary[500]} style={{ marginLeft: 6 }} />}
+                        </View>
                         <Text style={{ fontSize: Typography.size.xs, color: Colors.gray[500], fontFamily: Typography.family.regular }}>Replace current data</Text>
                     </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={[styles.row, { borderBottomWidth: 0 }]} onPress={() => router.push('/data-cleanup' as any)}>
+                    <View style={[styles.rowIcon, { backgroundColor: Colors.danger[50] }]}>
+                        <Trash2 size={20} color={Colors.danger[600]} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                        <Text style={[styles.rowText, { color: Colors.danger[600] }]}>Delete Records by Period</Text>
+                        <Text style={{ fontSize: Typography.size.xs, color: Colors.gray[500], fontFamily: Typography.family.regular }}>Clean up historical transactions</Text>
+                    </View>
+                    <ChevronRight size={20} color={Colors.gray[400]} />
                 </TouchableOpacity>
             </View>
 
             <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Application</Text>
+
+                <TouchableOpacity style={styles.row} onPress={() => router.push('/quick-guide' as any)}>
+                    <View style={[styles.rowIcon, { backgroundColor: 'rgba(100,116,139,0.1)' }]}>
+                        <Info size={20} color="#64748B" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.rowText}>Help & In-App Guide</Text>
+                        <Text style={styles.rowSubtext}>Learn how to use Gastos features</Text>
+                    </View>
+                    <ChevronRight size={20} color="#9ca3af" />
+                </TouchableOpacity>
+
                 <View style={styles.row}>
                     <View style={styles.rowIcon}>
                         <Info size={20} color={Colors.gray[600]} />
                     </View>
                     <View style={{ flex: 1 }}>
                         <Text style={styles.rowText}>Version</Text>
-                        <Text style={{ fontSize: Typography.size.xs, color: Colors.gray[500], fontFamily: Typography.family.regular }}>2.2.0 (Build 32)</Text>
+                        <Text style={{ fontSize: Typography.size.xs, color: Colors.gray[500], fontFamily: Typography.family.regular }}>3.5.0 (Build 45)</Text>
                     </View>
                 </View>
             </View>
@@ -309,6 +493,78 @@ const styles = StyleSheet.create({
         fontSize: Typography.size.sm,
         color: Colors.gray[500],
         marginTop: 2,
+    },
+    premiumCardContainer: {
+        marginBottom: 20,
+    },
+    premiumCard: {
+        backgroundColor: Colors.primary[50],
+        borderWidth: 1,
+        borderColor: Colors.primary[200],
+        borderRadius: 24,
+        padding: 20,
+    },
+    premiumCardActive: {
+        backgroundColor: Colors.gray[900],
+        borderColor: Colors.gray[800],
+    },
+    premiumCardTrial: {
+        backgroundColor: Colors.primary[50],
+        borderColor: Colors.primary[100],
+    },
+    premiumHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    premiumTitle: {
+        fontSize: Typography.size.md,
+        fontFamily: Typography.family.bold,
+        color: Colors.primary[800],
+    },
+    premiumDesc: {
+        fontSize: Typography.size.sm,
+        fontFamily: Typography.family.regular,
+        color: Colors.gray[600],
+        lineHeight: 20,
+        marginBottom: 16,
+    },
+    premiumActionRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    upgradeBtn: {
+        backgroundColor: Colors.primary[500],
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 12,
+    },
+    upgradeBtnText: {
+        color: Colors.white,
+        fontFamily: Typography.family.bold,
+        fontSize: Typography.size.sm,
+    },
+    restoreBtn: {
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 12,
+        alignSelf: 'flex-start',
+    },
+    restoreBtnText: {
+        color: Colors.white,
+        fontFamily: Typography.family.bold,
+        fontSize: Typography.size.sm,
+    },
+    restoreBtnLink: {
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+    },
+    restoreBtnLinkText: {
+        color: Colors.primary[600],
+        fontFamily: Typography.family.bold,
+        fontSize: Typography.size.sm,
     },
 });
 

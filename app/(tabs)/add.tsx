@@ -2,11 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { TabErrorFallback } from '../../components/ErrorBoundary';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, StatusBar, ScrollView, Dimensions, Modal, DeviceEventEmitter } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, StatusBar, ScrollView, Dimensions, Modal, DeviceEventEmitter, ActivityIndicator, InteractionManager } from 'react-native';
 import { useFocusEffect, useRouter , useLocalSearchParams } from 'expo-router';
 import { useApp } from '../../context/AppContext';
 import { addTransaction, addRechargeMeta, CategoryNode } from '../../services/database';
-import { schedulePaymentNotifications } from '../../services/paymentNotifications';
 import { Clock, Calendar as CalendarIcon, Wallet as WalletIcon, Tag as TagIcon, X, ChevronDown, CheckCircle2 , Sparkles } from 'lucide-react-native';
 import { format, addDays } from 'date-fns';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -25,6 +24,7 @@ import Animated, { FadeIn, FadeInDown, FadeInUp } from 'react-native-reanimated'
 
 import { checkDuplicate, getSmartSuggestions, getLastUsedForCategory, SmartSuggestion } from '../../services/duplicateCheck';
 import { DuplicateWarningSheet } from '../../components/DuplicateWarningSheet';
+import { useSubscription } from '../../src/subscription/useSubscription';
 
 
 
@@ -33,6 +33,8 @@ function AddTransactionContent() {
     const insets = useSafeAreaInsets();
     const params = useLocalSearchParams();
     const { accounts, refreshData, soundEnabled, categories } = useApp();
+    const { isPremium, isTrialActive } = useSubscription();
+    const isFreeUser = !isPremium && !isTrialActive;
 
     const [display, setDisplay] = useState('0');
     const [description, setDescription] = useState('');
@@ -63,12 +65,24 @@ function AddTransactionContent() {
     const [suggestions, setSuggestions] = useState<SmartSuggestion[]>([]);
     const [lastUsedHint, setLastUsedHint] = useState<string>('');
 
+    const [initializing, setInitializing] = useState(true);
+    useEffect(() => {
+        const task = InteractionManager.runAfterInteractions(() => {
+            setInitializing(false);
+        });
+        return () => task.cancel();
+    }, []);
+
     // Initial Account Setup
     useEffect(() => {
         if (accounts.length > 0 && !selectedAccount) {
-            setSelectedAccount(null); // Explicit text "Select Account"
+            if (isFreeUser) {
+                setSelectedAccount(accounts[0]);
+            } else {
+                setSelectedAccount(null); // Explicit text "Select Account"
+            }
         }
-    }, [accounts, selectedAccount]);
+    }, [accounts, selectedAccount, isFreeUser]);
 
     // Smart Suggestions for Amount
     useEffect(() => {
@@ -115,6 +129,7 @@ function AddTransactionContent() {
     const prefill_category = params.prefill_category as string;
     const prefill_account_id = params.prefill_account_id as string;
     const from_notification = params.from_notification as string;
+    const sched_log_id = params.sched_log_id as string;
 
     // Handle Prefill from Notifications
     useEffect(() => {
@@ -139,6 +154,45 @@ function AddTransactionContent() {
             }
         }
     }, [prefill_amount, prefill_description, prefill_category, prefill_account_id, accounts, categories, selectedAccount]);
+
+    // Handle Prefill from Scheduled Expenses log
+    useEffect(() => {
+        const fetchScheduledLog = async () => {
+            if (sched_log_id) {
+                try {
+                    const { getDatabase } = await import('../../services/database');
+                    const db = getDatabase();
+                    const log = await db.getFirstAsync(
+                        'SELECT * FROM scheduled_expense_log WHERE id = ?', [parseInt(sched_log_id)]
+                    );
+                    if (log) {
+                        setDisplay(log.amount.toString());
+                        const se = await db.getFirstAsync(`
+                            SELECT se.*, c.name as category_name, cs.name as subcategory_name
+                            FROM scheduled_expenses se
+                            LEFT JOIN categories c ON se.category_id = c.id
+                            LEFT JOIN category_subcategories cs ON se.subcategory_id = cs.id
+                            WHERE se.id = ?
+                        `, [log.scheduled_expense_id]);
+                        
+                        if (se) {
+                            setDescription(se.description || se.name);
+                            setCategory(se.category_name);
+                            if (se.subcategory_name) setSubcategory(se.subcategory_name);
+                            
+                            const matchedAccount = accounts.find(a => a.id === se.account_id);
+                            if (matchedAccount) {
+                                setSelectedAccount(matchedAccount);
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error('Error pre-filling scheduled log:', e);
+                }
+            }
+        };
+        fetchScheduledLog();
+    }, [sched_log_id, accounts]);
 
     // Reset Form on Focus (but skip if params are present)
     useFocusEffect(
@@ -299,6 +353,7 @@ function AddTransactionContent() {
                     const reminderDate = addDays(expiryDate, -2); // 2 days before
 
                     // Schedule Multi-tier Notifications
+                    const { schedulePaymentNotifications } = await import('../../services/paymentNotifications');
                     await schedulePaymentNotifications({
                         id: txId, // Using transaction ID as temporary unique ID for recharges
                         type: 'recharge',
@@ -370,6 +425,29 @@ function AddTransactionContent() {
                 }
             }
 
+            // Handle Scheduled Expense approval from UI
+            if (sched_log_id) {
+                const logId = parseInt(sched_log_id);
+                const { getDatabase } = await import('../../services/database');
+                const db = getDatabase();
+                
+                await db.runAsync(
+                    `UPDATE scheduled_expense_log SET action = 'approved', transaction_id = ? WHERE id = ?`,
+                    [txId, logId]
+                );
+                
+                const log = await db.getFirstAsync(
+                    'SELECT scheduled_expense_id, scheduled_date FROM scheduled_expense_log WHERE id = ?',
+                    [logId]
+                );
+                if (log) {
+                    await db.runAsync(
+                        `UPDATE scheduled_expenses SET last_created_date = ?, updated_at = datetime('now') WHERE id = ?`,
+                        [log.scheduled_date, log.scheduled_expense_id]
+                    );
+                }
+            }
+
             await refreshData();
             DeviceEventEmitter.emit('RECOMPUTE_SATISFACTION');
 
@@ -405,6 +483,12 @@ function AddTransactionContent() {
     };
 
     const cycleAccount = () => {
+        if (isFreeUser) {
+            if (accounts.length > 0) {
+                setSelectedAccount(accounts[0]);
+            }
+            return;
+        }
         if (accounts.length > 1) {
             const idx = accounts.findIndex(a => a.id === selectedAccount?.id);
             const next = accounts[(idx + 1) % accounts.length];
@@ -425,6 +509,14 @@ function AddTransactionContent() {
             Alert.alert('Parser Error', 'Could not find transaction details in this SMS.');
         }
     };
+
+    if (initializing) {
+        return (
+            <View style={[styles.container, { paddingTop: insets.top, justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color={Colors.primary[500]} />
+            </View>
+        );
+    }
 
     return (
         <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -520,6 +612,11 @@ function AddTransactionContent() {
                             </View>
                         </PressableScale>
                         {errors.account && <Text style={styles.pillErrorText}>{errors.account}</Text>}
+                        {isFreeUser && accounts.length > 1 && (
+                            <Text style={{ fontSize: 9, color: Colors.gray[400], marginTop: 4, marginLeft: 4 }}>
+                                🔒 Multi-account requires Premium
+                            </Text>
+                        )}
                     </View>
                 </Animated.View>
 

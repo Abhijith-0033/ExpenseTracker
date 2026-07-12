@@ -12,6 +12,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { playExpenseSound, playIncomeSound } from '../../services/SoundService';
+import { ConfirmActionSheet } from '../../components/ConfirmActionSheet';
 
 export default function BookDetailScreen() {
     const { id } = useLocalSearchParams();
@@ -38,6 +39,14 @@ export default function BookDetailScreen() {
     const [bookName, setBookName] = useState('');
     const [bookDesc, setBookDesc] = useState('');
     const [bookBudget, setBookBudget] = useState('');
+
+    const [confirmSheet, setConfirmSheet] = useState<{
+        title: string;
+        description: string;
+        confirmLabel: string;
+        actionType: 'delete' | 'edit' | 'approve' | 'pay' | 'warning';
+        onConfirm: () => void;
+    } | null>(null);
 
     const fetchData = async () => {
         if (!id) return;
@@ -85,15 +94,17 @@ export default function BookDetailScreen() {
     };
 
     const handleDeleteItem = (itemId: number) => {
-        Alert.alert('Delete Item', 'Are you sure?', [
-            { text: 'Cancel', style: 'cancel' },
-            {
-                text: 'Delete', style: 'destructive', onPress: async () => {
-                    await deleteBookItem(itemId);
-                    fetchData();
-                }
+        setConfirmSheet({
+            title: 'Delete Item?',
+            description: 'Are you sure you want to delete this expense item?',
+            confirmLabel: 'Delete',
+            actionType: 'delete',
+            onConfirm: async () => {
+                setConfirmSheet(null);
+                await deleteBookItem(itemId);
+                fetchData();
             }
-        ]);
+        });
     };
 
     const handleEditBook = async () => {
@@ -111,15 +122,17 @@ export default function BookDetailScreen() {
     }
 
     const handleDeleteBook = () => {
-        Alert.alert('Delete Project', 'This will delete the project and all its items. This cannot be undone.', [
-            { text: 'Cancel', style: 'cancel' },
-            {
-                text: 'Delete', style: 'destructive', onPress: async () => {
-                    await deleteBook(Number(id));
-                    router.back();
-                }
+        setConfirmSheet({
+            title: 'Delete Project?',
+            description: 'This will delete the project and all its items. This cannot be undone.',
+            confirmLabel: 'Delete Project',
+            actionType: 'delete',
+            onConfirm: async () => {
+                setConfirmSheet(null);
+                await deleteBook(Number(id));
+                router.back();
             }
-        ]);
+        });
     };
 
     const openEditBook = () => {
@@ -515,6 +528,18 @@ export default function BookDetailScreen() {
                     </View>
                 </View>
             </Modal>
+
+            {confirmSheet && (
+                <ConfirmActionSheet
+                    visible={!!confirmSheet}
+                    title={confirmSheet.title}
+                    description={confirmSheet.description}
+                    confirmLabel={confirmSheet.confirmLabel}
+                    actionType={confirmSheet.actionType}
+                    onConfirm={confirmSheet.onConfirm}
+                    onCancel={() => setConfirmSheet(null)}
+                />
+            )}
         </View>
     );
 }

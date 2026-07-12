@@ -7,8 +7,12 @@ import { addDebtRecord } from '../../services/debttracker/debtService';
 import { calculateInterestPreview, DebtRecord } from '../../services/debttracker/DebtEngine';
 import { Snackbar } from '../../components/Snackbar';
 import { FormField } from '../../components/FormField';
+import { useSubscription } from '../../src/subscription/useSubscription';
+import PaywallScreen from '../../src/subscription/PaywallScreen';
 
 export default function AddDebtScreen() {
+  const { isPremium, isTrialActive } = useSubscription();
+
   const router = useRouter();
   
   // Form state
@@ -28,6 +32,10 @@ export default function AddDebtScreen() {
   const [showPreview, setShowPreview] = useState(false);
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
+
+  if (!isPremium && !isTrialActive) {
+    return <PaywallScreen showClose={true} />;
+  }
 
   // Calculate interest preview
   const principalAmount = parseFloat(principal) || 0;

@@ -10,8 +10,12 @@ import { MonthlyReport, generateMonthlyReportData, exportReportAsPDF } from '../
 import { formatCurrency } from '../utils/currency';
 import { format, subMonths, addMonths } from 'date-fns';
 import { BarChart, PieChart } from 'react-native-gifted-charts';
+import { useSubscription } from '../src/subscription/useSubscription';
+import PaywallScreen from '../src/subscription/PaywallScreen';
 
 export default function FinancialReportScreen() {
+    const { isPremium, isTrialActive } = useSubscription();
+
     const [selectedMonth, setSelectedMonth] = useState(new Date());
     const [report, setReport] = useState<MonthlyReport | null>(null);
     const [loading, setLoading] = useState(true);
@@ -33,6 +37,10 @@ export default function FinancialReportScreen() {
     useEffect(() => {
         loadData();
     }, [loadData]);
+
+    if (!isPremium && !isTrialActive) {
+        return <PaywallScreen showClose={true} />;
+    }
 
     const handleExport = async () => {
         setExporting(true);

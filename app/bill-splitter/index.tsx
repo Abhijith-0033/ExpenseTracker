@@ -7,7 +7,11 @@ import { Colors, Typography } from '../../constants/Theme';
 import { getGroups, getGroupMembers, getGroupExpenses, BillGroup } from '../../services/billSplitter';
 import { BillGroupCard } from '../../components/BillGroupCard';
 
+import { useSubscription } from '../../src/subscription/useSubscription';
+import PaywallScreen from '../../src/subscription/PaywallScreen';
+
 export default function BillSplitterScreen() {
+    const { isPremium, isTrialActive } = useSubscription();
     const router = useRouter();
     const [groups, setGroups] = useState<BillGroup[]>([]);
     const [loading, setLoading] = useState(true);
@@ -58,6 +62,10 @@ export default function BillSplitterScreen() {
             fetchData();
         }, [])
     );
+
+    if (!isPremium && !isTrialActive) {
+        return <PaywallScreen showClose={true} />;
+    }
 
     return (
         <View style={styles.container}>

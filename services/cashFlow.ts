@@ -120,6 +120,14 @@ export const generateCashFlowForecast = async (days: number = 30): Promise<CashF
         JOIN transactions t ON r.expense_id = t.id
         WHERE date(r.expiry_date) >= date(?) AND date(r.expiry_date) <= date(?)
     `, [toDayString(now), endDay]);
+
+    // D. Upcoming Bills (pending, overdue, or snoozed)
+    const upcomingBills = await db.getAllAsync<{due_date: string, amount: number, name: string}>(`
+        SELECT due_date, amount, name
+        FROM upcoming_bills
+        WHERE (status = 'pending' OR status = 'overdue' OR status = 'snoozed')
+          AND date(due_date) >= date(?) AND date(due_date) <= date(?)
+    `, [toDayString(now), endDay]);
     
     // C. Detected recurring
     const recurring = await detectRecurringTransactions(days);
@@ -149,7 +157,7 @@ export const generateCashFlowForecast = async (days: number = 30): Promise<CashF
             }
         });
         
-        // Add bills
+        // Add bills (recharge_meta)
         bills.forEach(bill => {
             if (bill.expiry_date.startsWith(dayStr)) {
                 dailyExpense += bill.amount;
@@ -157,6 +165,19 @@ export const generateCashFlowForecast = async (days: number = 30): Promise<CashF
                     type: 'bill',
                     description: `Bill: ${bill.description}`,
                     amount: bill.amount,
+                    source: 'scheduled'
+                });
+            }
+        });
+
+        // Add new upcoming bills
+        upcomingBills.forEach(ub => {
+            if (ub.due_date.startsWith(dayStr)) {
+                dailyExpense += ub.amount;
+                events.push({
+                    type: 'bill',
+                    description: `Bill: ${ub.name}`,
+                    amount: ub.amount,
                     source: 'scheduled'
                 });
             }

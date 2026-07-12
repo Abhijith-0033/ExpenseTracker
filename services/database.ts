@@ -508,6 +508,167 @@ const runMigrations = async (db: SQLite.SQLiteDatabase) => {
     await setDbVersion(db, version);
   }
 
+  if (version < 3) {
+    // Version 3: Tax Planner + Sinking Funds tables
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS tax_profile (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        financial_year    TEXT NOT NULL,
+        annual_income     REAL DEFAULT 0,
+        is_salaried       INTEGER DEFAULT 1,
+        tax_regime        TEXT DEFAULT 'new',
+        age_category      TEXT DEFAULT 'below60',
+        hra_received      REAL DEFAULT 0,
+        rent_paid         REAL DEFAULT 0,
+        is_metro_city     INTEGER DEFAULT 0,
+        basic_salary      REAL DEFAULT 0,
+        created_at        TEXT DEFAULT (datetime('now')),
+        updated_at        TEXT DEFAULT (datetime('now'))
+      );
+
+      CREATE TABLE IF NOT EXISTS tax_deductions (
+        id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+        financial_year          TEXT NOT NULL,
+        section                 TEXT NOT NULL,
+        instrument_type         TEXT DEFAULT NULL,
+        amount                  REAL NOT NULL,
+        date_invested           TEXT NOT NULL,
+        notes                   TEXT DEFAULT NULL,
+        linked_transaction_id   INTEGER DEFAULT NULL,
+        created_at              TEXT DEFAULT (datetime('now'))
+      );
+
+      CREATE TABLE IF NOT EXISTS sinking_funds (
+        id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+        name                  TEXT NOT NULL,
+        target_amount         REAL NOT NULL,
+        target_date           TEXT NOT NULL,
+        category_id           INTEGER DEFAULT NULL,
+        start_date            TEXT NOT NULL,
+        monthly_contribution  REAL NOT NULL,
+        current_saved         REAL DEFAULT 0,
+        linked_account_id     INTEGER DEFAULT NULL,
+        status                TEXT DEFAULT 'active',
+        is_recurring_annual   INTEGER DEFAULT 0,
+        notes                 TEXT DEFAULT NULL,
+        created_at            TEXT DEFAULT (datetime('now')),
+        updated_at            TEXT DEFAULT (datetime('now'))
+      );
+
+      CREATE TABLE IF NOT EXISTS sinking_fund_contributions (
+        id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+        fund_id             INTEGER NOT NULL,
+        amount              REAL NOT NULL,
+        contribution_date   TEXT NOT NULL,
+        account_id          INTEGER DEFAULT NULL,
+        transaction_id      INTEGER DEFAULT NULL,
+        notes               TEXT DEFAULT NULL,
+        created_at          TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY (fund_id) REFERENCES sinking_funds(id) ON DELETE CASCADE
+      );
+    `);
+
+    version = 3;
+    await setDbVersion(db, version);
+  }
+
+  if (version < 4) {
+    // Version 4: Subscription Cache + Scheduled Expenses tables
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS subscription_cache (
+        id                  INTEGER PRIMARY KEY,
+        revenuecat_user_id  TEXT NOT NULL,
+        tier                TEXT DEFAULT 'free',
+        plan                TEXT DEFAULT NULL,
+        trial_start_date    TEXT DEFAULT NULL,
+        trial_end_date      TEXT DEFAULT NULL,
+        subscription_expiry TEXT DEFAULT NULL,
+        last_verified       TEXT DEFAULT NULL,
+        is_trial_active     INTEGER DEFAULT 0,
+        created_at          TEXT DEFAULT (datetime('now')),
+        updated_at          TEXT DEFAULT (datetime('now'))
+      );
+
+      CREATE TABLE IF NOT EXISTS scheduled_expenses (
+        id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+        name                  TEXT NOT NULL,
+        amount                REAL NOT NULL,
+        category_id           INTEGER NOT NULL,
+        subcategory_id        INTEGER DEFAULT NULL,
+        account_id            INTEGER NOT NULL,
+        description           TEXT DEFAULT NULL,
+        days_of_week          TEXT NOT NULL,
+        scheduled_time        TEXT NOT NULL,
+        auto_create           INTEGER DEFAULT 0,
+        is_active             INTEGER DEFAULT 1,
+        status                TEXT DEFAULT 'active',
+        last_created_date     TEXT DEFAULT NULL,
+        created_at            TEXT DEFAULT (datetime('now')),
+        updated_at            TEXT DEFAULT (datetime('now'))
+      );
+
+      CREATE TABLE IF NOT EXISTS scheduled_expense_log (
+        id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+        scheduled_expense_id  INTEGER NOT NULL,
+        scheduled_date        TEXT NOT NULL,
+        scheduled_time        TEXT NOT NULL,
+        action                TEXT NOT NULL,
+        transaction_id        INTEGER DEFAULT NULL,
+        amount                REAL NOT NULL,
+        notification_id       TEXT DEFAULT NULL,
+        created_at            TEXT DEFAULT (datetime('now'))
+      );
+    `);
+
+    version = 4;
+    await setDbVersion(db, version);
+  }
+
+  if (version < 5) {
+    // Version 5: Upcoming Bills table
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS upcoming_bills (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        name              TEXT NOT NULL,
+        amount            REAL NOT NULL,
+        category          TEXT DEFAULT 'Bills',
+        due_date          TEXT NOT NULL,
+        recurrence        TEXT DEFAULT 'once',
+        status            TEXT DEFAULT 'pending',
+        account_id        INTEGER DEFAULT NULL,
+        notes             TEXT DEFAULT NULL,
+        transaction_id    INTEGER DEFAULT NULL,
+        icon              TEXT DEFAULT '📄',
+        color             TEXT DEFAULT '#2563EB',
+        paid_date         TEXT DEFAULT NULL,
+        created_at        TEXT DEFAULT (datetime('now')),
+        updated_at        TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY (account_id) REFERENCES accounts(id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_upcoming_bills_due_date ON upcoming_bills(due_date);
+      CREATE INDEX IF NOT EXISTS idx_upcoming_bills_status ON upcoming_bills(status);
+    `);
+
+    version = 5;
+    await setDbVersion(db, version);
+  }
+
+  if (version < 6) {
+    // Version 6: Data Deletion Log table
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS data_deletion_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        start_date TEXT NOT NULL,
+        end_date TEXT NOT NULL,
+        records_deleted INTEGER NOT NULL,
+        deleted_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+    `);
+
+    version = 6;
+    await setDbVersion(db, version);
+  }
+
   console.log(`Database migrated successfully to version ${version}`);
 };
 
@@ -1186,12 +1347,28 @@ export const getTransactionById = async (id: number): Promise<Transaction | null
 export const getTransactionsForMonth = async (date: Date): Promise<Transaction[]> => {
   await initDatabase();
   const db = getDatabase();
+  
+  let isFreeUser = true;
+  try {
+    const cache = await db.getFirstAsync<{ tier: string; is_trial_active: number }>(
+      'SELECT tier, is_trial_active FROM subscription_cache LIMIT 1'
+    );
+    if (cache && (cache.tier === 'premium' || cache.is_trial_active === 1)) {
+      isFreeUser = false;
+    }
+  } catch (e) {}
+
   const start = new Date(date.getFullYear(), date.getMonth(), 1).toISOString();
   const end = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999).toISOString();
-  const txs = await db.getAllAsync<Transaction>(
-    'SELECT * FROM transactions WHERE date >= ? AND date <= ? ORDER BY date DESC',
-    [start, end]
-  );
+  
+  let query = 'SELECT * FROM transactions WHERE date >= ? AND date <= ?';
+  const params = [start, end];
+  if (isFreeUser) {
+    query += " AND date >= date('now', '-30 days')";
+  }
+  query += ' ORDER BY date DESC';
+  
+  const txs = await db.getAllAsync<Transaction>(query, params);
   return txs.map(t => ({
     ...t,
     type: t.category === 'Income' ? 'income' : (t.category === 'Transfer' ? 'transfer' : (t.category === 'Debt/Credit' ? 'debt' : 'expense'))
@@ -1201,12 +1378,28 @@ export const getTransactionsForMonth = async (date: Date): Promise<Transaction[]
 export const getTransactionsForDay = async (date: Date): Promise<Transaction[]> => {
   await initDatabase();
   const db = getDatabase();
+  
+  let isFreeUser = true;
+  try {
+    const cache = await db.getFirstAsync<{ tier: string; is_trial_active: number }>(
+      'SELECT tier, is_trial_active FROM subscription_cache LIMIT 1'
+    );
+    if (cache && (cache.tier === 'premium' || cache.is_trial_active === 1)) {
+      isFreeUser = false;
+    }
+  } catch (e) {}
+
   const start = new Date(date.getFullYear(), date.getMonth(), date.getDate()).toISOString();
   const end = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999).toISOString();
-  const txs = await db.getAllAsync<Transaction>(
-    'SELECT * FROM transactions WHERE date >= ? AND date <= ? ORDER BY date DESC',
-    [start, end]
-  );
+  
+  let query = 'SELECT * FROM transactions WHERE date >= ? AND date <= ?';
+  const params = [start, end];
+  if (isFreeUser) {
+    query += " AND date >= date('now', '-30 days')";
+  }
+  query += ' ORDER BY date DESC';
+  
+  const txs = await db.getAllAsync<Transaction>(query, params);
   return txs.map(t => ({
     ...t,
     type: t.category === 'Income' ? 'income' : (t.category === 'Transfer' ? 'transfer' : (t.category === 'Debt/Credit' ? 'debt' : 'expense'))
@@ -1228,9 +1421,23 @@ export const getTransactionsPaginated = async (
   await initDatabase();
   const db = getDatabase();
 
+  let isFreeUser = true;
+  try {
+    const cache = await db.getFirstAsync<{ tier: string; is_trial_active: number }>(
+      'SELECT tier, is_trial_active FROM subscription_cache LIMIT 1'
+    );
+    if (cache && (cache.tier === 'premium' || cache.is_trial_active === 1)) {
+      isFreeUser = false;
+    }
+  } catch (e) {}
+
   let query = 'SELECT * FROM transactions';
   const conditions: string[] = [];
   const params: any[] = [];
+
+  if (isFreeUser) {
+    conditions.push("date >= date('now', '-30 days')");
+  }
 
   if (filters) {
     if (filters.accountId !== undefined && filters.accountId !== null) {
@@ -1280,3 +1487,206 @@ export const getTransactionsPaginated = async (
   }));
 };
 
+export interface ScheduledExpense {
+  id: number;
+  name: string;
+  amount: number;
+  category_id: number;
+  subcategory_id?: number | null;
+  account_id: number;
+  description?: string | null;
+  days_of_week: string; // JSON array of numbers, e.g. "[1,2,3]"
+  scheduled_time: string; // "HH:MM"
+  auto_create: number; // 0 or 1
+  is_active: number; // 0 or 1
+  status: string; // 'active' | 'deleted'
+  last_created_date?: string | null; // "YYYY-MM-DD"
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ScheduledExpenseJoined extends ScheduledExpense {
+  category_name: string;
+  subcategory_name?: string | null;
+  account_name: string;
+}
+
+export const getActiveScheduledExpenses = async (): Promise<ScheduledExpenseJoined[]> => {
+  await initDatabase();
+  const db = getDatabase();
+  return await db.getAllAsync<ScheduledExpenseJoined>(`
+    SELECT se.*, c.name as category_name, a.name as account_name, cs.name as subcategory_name
+    FROM scheduled_expenses se
+    LEFT JOIN categories c ON se.category_id = c.id
+    LEFT JOIN accounts a ON se.account_id = a.id
+    LEFT JOIN category_subcategories cs ON se.subcategory_id = cs.id
+    WHERE se.is_active = 1 AND se.status = 'active'
+  `);
+};
+
+export const getAllScheduledExpenses = async (): Promise<ScheduledExpenseJoined[]> => {
+  await initDatabase();
+  const db = getDatabase();
+  return await db.getAllAsync<ScheduledExpenseJoined>(`
+    SELECT se.*, c.name as category_name, a.name as account_name, cs.name as subcategory_name
+    FROM scheduled_expenses se
+    LEFT JOIN categories c ON se.category_id = c.id
+    LEFT JOIN accounts a ON se.account_id = a.id
+    LEFT JOIN category_subcategories cs ON se.subcategory_id = cs.id
+    WHERE se.status = 'active'
+  `);
+};
+
+export const getScheduledExpenseById = async (id: number): Promise<ScheduledExpenseJoined | null> => {
+  await initDatabase();
+  const db = getDatabase();
+  return await db.getFirstAsync<ScheduledExpenseJoined>(`
+    SELECT se.*, c.name as category_name, a.name as account_name, cs.name as subcategory_name
+    FROM scheduled_expenses se
+    LEFT JOIN categories c ON se.category_id = c.id
+    LEFT JOIN accounts a ON se.account_id = a.id
+    LEFT JOIN category_subcategories cs ON se.subcategory_id = cs.id
+    WHERE se.id = ?
+  `, [id]);
+};
+
+export const insertScheduledExpense = async (se: Omit<ScheduledExpense, 'id' | 'created_at' | 'updated_at' | 'status' | 'last_created_date'>): Promise<number> => {
+  await initDatabase();
+  const db = getDatabase();
+  const result = await db.runAsync(`
+    INSERT INTO scheduled_expenses 
+      (name, amount, category_id, subcategory_id, account_id, description, days_of_week, scheduled_time, auto_create, is_active)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `, [se.name, se.amount, se.category_id, se.subcategory_id ?? null, se.account_id, se.description ?? null, se.days_of_week, se.scheduled_time, se.auto_create, se.is_active]);
+  return result.lastInsertRowId;
+};
+
+export const updateScheduledExpense = async (id: number, se: Partial<ScheduledExpense>): Promise<void> => {
+  await initDatabase();
+  const db = getDatabase();
+  const keys = Object.keys(se);
+  if (keys.length === 0) return;
+  const sets = keys.map(k => `${k} = ?`).join(', ');
+  const vals = [...Object.values(se), new Date().toISOString(), id];
+  await db.runAsync(`UPDATE scheduled_expenses SET ${sets}, updated_at = ? WHERE id = ?`, vals);
+};
+
+export const softDeleteScheduledExpense = async (id: number): Promise<void> => {
+  await initDatabase();
+  const db = getDatabase();
+  await db.runAsync(`UPDATE scheduled_expenses SET status = 'deleted', updated_at = datetime('now') WHERE id = ?`, [id]);
+};
+
+export const getScheduledExpenseStats = async () => {
+  await initDatabase();
+  const db = getDatabase();
+  
+  // Find start of current week (Monday)
+  const monday = new Date();
+  const day = monday.getDay();
+  const diff = monday.getDate() - day + (day === 0 ? -6 : 1);
+  const mondayStr = new Date(monday.setDate(diff)).toISOString().split('T')[0];
+
+  const autoCreated = await db.getFirstAsync<{ count: number, sum: number }>(`
+    SELECT COUNT(*) as count, IFNULL(SUM(amount), 0) as sum 
+    FROM scheduled_expense_log 
+    WHERE action = 'auto_created' AND scheduled_date >= ?
+  `, [mondayStr]);
+
+  const rejected = await db.getFirstAsync<{ count: number, sum: number }>(`
+    SELECT COUNT(*) as count, IFNULL(SUM(amount), 0) as sum 
+    FROM scheduled_expense_log 
+    WHERE action = 'rejected' AND scheduled_date >= ?
+  `, [mondayStr]);
+
+  const pending = await db.getFirstAsync<{ count: number }>(`
+    SELECT COUNT(*) as count 
+    FROM scheduled_expense_log 
+    WHERE action = 'pending'
+  `);
+
+  const activeSchedulesCount = await db.getFirstAsync<{ count: number }>(`
+    SELECT COUNT(*) as count 
+    FROM scheduled_expenses 
+    WHERE is_active = 1 AND status = 'active'
+  `);
+
+  return {
+    autoCreatedCount: autoCreated?.count || 0,
+    autoCreatedAmount: autoCreated?.sum || 0,
+    pendingCount: pending?.count || 0,
+    rejectedCount: rejected?.count || 0,
+    rejectedAmount: rejected?.sum || 0,
+    hasSchedules: (activeSchedulesCount?.count || 0) > 0
+  };
+};
+
+export const previewDeleteByDateRange = async (startDate: string, endDate: string): Promise<number> => {
+  await initDatabase();
+  const db = getDatabase();
+  const result = await db.getFirstAsync<{ cnt: number }>(
+    `SELECT COUNT(*) as cnt FROM transactions WHERE date >= ? AND date <= ?`,
+    [startDate + 'T00:00:00.000Z', endDate + 'T23:59:59.999Z']
+  );
+  return result?.cnt ?? 0;
+};
+
+export const deleteTransactionsByDateRange = async (startDate: string, endDate: string): Promise<number> => {
+  await initDatabase();
+  const db = getDatabase();
+
+  // 1. Load all transactions in range to reverse their account effects
+  const txs = await db.getAllAsync<Transaction>(
+    `SELECT * FROM transactions WHERE date >= ? AND date <= ?`,
+    [startDate + 'T00:00:00.000Z', endDate + 'T23:59:59.999Z']
+  );
+
+  // 2. Reverse each transaction's balance effect
+  for (const tx of txs) {
+    const delta = getAccountBalanceDelta(tx);
+    await db.runAsync(
+      'UPDATE accounts SET balance = balance - ? WHERE id = ?',
+      [delta, tx.account_id]
+    );
+  }
+
+  // 3. Delete the transactions
+  const result = await db.runAsync(
+    `DELETE FROM transactions WHERE date >= ? AND date <= ?`,
+    [startDate + 'T00:00:00.000Z', endDate + 'T23:59:59.999Z']
+  );
+
+  const count = result.changes;
+
+  // 4. Log the deletion
+  await db.runAsync(
+    `INSERT INTO data_deletion_log (start_date, end_date, records_deleted) VALUES (?, ?, ?)`,
+    [startDate, endDate, count]
+  );
+
+  return count;
+};
+
+export const getDataDeletionLog = async (): Promise<any[]> => {
+  await initDatabase();
+  const db = getDatabase();
+  return await db.getAllAsync(
+    'SELECT * FROM data_deletion_log ORDER BY deleted_at DESC LIMIT 20'
+  );
+};
+
+
+
+export const checkTransactionsExistForAccount = async (accountId: number): Promise<boolean> => {
+    const result = await db.getFirstAsync<{count: number}>('SELECT COUNT(*) as count FROM transactions WHERE account_id = ?', [accountId]);
+    return (result?.count || 0) > 0;
+};
+
+export const deleteAccount = async (accountId: number): Promise<void> => {
+    await db.runAsync('DELETE FROM accounts WHERE id = ?', [accountId]);
+};
+
+export const checkTransactionsExistForCategory = async (categoryName: string): Promise<boolean> => {
+    const result = await db.getFirstAsync<{count: number}>('SELECT COUNT(*) as count FROM transactions WHERE category = ? OR subcategory = ?', [categoryName, categoryName]);
+    return (result?.count || 0) > 0;
+};

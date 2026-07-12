@@ -9,6 +9,7 @@ import { BookCard } from '../../components/BookCard';
 import { formatCurrency } from '../../utils/currency';
 import { PressableScale } from '../../components/ui/PressableScale';
 import { Snackbar } from '../../components/Snackbar';
+import { ConfirmActionSheet } from '../../components/ConfirmActionSheet';
 
 export default function BooksScreen() {
     const router = useRouter();
@@ -29,6 +30,14 @@ export default function BooksScreen() {
     // Snackbar State
     const [snackbarVisible, setSnackbarVisible] = useState(false);
     const [snackbarMessage, setSnackbarMessage] = useState('');
+
+    const [confirmSheet, setConfirmSheet] = useState<{
+        title: string;
+        description: string;
+        confirmLabel: string;
+        actionType: 'delete' | 'edit' | 'approve' | 'pay' | 'warning';
+        onConfirm: () => void;
+    } | null>(null);
 
     const fetchData = async () => {
         try {
@@ -117,27 +126,23 @@ export default function BooksScreen() {
     };
 
     const handleDeleteBook = (book: ExpenseBook & { total_spent: number; total_income: number; item_count: number }) => {
-        Alert.alert(
-            'Delete Expense Book',
-            `This will permanently delete '${book.name}' and all its entries. This cannot be undone.`,
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Delete',
-                    style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            await deleteBook(book.id);
-                            fetchData();
-                            setSnackbarMessage('Expense book deleted');
-                            setSnackbarVisible(true);
-                        } catch (_e) {
-                            Alert.alert('Error', 'Failed to delete book');
-                        }
-                    }
+        setConfirmSheet({
+            title: 'Delete Expense Book?',
+            description: `This will permanently delete '${book.name}' and all its entries.`,
+            confirmLabel: 'Delete Book',
+            actionType: 'delete',
+            onConfirm: async () => {
+                setConfirmSheet(null);
+                try {
+                    await deleteBook(book.id);
+                    fetchData();
+                    setSnackbarMessage('Expense book deleted');
+                    setSnackbarVisible(true);
+                } catch (_e) {
+                    Alert.alert('Error', 'Failed to delete book');
                 }
-            ]
-        );
+            }
+        });
     };
 
     const totalTracked = books.reduce((sum, b) => sum + b.total_spent, 0);
@@ -316,6 +321,18 @@ export default function BooksScreen() {
                 message={snackbarMessage}
                 onDismiss={() => setSnackbarVisible(false)}
             />
+
+            {confirmSheet && (
+                <ConfirmActionSheet
+                    visible={!!confirmSheet}
+                    title={confirmSheet.title}
+                    description={confirmSheet.description}
+                    confirmLabel={confirmSheet.confirmLabel}
+                    actionType={confirmSheet.actionType}
+                    onConfirm={confirmSheet.onConfirm}
+                    onCancel={() => setConfirmSheet(null)}
+                />
+            )}
         </View>
     );
 };

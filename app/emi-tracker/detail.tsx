@@ -9,10 +9,15 @@ import { getAccounts, Account } from '../../services/database';
 import { AccountSelector } from '../../components/AccountSelector';
 import { PieChart as GiftedPieChart, BarChart as GiftedBarChart } from 'react-native-gifted-charts';
 import { format, parseISO } from 'date-fns';
+import PaywallScreen from '../../src/subscription/PaywallScreen';
+import { useSubscription } from '../../src/subscription/useSubscription';
+import { ConfirmActionSheet } from '../../components/ConfirmActionSheet';
 
 const _screenWidth = Dimensions.get('window').width;
 
 export default function EMIDetailScreen() {
+  const { isPremium, isTrialActive } = useSubscription();
+
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string }>();
   const emiId = params.id ? parseInt(params.id) : 0;
@@ -27,6 +32,14 @@ export default function EMIDetailScreen() {
   const [selectedPayment, setSelectedPayment] = useState<EMIPayment | null>(null);
   const [paymentDate, setPaymentDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
+  
+  const [confirmSheet, setConfirmSheet] = useState<{
+    title: string;
+    description: string;
+    confirmLabel: string;
+    actionType: 'delete' | 'edit' | 'approve' | 'pay' | 'warning';
+    onConfirm: () => void;
+  } | null>(null);
   const [paymentNote, setPaymentNote] = useState('Manually marked as paid');
 
   const loadData = useCallback(async () => {
@@ -49,6 +62,10 @@ export default function EMIDetailScreen() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  if (!isPremium && !isTrialActive) {
+    return <PaywallScreen showClose={true} />;
+  }
 
   const paidCount = payments.filter((p) => p.payment_status === 'paid').length;
   const pendingCount = payments.filter((p) => p.payment_status === 'pending').length;
@@ -138,25 +155,21 @@ export default function EMIDetailScreen() {
   };
 
   const handleRevertPayment = (payment: EMIPayment) => {
-    Alert.alert(
-      'Revert Payment',
-      'Are you sure you want to revert this payment to pending? Any account balance deduction will be reversed.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Revert',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await revertPaymentStatus(payment.id);
-              loadData();
-            } catch (_error) {
-              Alert.alert('Error', 'Failed to revert payment');
-            }
-          }
+    setConfirmSheet({
+      title: 'Revert Payment?',
+      description: 'Are you sure you want to revert this payment to pending? Any account balance deduction will be reversed.',
+      confirmLabel: 'Revert',
+      actionType: 'delete',
+      onConfirm: async () => {
+        setConfirmSheet(null);
+        try {
+          await revertPaymentStatus(payment.id);
+          loadData();
+        } catch (_error) {
+          Alert.alert('Error', 'Failed to revert payment');
         }
-      ]
-    );
+      }
+    });
   };
 
   const handleEditPayment = (payment: EMIPayment) => {
@@ -453,6 +466,18 @@ export default function EMIDetailScreen() {
           </View>
         </View>
       </Modal>
+
+      {confirmSheet && (
+        <ConfirmActionSheet
+          visible={!!confirmSheet}
+          title={confirmSheet.title}
+          description={confirmSheet.description}
+          confirmLabel={confirmSheet.confirmLabel}
+          actionType={confirmSheet.actionType}
+          onConfirm={confirmSheet.onConfirm}
+          onCancel={() => setConfirmSheet(null)}
+        />
+      )}
     </View>
   );
 }

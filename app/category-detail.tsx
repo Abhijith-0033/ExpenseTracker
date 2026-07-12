@@ -12,11 +12,15 @@ import { formatCurrency } from '../utils/currency';
 import { startOfMonth, subMonths, startOfYear, format, parseISO } from 'date-fns';
 import { TransactionList } from '../components/TransactionList';
 
+import { useSubscription } from '../src/subscription/useSubscription';
+import PaywallScreen from '../src/subscription/PaywallScreen';
+
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 type Period = 'Last 6M' | 'This Year' | 'All Time';
 
 export default function CategoryDetailScreen() {
+    const { isPremium, isTrialActive } = useSubscription();
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const params = useLocalSearchParams();
@@ -94,6 +98,10 @@ export default function CategoryDetailScreen() {
             loadCategoryData();
         }
     }, [selectedCategory, period, loadCategoryData]);
+
+    if (!isPremium && !isTrialActive) {
+        return <PaywallScreen showClose={true} />;
+    }
 
     async function loadBaseData() {
         const [cats, classMap] = await Promise.all([
@@ -226,6 +234,7 @@ export default function CategoryDetailScreen() {
                             <View style={{ marginTop: 20, alignItems: 'center' }}>
                                 <BarChart
                                     data={chartData}
+                                    maxValue={chartData.length > 0 ? Math.max(...chartData.map(d => d.value), 10) * 1.2 : 100}
                                     width={SCREEN_WIDTH - 100}
                                     height={180}
                                     barWidth={28}

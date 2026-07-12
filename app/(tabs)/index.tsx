@@ -4,7 +4,7 @@ import { TabErrorFallback } from '../../components/ErrorBoundary';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, StatusBar, TouchableOpacity, Dimensions , Modal } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useApp } from '../../context/AppContext';
-import {  TrendingUp, TrendingDown, ArrowRight, BookOpen, Activity , CalendarDays, CalendarRange, Calendar, BarChart3, X , Grid } from 'lucide-react-native';
+import {  TrendingUp, TrendingDown, ArrowRight, BookOpen, Activity , CalendarDays, CalendarRange, Calendar, BarChart3, X , Grid, Lock } from 'lucide-react-native';
 import { Colors, Layout, Typography } from '../../constants/Theme';
 import { LinearGradient } from 'expo-linear-gradient';
 import { formatCurrency } from '../../utils/currency';
@@ -23,6 +23,8 @@ import SatisfactionCard from '../../satisfaction/SatisfactionCard';
 import { formatAmount } from '../../utils/formatAmount';
 import { FlippableBalanceCard } from '../../components/FlippableBalanceCard';
 import { SidePanel } from '../../components/SidePanel';
+import { useSubscription } from '../../src/subscription/useSubscription';
+import { shouldShowTrialBanner, dismissTrialBannerForOneHour } from '../../src/subscription/trialManager';
 
 const { width: _SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -38,6 +40,21 @@ function DashboardContent() {
   const _insets = useSafeAreaInsets();
   const { accounts, refreshData, dataVersion } = useApp();
   const [refreshing, setRefreshing] = useState(false);
+  const { isPremium: _isPremium, isTrialActive, trialHoursRemaining } = useSubscription();
+  const [showBanner, setShowBanner] = useState(false);
+
+  useEffect(() => {
+    if (isTrialActive) {
+      shouldShowTrialBanner().then(setShowBanner);
+    } else {
+      setShowBanner(false);
+    }
+  }, [isTrialActive]);
+
+  const handleDismissBanner = async () => {
+    await dismissTrialBannerForOneHour();
+    setShowBanner(false);
+  };
 
   // Dashboard Summaries State
   const [bookSummary, setBookSummary] = useState({ count: 0, total: 0 });
@@ -136,6 +153,37 @@ function DashboardContent() {
               </TouchableOpacity>
             </View>
           </Animated.View>
+
+          {/* Trial Expiry Banner */}
+          {showBanner && (
+            <Animated.View 
+              entering={FadeInDown.duration(400)} 
+              style={styles.trialBanner}
+            >
+              <TouchableOpacity 
+                activeOpacity={0.9} 
+                style={styles.trialBannerContent}
+                onPress={() => router.push('/paywall')}
+              >
+                <View style={styles.trialBannerLeft}>
+                  <View style={styles.trialBannerIconContainer}>
+                    <Lock size={16} color={Colors.white} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.trialBannerTitle}>Premium Trial Active</Text>
+                    <Text style={styles.trialBannerSub}>Only {Math.max(1, Math.round(trialHoursRemaining))} hours remaining. Tap to secure access forever.</Text>
+                  </View>
+                </View>
+                <TouchableOpacity 
+                  style={styles.trialDismissBtn} 
+                  onPress={handleDismissBanner}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <X size={16} color="rgba(255,255,255,0.7)" />
+                </TouchableOpacity>
+              </TouchableOpacity>
+            </Animated.View>
+          )}
 
           {/* Main Balance Card */}
           <Animated.View entering={FadeInDown.delay(100).duration(600)}>
@@ -785,6 +833,49 @@ const styles = StyleSheet.create({
   miniBudgetStatus: {
     fontSize: Typography.size.xs,
     fontFamily: Typography.family.bold,
+  },
+  trialBanner: {
+    marginHorizontal: 20,
+    marginBottom: 16,
+    borderRadius: 20,
+    overflow: 'hidden',
+    ...Layout.shadows.md,
+  },
+  trialBannerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Colors.gray[900],
+    padding: 16,
+  },
+  trialBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    paddingRight: 8,
+  },
+  trialBannerIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  trialBannerTitle: {
+    fontSize: 14,
+    fontFamily: Typography.family.bold,
+    color: Colors.white,
+    marginBottom: 2,
+  },
+  trialBannerSub: {
+    fontSize: 11,
+    fontFamily: Typography.family.medium,
+    color: 'rgba(255,255,255,0.85)',
+  },
+  trialDismissBtn: {
+    padding: 4,
   },
 });
 

@@ -8,8 +8,12 @@ import { ChitFund } from '../../services/chitfund/ChitEngine';
 import { Snackbar } from '../../components/Snackbar';
 import { FormField } from '../../components/FormField';
 import { formatCurrency } from '../../utils/currency';
+import { useSubscription } from '../../src/subscription/useSubscription';
+import PaywallScreen from '../../src/subscription/PaywallScreen';
 
 export default function AddChitFundScreen() {
+  const { isPremium, isTrialActive } = useSubscription();
+
   const router = useRouter();
   
   // Form state
@@ -27,6 +31,10 @@ export default function AddChitFundScreen() {
   const [showPreview, setShowPreview] = useState(false);
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
+
+  if (!isPremium && !isTrialActive) {
+    return <PaywallScreen showClose={true} />;
+  }
 
   // Calculate preview values
   const members = parseInt(totalMembers) || 0;

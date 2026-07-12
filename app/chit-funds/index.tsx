@@ -10,9 +10,14 @@ import { Snackbar } from '../../components/Snackbar';
 import { Swipeable } from 'react-native-gesture-handler';
 import { format } from 'date-fns';
 
+import { useSubscription } from '../../src/subscription/useSubscription';
+import PaywallScreen from '../../src/subscription/PaywallScreen';
+import { ConfirmActionSheet } from '../../components/ConfirmActionSheet';
+
 type FilterType = 'all' | 'active' | 'completed' | 'cancelled';
 
 export default function ChitFundsScreen() {
+  const { isPremium, isTrialActive } = useSubscription();
   const router = useRouter();
   const [chitFunds, setChitFunds] = useState<ChitFund[]>([]);
   const [filteredChitFunds, setFilteredChitFunds] = useState<ChitFund[]>([]);
@@ -31,6 +36,14 @@ export default function ChitFundsScreen() {
   // Snackbar state
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
+
+  const [confirmSheet, setConfirmSheet] = useState<{
+    title: string;
+    description: string;
+    confirmLabel: string;
+    actionType: 'delete' | 'edit' | 'approve' | 'pay' | 'warning';
+    onConfirm: () => void;
+  } | null>(null);
 
   const fetchData = async () => {
     try {
@@ -97,28 +110,28 @@ export default function ChitFundsScreen() {
     setFilteredChitFunds(filtered);
   }, [activeFilter, chitFunds]);
 
+  if (!isPremium && !isTrialActive) {
+    return <PaywallScreen showClose={true} />;
+  }
+
   const handleDelete = (chitFund: ChitFund) => {
-    Alert.alert(
-      'Delete Chit Fund',
-      `This will permanently delete '${chitFund.name}' and all its records. This cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteChitFund(chitFund.id);
-              fetchData();
-              setSnackbarMessage('Chit fund deleted');
-              setSnackbarVisible(true);
-            } catch (_error) {
-              Alert.alert('Error', 'Failed to delete chit fund');
-            }
-          }
+    setConfirmSheet({
+      title: 'Delete Chit Fund?',
+      description: `This will permanently delete '${chitFund.name}' and all its records.`,
+      confirmLabel: 'Delete',
+      actionType: 'delete',
+      onConfirm: async () => {
+        setConfirmSheet(null);
+        try {
+          await deleteChitFund(chitFund.id);
+          fetchData();
+          setSnackbarMessage('Chit fund deleted');
+          setSnackbarVisible(true);
+        } catch (_error) {
+          Alert.alert('Error', 'Failed to delete chit fund');
         }
-      ]
-    );
+      }
+    });
   };
 
   const ChitFundCard = ({ chitFund }: { chitFund: ChitFund }) => {
@@ -411,6 +424,18 @@ export default function ChitFundsScreen() {
         message={snackbarMessage}
         onDismiss={() => setSnackbarVisible(false)}
       />
+
+      {confirmSheet && (
+        <ConfirmActionSheet
+          visible={!!confirmSheet}
+          title={confirmSheet.title}
+          description={confirmSheet.description}
+          confirmLabel={confirmSheet.confirmLabel}
+          actionType={confirmSheet.actionType}
+          onConfirm={confirmSheet.onConfirm}
+          onCancel={() => setConfirmSheet(null)}
+        />
+      )}
     </View>
   );
 }

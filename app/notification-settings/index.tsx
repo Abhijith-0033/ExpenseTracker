@@ -39,6 +39,8 @@ export default function NotificationSettingsScreen() {
   const [emiRemindersEnabled, setEMIRemindersEnabled] = useState(false);
   const [emiAutopayEnabled, setEMIAutopayEnabled] = useState(false);
   const [telegramAlertsEnabled, setTelegramAlertsEnabled] = useState(false);
+  const [scheduledAutoConfirmEnabled, setScheduledAutoConfirmEnabled] = useState(false);
+  const [scheduledApprovalEnabled, setScheduledApprovalEnabled] = useState(false);
   
   // UI state
   const [_loading, _setLoading] = useState(false);
@@ -76,6 +78,8 @@ export default function NotificationSettingsScreen() {
         AsyncStorage.getItem(SETTINGS_KEYS.NOTIF_EMI_REMINDERS),
         AsyncStorage.getItem(SETTINGS_KEYS.NOTIF_EMI_AUTOPAY),
         AsyncStorage.getItem(SETTINGS_KEYS.NOTIF_TELEGRAM),
+        AsyncStorage.getItem(SETTINGS_KEYS.NOTIF_SCHED_AUTO_CONFIRM),
+        AsyncStorage.getItem(SETTINGS_KEYS.NOTIF_SCHED_APPROVAL),
       ]);
 
       setMasterEnabled(settings[0] === 'true');
@@ -95,6 +99,8 @@ export default function NotificationSettingsScreen() {
       setEMIRemindersEnabled(settings[14] === 'true');
       setEMIAutopayEnabled(settings[15] === 'true');
       setTelegramAlertsEnabled(settings[16] === 'true');
+      setScheduledAutoConfirmEnabled(settings[17] === 'true');
+      setScheduledApprovalEnabled(settings[18] === 'true');
     } catch (error) {
       console.error('Failed to load notification settings:', error);
     }
@@ -161,6 +167,8 @@ export default function NotificationSettingsScreen() {
         AsyncStorage.setItem(SETTINGS_KEYS.NOTIF_EMI_REMINDERS, 'false'),
         AsyncStorage.setItem(SETTINGS_KEYS.NOTIF_EMI_AUTOPAY, 'false'),
         AsyncStorage.setItem(SETTINGS_KEYS.NOTIF_TELEGRAM, 'false'),
+        AsyncStorage.setItem(SETTINGS_KEYS.NOTIF_SCHED_AUTO_CONFIRM, 'false'),
+        AsyncStorage.setItem(SETTINGS_KEYS.NOTIF_SCHED_APPROVAL, 'false'),
       ]);
       
       // Update UI state
@@ -178,6 +186,8 @@ export default function NotificationSettingsScreen() {
       setEMIRemindersEnabled(false);
       setEMIAutopayEnabled(false);
       setTelegramAlertsEnabled(false);
+      setScheduledAutoConfirmEnabled(false);
+      setScheduledApprovalEnabled(false);
       
       // Cancel all notifications
       await cancelByPrefix('');
@@ -504,6 +514,33 @@ export default function NotificationSettingsScreen() {
             onToggle={(value) => {
               setEMIAutopayEnabled(value);
               updateSetting(SETTINGS_KEYS.NOTIF_EMI_AUTOPAY, value);
+            }}
+            disabled={!masterEnabled}
+          />
+        </View>
+
+        {/* Scheduled Expenses Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>SCHEDULED EXPENSES</Text>
+          
+          <ToggleRow
+            title="Auto-Create Confirmations"
+            subtitle="Notify when an automatic expense is created"
+            value={scheduledAutoConfirmEnabled}
+            onToggle={(value) => {
+              setScheduledAutoConfirmEnabled(value);
+              updateSetting(SETTINGS_KEYS.NOTIF_SCHED_AUTO_CONFIRM, value);
+            }}
+            disabled={!masterEnabled}
+          />
+          
+          <ToggleRow
+            title="Due Approvals"
+            subtitle="Alerts asking you to approve or reject due expenses"
+            value={scheduledApprovalEnabled}
+            onToggle={(value) => {
+              setScheduledApprovalEnabled(value);
+              updateSetting(SETTINGS_KEYS.NOTIF_SCHED_APPROVAL, value);
             }}
             disabled={!masterEnabled}
           />

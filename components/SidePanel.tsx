@@ -10,9 +10,10 @@ import Animated, {
     Extrapolate
 } from 'react-native-reanimated';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
-import { X, Wallet, PieChart, Target, TrendingUp, Calculator, CreditCard, Users, ChevronRight, Calendar } from 'lucide-react-native';
+import { X, Wallet, PieChart, Target, TrendingUp, Calculator, CreditCard, Users, ChevronRight, Calendar, Lock, Clock } from 'lucide-react-native';
 import { Colors, Typography } from '../constants/Theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSubscription } from '../src/subscription/useSubscription';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PANEL_WIDTH = SCREEN_WIDTH * 0.82;
@@ -25,6 +26,8 @@ interface MenuItem {
     bgColor: string;
     iconColor: string;
     disabled?: boolean;
+    isPremiumOnly?: boolean;
+    badgeCount?: number;
 }
 
 interface SidePanelProps {
@@ -34,9 +37,30 @@ interface SidePanelProps {
 }
 
 export const SidePanel: React.FC<SidePanelProps> = ({ visible, onClose, onNavigate }) => {
+    const { isPremium, isTrialActive } = useSubscription();
+    const isFreeUser = !isPremium && !isTrialActive;
     const insets = useSafeAreaInsets();
     const translateX = useSharedValue(SCREEN_WIDTH);
     const [render, setRender] = React.useState(false);
+
+    const [pendingApprovalCount, setPendingApprovalCount] = React.useState(0);
+
+    React.useEffect(() => {
+        const load = async () => {
+            try {
+                const { getDatabase, initDatabase } = await import('../services/database');
+                await initDatabase();
+                const db = getDatabase();
+                const result: any = await db.getFirstAsync(
+                    `SELECT COUNT(*) as cnt FROM scheduled_expense_log WHERE action = 'pending'`
+                );
+                setPendingApprovalCount(result?.cnt ?? 0);
+            } catch (_e) {
+                // silently fail
+            }
+        };
+        if (visible) load();
+    }, [visible]);
 
     useEffect(() => {
         if (visible) {
@@ -54,6 +78,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({ visible, onClose, onNaviga
     }, [translateX, visible]);
 
     const panGesture = Gesture.Pan()
+        .activeOffsetX([-10, 10])
         .onUpdate((e) => {
             if (e.translationX > 0) {
                 translateX.value = e.translationX;
@@ -90,6 +115,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({ visible, onClose, onNaviga
             icon: Wallet,
             bgColor: Colors.primary[100],
             iconColor: Colors.primary[600],
+            isPremiumOnly: true,
         },
         {
             id: 'category-detail',
@@ -98,6 +124,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({ visible, onClose, onNaviga
             icon: PieChart,
             bgColor: Colors.warning[100],
             iconColor: Colors.warning[600],
+            isPremiumOnly: true,
         },
         {
             id: 'budgets',
@@ -114,6 +141,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({ visible, onClose, onNaviga
             icon: TrendingUp,
             bgColor: Colors.success[100],
             iconColor: Colors.success[600],
+            isPremiumOnly: true,
         },
         {
             id: 'debt-calculator',
@@ -130,6 +158,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({ visible, onClose, onNaviga
             icon: CreditCard,
             bgColor: 'rgba(239, 68, 68, 0.1)',
             iconColor: '#EF4444',
+            isPremiumOnly: true,
         },
         {
             id: 'chit-funds',
@@ -138,6 +167,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({ visible, onClose, onNaviga
             icon: Users,
             bgColor: 'rgba(16, 185, 129, 0.1)',
             iconColor: '#10B981',
+            isPremiumOnly: true,
         },
         {
             id: 'emi-tracker',
@@ -146,8 +176,18 @@ export const SidePanel: React.FC<SidePanelProps> = ({ visible, onClose, onNaviga
             icon: Calendar,
             bgColor: 'rgba(156, 39, 176, 0.1)',
             iconColor: '#9C27B0',
+            isPremiumOnly: true,
         },
-
+        {
+            id: 'scheduled-expenses',
+            title: 'Scheduled Expenses',
+            subtitle: 'Automate recurring payments',
+            icon: Clock,
+            bgColor: 'rgba(99, 102, 241, 0.1)',
+            iconColor: '#6366F1',
+            isPremiumOnly: true,
+            badgeCount: pendingApprovalCount > 0 ? pendingApprovalCount : undefined,
+        },
     ];
 
     return (
@@ -168,7 +208,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({ visible, onClose, onNaviga
                         </TouchableOpacity>
                     </View>
 
-                    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.menuContainer}>
+                    <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={styles.menuContainer}>
                         {menuItems.map((item) => (
                             <TouchableOpacity
                                 key={item.id}
@@ -187,13 +227,24 @@ export const SidePanel: React.FC<SidePanelProps> = ({ visible, onClose, onNaviga
                                     <Text style={styles.menuTitle}>{item.title}</Text>
                                     <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
                                 </View>
-                                {!item.disabled && <ChevronRight size={20} color={Colors.gray[300]} />}
+                                {item.badgeCount !== undefined && (
+                                    <View style={styles.menuBadge}>
+                                        <Text style={styles.menuBadgeText}>{item.badgeCount}</Text>
+                                    </View>
+                                )}
+                                {item.isPremiumOnly && isFreeUser ? (
+                                    <View style={styles.lockIconWrapper}>
+                                        <Lock size={14} color={Colors.primary[500]} />
+                                    </View>
+                                ) : (
+                                    !item.disabled && <ChevronRight size={20} color={Colors.gray[300]} />
+                                )}
                             </TouchableOpacity>
                         ))}
                     </ScrollView>
 
                     <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-                        <Text style={styles.versionText}>Gastos v2.5.0</Text>
+                        <Text style={styles.versionText}>Gastos v3.5.0 (Build 45)</Text>
                     </View>
                 </Animated.View>
             </GestureDetector>
@@ -301,8 +352,32 @@ const styles = StyleSheet.create({
     },
     versionText: {
         fontSize: Typography.size.xs,
+        fontFamily: Typography.family.regular,
+        color: Colors.gray[400],
+        textAlign: 'center',
+    },
+    lockIconWrapper: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        backgroundColor: Colors.primary[50],
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    menuBadge: {
+        backgroundColor: Colors.danger[500],
+        borderRadius: 10,
+        minWidth: 20,
+        height: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 5,
+        marginLeft: 'auto',
+        marginRight: 8,
+    },
+    menuBadgeText: {
+        fontSize: 10,
         fontFamily: Typography.family.bold,
-        color: Colors.gray[300],
-        letterSpacing: 1,
+        color: Colors.white,
     },
 });

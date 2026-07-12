@@ -15,8 +15,13 @@ import { SwipeableRow } from '../components/SwipeableRow';
 import { formatAmount } from '../utils/formatAmount';
 import { FormField } from '../components/FormField';
 import { Snackbar } from '../components/Snackbar';
+import { ConfirmActionSheet, ConfirmActionType } from '../components/ConfirmActionSheet';
+
+import { useSubscription } from '../src/subscription/useSubscription';
+import PaywallScreen from '../src/subscription/PaywallScreen';
 
 export default function SubscriptionsScreen() {
+    const { isPremium, isTrialActive } = useSubscription();
     const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
     const [monthlyBurn, setMonthlyBurn] = useState(0);
     const [activeTab, setActiveTab] = useState<'active' | 'cancelled'>('active');
@@ -25,7 +30,13 @@ export default function SubscriptionsScreen() {
     // Modal state
     const [showAddModal, setShowAddModal] = useState(false);
     const [editingSub, setEditingSub] = useState<Subscription | null>(null);
-    const [pendingDeleteSub, setPendingDeleteSub] = useState<{id: number, name: string} | null>(null);
+    const [confirmSheet, setConfirmSheet] = useState<{
+        title: string;
+        description: string;
+        confirmLabel: string;
+        actionType: ConfirmActionType;
+        onConfirm: () => void;
+    } | null>(null);
     const [name, setName] = useState('');
     const [amount, setAmount] = useState('');
     const [date, setDate] = useState(new Date());
@@ -45,6 +56,10 @@ export default function SubscriptionsScreen() {
     useEffect(() => {
         loadData();
     }, []);
+
+    if (!isPremium && !isTrialActive) {
+        return <PaywallScreen showClose={true} />;
+    }
 
     const loadData = async () => {
         setLoading(true);
@@ -79,7 +94,7 @@ export default function SubscriptionsScreen() {
         
         buttons.push({ text: '💰 Mark as Paid', onPress: () => handleMarkAsPaid(sub) });
         buttons.push({ text: '✏️ Edit', onPress: () => openEditModal(sub) });
-        buttons.push({ text: '🗑️ Delete', style: 'destructive', onPress: () => handleDelete(sub.id, sub.name) });
+        buttons.push({ text: '🗑️ Delete', style: 'destructive', onPress: () => requestDelete(sub.id, sub.name) });
         buttons.push({ text: 'Cancel', style: 'cancel' });
 
         Alert.alert(sub.name, 'Choose an action', buttons);
@@ -100,20 +115,22 @@ export default function SubscriptionsScreen() {
         ]);
     };
 
-    const handleDelete = (id: number, name: string) => {
-        setPendingDeleteSub({ id, name });
-    };
-
-    const commitDelete = async () => {
-        if (!pendingDeleteSub) return;
-        try {
-            await deleteSubscription(pendingDeleteSub.id);
-            loadData();
-        } catch (_e) {
-            Alert.alert("Error", "Failed to delete subscription");
-        } finally {
-            setPendingDeleteSub(null);
-        }
+    const requestDelete = (id: number, subName: string) => {
+        setConfirmSheet({
+            title: 'Delete Subscription?',
+            description: `Are you sure you want to permanently delete ${subName}? This action cannot be undone.`,
+            confirmLabel: 'Delete',
+            actionType: 'delete',
+            onConfirm: async () => {
+                setConfirmSheet(null);
+                try {
+                    await deleteSubscription(id);
+                    loadData();
+                } catch (_e) {
+                    Alert.alert("Error", "Failed to delete subscription");
+                }
+            }
+        });
     };
 
     const openAddModal = () => {
@@ -152,7 +169,7 @@ export default function SubscriptionsScreen() {
         setShowAddModal(true);
     };
 
-    const handleSave = async () => {
+    const requestSave = () => {
         const newErrors: Record<string, string> = {};
         if (!name) newErrors.name = 'Name is required';
         if (!amount || isNaN(parseFloat(amount))) newErrors.amount = 'Valid amount is required';
@@ -162,6 +179,24 @@ export default function SubscriptionsScreen() {
             return;
         }
         setErrors({});
+
+        if (editingSub) {
+            setConfirmSheet({
+                title: 'Save Changes?',
+                description: 'Are you sure you want to save these changes?',
+                confirmLabel: 'Edit',
+                actionType: 'edit',
+                onConfirm: () => {
+                    setConfirmSheet(null);
+                    commitSave();
+                }
+            });
+        } else {
+            commitSave();
+        }
+    };
+
+    const commitSave = async () => {
 
         const subData = {
             name,
@@ -193,8 +228,7 @@ export default function SubscriptionsScreen() {
         loadData();
     };
 
-    const validSubs = subscriptions.filter(s => s.id !== pendingDeleteSub?.id);
-    const filteredSubs = validSubs.filter(s => {
+    const filteredSubs = subscriptions.filter(s => {
         if (activeTab === 'active') return s.status !== 'cancelled';
         return s.status === 'cancelled';
     });
@@ -297,7 +331,7 @@ export default function SubscriptionsScreen() {
                             return (
                                 <Animated.View key={sub.id} entering={FadeInRight.delay(index * 100).duration(500)}>
                                     <SwipeableRow
-                                        onDelete={() => handleDelete(sub.id, sub.name)}
+                                        onDelete={() => requestDelete(sub.id, sub.name)}
                                         onEdit={() => openEditModal(sub)}
                                         deleteConfirmTitle="Delete Subscription"
                                         deleteConfirmMessage={`Are you sure you want to permanently delete ${sub.name}?`}
@@ -360,12 +394,7 @@ export default function SubscriptionsScreen() {
                 </View>
             </ScrollView>
 
-            <Snackbar 
-                visible={!!pendingDeleteSub}
-                message="Subscription deleted"
-                onUndo={() => setPendingDeleteSub(null)}
-                onDismiss={commitDelete}
-            />
+
 
             {/* Add/Edit Modal */}
             <Modal visible={showAddModal} animationType="slide" transparent>
@@ -512,7 +541,7 @@ export default function SubscriptionsScreen() {
 
                             <Button 
                                 title={editingSub ? "Update Subscription" : "Create Subscription"} 
-                                onPress={handleSave} 
+                                onPress={requestSave} 
                                 style={styles.saveBtn}
                             />
 
@@ -545,12 +574,17 @@ export default function SubscriptionsScreen() {
                 />
             )}
 
-            <Snackbar 
-                visible={!!pendingDeleteSub}
-                message="Subscription deleted"
-                onUndo={() => setPendingDeleteSub(null)}
-                onDismiss={commitDelete}
-            />
+            {confirmSheet && (
+                <ConfirmActionSheet
+                    visible={!!confirmSheet}
+                    title={confirmSheet.title}
+                    description={confirmSheet.description}
+                    confirmLabel={confirmSheet.confirmLabel}
+                    actionType={confirmSheet.actionType}
+                    onConfirm={confirmSheet.onConfirm}
+                    onCancel={() => setConfirmSheet(null)}
+                />
+            )}
         </SafeAreaView>
     );
 }

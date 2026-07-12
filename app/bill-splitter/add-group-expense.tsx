@@ -8,6 +8,7 @@ import { getGroupMembers, addExpense, getExpenseById, updateExpense, deleteExpen
 
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { format } from 'date-fns';
+import { ConfirmActionSheet, ConfirmActionType } from '../../components/ConfirmActionSheet';
 
 export default function AddGroupExpenseScreen() {
     const router = useRouter();
@@ -30,6 +31,13 @@ export default function AddGroupExpenseScreen() {
     const [members, setMembers] = useState<BillGroupMember[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [confirmSheet, setConfirmSheet] = useState<{
+        title: string;
+        description: string;
+        confirmLabel: string;
+        actionType: ConfirmActionType;
+        onConfirm: () => void;
+    } | null>(null);
 
     const loadData = React.useCallback(async () => {
         try {
@@ -389,6 +397,17 @@ export default function AddGroupExpenseScreen() {
                     {saving ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.saveBtnText}>{isEditing ? 'Update Expense' : 'Save Expense'}</Text>}
                 </TouchableOpacity>
             </View>
+            {confirmSheet && (
+                <ConfirmActionSheet
+                    visible={!!confirmSheet}
+                    title={confirmSheet.title}
+                    description={confirmSheet.description}
+                    confirmLabel={confirmSheet.confirmLabel}
+                    actionType={confirmSheet.actionType}
+                    onConfirm={confirmSheet.onConfirm}
+                    onCancel={() => setConfirmSheet(null)}
+                />
+            )}
         </KeyboardAvoidingView>
     );
 }

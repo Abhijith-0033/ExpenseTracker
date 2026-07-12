@@ -15,6 +15,7 @@ import { RecurringBottomSheet } from './RecurringBottomSheet';
 import { addSubscription } from '../services/subscriptions';
 import { formatAmount } from '../utils/formatAmount';
 import { Snackbar } from './Snackbar';
+import { ConfirmActionSheet, ConfirmActionType } from './ConfirmActionSheet';
 
 const TypedFlashList = FlashList as any;
 
@@ -65,6 +66,13 @@ export const TransactionList: React.FC<TransactionListProps> = ({
     const [recurringTx, setRecurringTx] = useState<Transaction | null>(null);
     const [showRecurring, setShowRecurring] = useState(false);
     const [pendingDeleteTx, setPendingDeleteTx] = useState<Transaction | null>(null);
+    const [confirmSheet, setConfirmSheet] = useState<{
+        title: string;
+        description: string;
+        confirmLabel: string;
+        actionType: ConfirmActionType;
+        onConfirm: () => void;
+    } | null>(null);
 
     const isStatic = transactions !== undefined;
 
@@ -121,7 +129,21 @@ export const TransactionList: React.FC<TransactionListProps> = ({
     };
 
     const handleDelete = (item: Transaction) => {
-        setPendingDeleteTx(item);
+        setConfirmSheet({
+            title: 'Delete Transaction?',
+            description: 'Are you sure you want to delete this transaction? This action cannot be undone.',
+            confirmLabel: 'Delete',
+            actionType: 'delete',
+            onConfirm: async () => {
+                setConfirmSheet(null);
+                try {
+                    await deleteTransaction(item.id, item.account_id, item.amount, item.category);
+                    await refreshData();
+                } catch (_e) {
+                    Alert.alert("Error", "Failed to delete transaction");
+                }
+            }
+        });
     };
 
     const commitDelete = async () => {
@@ -213,7 +235,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
         );
     }, [router]);
 
-    const validTransactions = activeList.filter(t => t.id !== pendingDeleteTx?.id);
+    const validTransactions = activeList;
     const displayedTransactions = limit ? validTransactions.slice(0, limit) : validTransactions;
 
     const accountName = selectedTx ? accounts.find(a => a.id === selectedTx.account_id)?.name || 'Default Account' : '';
@@ -329,12 +351,17 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                 onSave={handleRecurringSave}
             />
 
-            <Snackbar 
-                visible={!!pendingDeleteTx}
-                message="Transaction deleted"
-                onUndo={() => setPendingDeleteTx(null)}
-                onDismiss={commitDelete}
-            />
+            {confirmSheet && (
+                <ConfirmActionSheet
+                    visible={!!confirmSheet}
+                    title={confirmSheet.title}
+                    description={confirmSheet.description}
+                    confirmLabel={confirmSheet.confirmLabel}
+                    actionType={confirmSheet.actionType}
+                    onConfirm={confirmSheet.onConfirm}
+                    onCancel={() => setConfirmSheet(null)}
+                />
+            )}
         </View>
     );
 };

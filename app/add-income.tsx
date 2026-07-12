@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, Alert, StatusBar, Dimensions, ScrollView, DeviceEventEmitter } from 'react-native';
+import { View, Text, StyleSheet, TextInput, Alert, StatusBar, Dimensions, ScrollView, DeviceEventEmitter, ActivityIndicator, InteractionManager } from 'react-native';
 import { useRouter , useFocusEffect } from 'expo-router';
 import { useApp } from '../context/AppContext';
 import { addTransaction, getIncomeSources } from '../services/database';
@@ -28,6 +28,13 @@ export default function AddIncomeScreen() {
     const [display, setDisplay] = useState('0');
     const [description, setDescription] = useState('');
     const [selectedAccount, setSelectedAccount] = useState<any>(null);
+    const [initializing, setInitializing] = useState(true);
+    useEffect(() => {
+        const task = InteractionManager.runAfterInteractions(() => {
+            setInitializing(false);
+        });
+        return () => task.cancel();
+    }, []);
     // Fixed category for Income, but subcategory is selectable
     const category = 'Income';
     const [subcategory, setSubcategory] = useState('Salary');
@@ -64,7 +71,7 @@ export default function AddIncomeScreen() {
         } catch (e) {
             console.error("Failed to load income sources", e);
         }
-    }, [subcategory]);
+    }, []);
 
     useEffect(() => {
         if (accounts.length > 0 && !selectedAccount) {
@@ -213,6 +220,14 @@ export default function AddIncomeScreen() {
         setSelectedSourceIcon(nextSource.icon);
     }
 
+
+    if (initializing) {
+        return (
+            <View style={[commonStyles.screenContainer, { paddingTop: insets.top, justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color={Colors.primary[500]} />
+            </View>
+        );
+    }
 
     return (
         <View style={[commonStyles.screenContainer, { paddingTop: insets.top, paddingBottom: insets.bottom + 16 }]}>

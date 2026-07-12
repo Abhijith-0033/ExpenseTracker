@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput,
-  Alert, StatusBar, Dimensions, DeviceEventEmitter
+  Alert, StatusBar, Dimensions, DeviceEventEmitter, ActivityIndicator, InteractionManager
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useApp } from '../context/AppContext';
@@ -37,6 +37,14 @@ export default function AddTransferScreen() {
     const isSubmittingRef = React.useRef(false);
     const [showSuccess, setShowSuccess] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
+    
+    const [initializing, setInitializing] = useState(true);
+    React.useEffect(() => {
+        const task = InteractionManager.runAfterInteractions(() => {
+            setInitializing(false);
+        });
+        return () => task.cancel();
+    }, []);
     
     useFocusEffect(
         React.useCallback(() => {
@@ -184,6 +192,14 @@ export default function AddTransferScreen() {
             isSubmittingRef.current = false;
         }
     };
+
+    if (initializing) {
+        return (
+            <View style={[styles.container, { paddingTop: insets.top, justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color={Colors.primary[500]} />
+            </View>
+        );
+    }
 
     return (
         <View style={styles.container}>

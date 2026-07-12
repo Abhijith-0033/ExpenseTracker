@@ -23,6 +23,12 @@ export const NOTIFICATION_IDS = {
   BUDGET_ALERT_PREFIX: 'budget_',
   EMI_PREFIX: 'emi_',
   EMI_AUTOPAY_PREFIX: 'emi_autopay_',
+  SCHED_AUTO_CREATED_PREFIX: 'sched_created_',
+  SCHED_PENDING_PREFIX: 'sched_pending_',
+  SCHED_APPROVED_PREFIX: 'sched_approved_',
+  SCHED_REJECTED_PREFIX: 'sched_rejected_',
+  SCHED_TRIGGER_PREFIX: 'sched_trigger_',
+  UPCOMING_BILL_PREFIX: 'ubill_',
 };
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -47,6 +53,8 @@ export const SETTINGS_KEYS = {
   NOTIF_EMI_REMINDERS: 'notif_emi_reminders',
   NOTIF_EMI_AUTOPAY: 'notif_emi_autopay',
   NOTIF_TELEGRAM: 'notif_telegram',
+  NOTIF_SCHED_AUTO_CONFIRM: 'notif_sched_auto_confirm',
+  NOTIF_SCHED_APPROVAL: 'notif_sched_approval',
 };
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -163,6 +171,13 @@ export const setupNotificationChannels = async (): Promise<void> => {
         vibrationPattern: [0, 250, 250, 250],
         lightColor: '#0088CC',
       });
+
+      await Notifications.setNotificationChannelAsync('scheduled-expenses', {
+        name: 'Scheduled Expenses',
+        importance: Notifications.AndroidImportance.HIGH,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#6366F1',
+      });
     } catch (error) {
       console.warn('Failed to setup notification channels:', error);
     }
@@ -215,6 +230,25 @@ export const setupNotificationCategories = async (): Promise<void> => {
     // Budget Actions
     await Notifications.setNotificationCategoryAsync('BUDGET_ACTIONS', [
       { identifier: 'VIEW_BUDGET', buttonTitle: '📊 View Budget', options: { opensAppToForeground: true } },
+    ]);
+
+    // Scheduled Expense Actions
+    await Notifications.setNotificationCategoryAsync('SCHED_APPROVAL_ACTIONS', [
+      { identifier: 'SCHED_APPROVE', buttonTitle: '✅ Approve', options: { opensAppToForeground: false } },
+      { identifier: 'SCHED_REJECT', buttonTitle: '❌ Reject', options: { opensAppToForeground: false } },
+      { identifier: 'SCHED_EDIT', buttonTitle: '✏️ Edit', options: { opensAppToForeground: true } },
+    ]);
+
+    // Payment Due Actions
+    await Notifications.setNotificationCategoryAsync('PAYMENT_DUE_ACTIONS', [
+      { identifier: 'MARK_PAID', buttonTitle: '✅ Mark as Paid', options: { opensAppToForeground: true } },
+      { identifier: 'REMIND_LATER', buttonTitle: '⏰ Remind Later', options: { opensAppToForeground: false } },
+    ]);
+
+    // Payment Evening Actions
+    await Notifications.setNotificationCategoryAsync('PAYMENT_EVENING_ACTIONS', [
+      { identifier: 'MARK_PAID', buttonTitle: '✅ Mark as Paid', options: { opensAppToForeground: true } },
+      { identifier: 'SNOOZE_1H', buttonTitle: '⏰ Snooze 1 Hour', options: { opensAppToForeground: false } },
     ]);
 
   } catch (error) {
@@ -428,7 +462,10 @@ export const updateDailyReportContent = async (): Promise<void> => {
         },
         categoryIdentifier: 'DAILY_REPORT_ACTIONS',
       },
-      trigger: triggerTime,
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: triggerTime,
+      },
     });
   } catch (error) {
     console.error('Error updating daily report content:', error);
@@ -551,7 +588,10 @@ export const scheduleDebtNotifications = async (debtId: number): Promise<void> =
           },
           categoryIdentifier: 'DEBT_PAYMENT_ACTIONS',
         },
-        trigger: setMinutes(setHours(nextDueDate, 9), 0),
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: setMinutes(setHours(nextDueDate, 9), 0),
+        },
       });
     } else if (daysUntilDue === 3) {
       await Notifications.scheduleNotificationAsync({
@@ -569,7 +609,10 @@ export const scheduleDebtNotifications = async (debtId: number): Promise<void> =
           },
           categoryIdentifier: 'DEBT_PAYMENT_ACTIONS',
         },
-        trigger: setMinutes(setHours(nextDueDate, 9), 0),
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: setMinutes(setHours(nextDueDate, 9), 0),
+        },
       });
     } else if (daysUntilDue === 1) {
       await Notifications.scheduleNotificationAsync({
@@ -587,7 +630,10 @@ export const scheduleDebtNotifications = async (debtId: number): Promise<void> =
           },
           categoryIdentifier: 'DEBT_PAYMENT_ACTIONS',
         },
-        trigger: setMinutes(setHours(nextDueDate, 9), 0),
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: setMinutes(setHours(nextDueDate, 9), 0),
+        },
       });
     } else if (daysUntilDue === 0) {
       await Notifications.scheduleNotificationAsync({
@@ -604,7 +650,10 @@ export const scheduleDebtNotifications = async (debtId: number): Promise<void> =
           },
           categoryIdentifier: 'DEBT_PAYMENT_ACTIONS',
         },
-        trigger: setMinutes(setHours(nextDueDate, 9), 0),
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: setMinutes(setHours(nextDueDate, 9), 0),
+        },
       });
     }
   }
@@ -700,7 +749,10 @@ export const scheduleChitNotifications = async (chitId: number): Promise<void> =
             },
             categoryIdentifier: 'CHIT_PAYMENT_ACTIONS',
           },
-          trigger: setMinutes(setHours(monthDate, 9), 0),
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.DATE,
+            date: setMinutes(setHours(monthDate, 9), 0),
+          },
         });
       } else if (daysUntil === 1) {
         await Notifications.scheduleNotificationAsync({
@@ -719,7 +771,10 @@ export const scheduleChitNotifications = async (chitId: number): Promise<void> =
             },
             categoryIdentifier: 'CHIT_PAYMENT_ACTIONS',
           },
-          trigger: setMinutes(setHours(monthDate, 9), 0),
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.DATE,
+            date: setMinutes(setHours(monthDate, 9), 0),
+          },
         });
       } else if (daysUntil === 0) {
         // Morning reminder
@@ -739,7 +794,10 @@ export const scheduleChitNotifications = async (chitId: number): Promise<void> =
             },
             categoryIdentifier: 'CHIT_PAYMENT_ACTIONS',
           },
-          trigger: setMinutes(setHours(monthDate, 9), 0),
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.DATE,
+            date: setMinutes(setHours(monthDate, 9), 0),
+          },
         });
 
         // Evening reminder
@@ -758,7 +816,10 @@ export const scheduleChitNotifications = async (chitId: number): Promise<void> =
             },
             categoryIdentifier: 'CHIT_PAYMENT_ACTIONS',
           },
-          trigger: setMinutes(setHours(monthDate, 19), 0),
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.DATE,
+            date: setMinutes(setHours(monthDate, 19), 0),
+          },
         });
       }
     }
@@ -795,7 +856,10 @@ export const scheduleChitNotifications = async (chitId: number): Promise<void> =
             },
             categoryIdentifier: 'GOAL_ACTIONS',
           },
-          trigger: setMinutes(setHours(winningDate, 9), 0),
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.DATE,
+            date: setMinutes(setHours(winningDate, 9), 0),
+          },
         });
       } else if (daysUntil === 7) {
         await Notifications.scheduleNotificationAsync({
@@ -813,7 +877,10 @@ export const scheduleChitNotifications = async (chitId: number): Promise<void> =
             },
             categoryIdentifier: 'GOAL_ACTIONS',
           },
-          trigger: setMinutes(setHours(winningDate, 9), 0),
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.DATE,
+            date: setMinutes(setHours(winningDate, 9), 0),
+          },
         });
       } else if (daysUntil === 0) {
         await Notifications.scheduleNotificationAsync({
@@ -831,7 +898,10 @@ export const scheduleChitNotifications = async (chitId: number): Promise<void> =
             },
             categoryIdentifier: 'GOAL_ACTIONS',
           },
-          trigger: setMinutes(setHours(winningDate, 9), 0),
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.DATE,
+            date: setMinutes(setHours(winningDate, 9), 0),
+          },
         });
       }
     }
@@ -940,7 +1010,10 @@ export const checkSavingsGoalMilestones = async (): Promise<void> => {
             },
             categoryIdentifier: 'GOAL_ACTIONS',
           },
-          trigger: setMinutes(setHours(targetDate, 10), 0),
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.DATE,
+            date: setMinutes(setHours(targetDate, 10), 0),
+          },
         });
       } else if (daysUntil === 7) {
         await Notifications.scheduleNotificationAsync({
@@ -958,7 +1031,10 @@ export const checkSavingsGoalMilestones = async (): Promise<void> => {
             },
             categoryIdentifier: 'GOAL_ACTIONS',
           },
-          trigger: setMinutes(setHours(targetDate, 10), 0),
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.DATE,
+            date: setMinutes(setHours(targetDate, 10), 0),
+          },
         });
       } else if (daysUntil === 0) {
         await Notifications.scheduleNotificationAsync({
@@ -976,7 +1052,10 @@ export const checkSavingsGoalMilestones = async (): Promise<void> => {
             },
             categoryIdentifier: 'GOAL_ACTIONS',
           },
-          trigger: setMinutes(setHours(targetDate, 10), 0),
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.DATE,
+            date: setMinutes(setHours(targetDate, 10), 0),
+          },
         });
       }
     }

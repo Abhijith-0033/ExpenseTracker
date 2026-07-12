@@ -34,7 +34,8 @@ import {
     getValueColor
 } from '../../components/AnalysisCharts';
 import { format, startOfMonth, addMonths, subMonths } from 'date-fns';
-import { ChevronLeft, ChevronRight, Filter, Sparkles, TrendingUp, Info, X } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, Filter, Sparkles, TrendingUp, Info, X, Lock } from 'lucide-react-native';
+import { useSubscription } from '../../src/subscription/useSubscription';
 import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { formatCurrency } from '../../utils/currency';
@@ -48,6 +49,9 @@ const screenWidth = Dimensions.get('window').width;
 
 function AnalyticsContent() {
     const router = useRouter();
+    const { isPremium, isTrialActive } = useSubscription();
+    const hasFullAccess = isPremium || isTrialActive;
+
     const [loading, setLoading] = useState(true);
     const [loadingSubcats, setLoadingSubcats] = useState(false);
     const [viewMode, setViewMode] = useState<'month' | 'all' | 'custom'>('month');
@@ -280,8 +284,35 @@ function AnalyticsContent() {
 
             <MonthlyTrendSection />
 
-            {/* Total Summary Card */}
-            <Card style={styles.summaryCard}>
+            {!hasFullAccess ? (
+                <View style={styles.premiumOverlayContainer}>
+                    <View style={styles.premiumOverlayBlur}>
+                        {/* Static/screenshot-like mockup layout */}
+                        <View style={{ height: 100, backgroundColor: '#f4f4f2', marginVertical: 8, borderRadius: 16, opacity: 0.2 }} />
+                        <View style={{ height: 140, backgroundColor: '#f4f4f2', marginVertical: 8, borderRadius: 16, opacity: 0.2 }} />
+                        <View style={{ height: 180, backgroundColor: '#f4f4f2', marginVertical: 8, borderRadius: 16, opacity: 0.2 }} />
+                    </View>
+                    
+                    <View style={styles.premiumOverlayCard}>
+                        <View style={styles.premiumOverlayLock}>
+                            <Lock size={24} color={Colors.warning[500]} />
+                        </View>
+                        <Text style={styles.premiumOverlayTitle}>Detailed Analysis is Premium</Text>
+                        <Text style={styles.premiumOverlayDesc}>
+                            Unlock breakdown summaries, AI forecasts, weekly/monthly trends, and full financial composition.
+                        </Text>
+                        <TouchableOpacity 
+                            style={styles.premiumOverlayBtn}
+                            onPress={() => router.push('/paywall')}
+                        >
+                            <Text style={styles.premiumOverlayBtnText}>Upgrade to Premium</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            ) : (
+                <>
+                    {/* Total Summary Card */}
+                    <Card style={styles.summaryCard}>
                 <Text style={styles.summaryLabel}>
                     {viewMode === 'month' ? `Total Expense (${format(selectedMonth, 'MMM yyyy')})` : 
                      viewMode === 'custom' ? `Total (${format(customRange.start, 'MMM dd')} - ${format(customRange.end, 'MMM dd')})` :
@@ -477,6 +508,8 @@ function AnalyticsContent() {
                     </View>
                 </View>
             </Modal>
+                </>
+            )}
         </ScrollView>
     );
 }
@@ -838,6 +871,64 @@ const styles = StyleSheet.create({
         fontSize: 13,
         color: Colors.gray[600],
         lineHeight: 20,
+    },
+    premiumOverlayContainer: {
+        position: 'relative',
+        marginTop: 16,
+    },
+    premiumOverlayBlur: {
+        pointerEvents: 'none',
+    },
+    premiumOverlayCard: {
+        position: 'absolute',
+        top: 40,
+        left: 16,
+        right: 16,
+        backgroundColor: Colors.white,
+        borderRadius: 24,
+        padding: 24,
+        alignItems: 'center',
+        shadowColor: '#101828',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.1,
+        shadowRadius: 24,
+        elevation: 8,
+    },
+    premiumOverlayLock: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: Colors.warning[50],
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 16,
+    },
+    premiumOverlayTitle: {
+        fontSize: Typography.size.md,
+        fontFamily: Typography.family.bold,
+        color: Colors.gray[900],
+        marginBottom: 8,
+    },
+    premiumOverlayDesc: {
+        fontSize: Typography.size.sm,
+        fontFamily: Typography.family.medium,
+        color: Colors.gray[500],
+        textAlign: 'center',
+        lineHeight: 20,
+        marginBottom: 20,
+        paddingHorizontal: 12,
+    },
+    premiumOverlayBtn: {
+        backgroundColor: Colors.primary[600],
+        paddingVertical: 12,
+        paddingHorizontal: 24,
+        borderRadius: 16,
+        ...Layout.shadows.sm,
+    },
+    premiumOverlayBtnText: {
+        color: Colors.white,
+        fontFamily: Typography.family.bold,
+        fontSize: Typography.size.sm,
     },
 });
 
