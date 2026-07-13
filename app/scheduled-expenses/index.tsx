@@ -12,8 +12,6 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Colors, Typography, Layout } from '../../constants/Theme';
 import { formatCurrency } from '../../utils/currency';
 import { getDatabase , getAllScheduledExpenses, getScheduledExpenseStats, updateScheduledExpense, ScheduledExpenseJoined } from '../../services/database';
-import { useSubscription } from '../../src/subscription/useSubscription';
-import PaywallScreen from '../../src/subscription/PaywallScreen';
 import { scheduleNotificationsForExpense, cancelNotificationsForExpense } from '../../src/scheduled/ScheduledExpenseEngine';
 import { ConfirmActionSheet } from '../../components/ConfirmActionSheet';
 
@@ -21,8 +19,7 @@ const DAYS_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export default function ScheduledExpensesIndex() {
   const router = useRouter();
-  const { isPremium, isTrialActive } = useSubscription();
-  
+    
   const [schedules, setSchedules] = useState<ScheduledExpenseJoined[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);
@@ -87,10 +84,7 @@ export default function ScheduledExpensesIndex() {
     }, [loadData])
   );
 
-  if (!isPremium && !isTrialActive) {
-    return <PaywallScreen showClose={true} />;
-  }
-
+  
   const toggleScheduleActive = async (item: ScheduledExpenseJoined) => {
     const newStatus = item.is_active === 1 ? 0 : 1;
     // 1. Optimistic update — flip the UI immediately
