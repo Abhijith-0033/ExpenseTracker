@@ -155,7 +155,7 @@ export default function RootLayout() {
 
     // Handle notification click
     const subscription = Notifications.addNotificationResponseReceivedListener(async response => {
-      const data = response.notification.request.content.data;
+      const data = response.notification.request.content.data as any;
       const actionId = response.actionIdentifier;
 
       // Handle quick-add inline reply (Android)
@@ -176,34 +176,43 @@ export default function RootLayout() {
       }
 
       // Handle action buttons
-      if (actionId.startsWith('SCHED_APPROVE_') || actionId === 'SCHED_APPROVE') {
-        const logId = data.logId || parseInt(actionId.replace('SCHED_APPROVE_', ''));
+      if (actionId.startsWith('SCHED_APPROVE') || actionId === 'SCHED_APPROVE') {
+        const logId = data.logId || (actionId.includes('_') ? parseInt(actionId.split('_').pop() || '') || null : null);
+        const schedId = data.schedId;
+        const dateISO = new Date().toISOString().split('T')[0];
         try {
           const { approveScheduled } = await import('../src/scheduled/ScheduledExpenseEngine');
-          await approveScheduled(logId);
+          await approveScheduled(logId, schedId, dateISO);
         } catch (e) {
           console.error('Approve scheduled failed:', e);
         }
         return;
       }
       
-      if (actionId.startsWith('SCHED_REJECT_') || actionId === 'SCHED_REJECT') {
-        const logId = data.logId || parseInt(actionId.replace('SCHED_REJECT_', ''));
+      if (actionId.startsWith('SCHED_REJECT') || actionId === 'SCHED_REJECT') {
+        const logId = data.logId || (actionId.includes('_') ? parseInt(actionId.split('_').pop() || '') || null : null);
+        const schedId = data.schedId;
+        const dateISO = new Date().toISOString().split('T')[0];
         try {
           const { rejectScheduled } = await import('../src/scheduled/ScheduledExpenseEngine');
-          await rejectScheduled(logId);
+          await rejectScheduled(logId, schedId, dateISO);
         } catch (e) {
           console.error('Reject scheduled failed:', e);
         }
         return;
       }
 
-      if (actionId.startsWith('SCHED_EDIT_') || actionId === 'SCHED_EDIT') {
-        const logId = data.logId || parseInt(actionId.replace('SCHED_EDIT_', ''));
-        router.push({
-          pathname: '/(tabs)/add',
-          params: { sched_log_id: String(logId) }
-        });
+      if (actionId.startsWith('SCHED_EDIT') || actionId === 'SCHED_EDIT') {
+        const schedId = data.schedId;
+        const logId = data.logId || (actionId.includes('_') ? parseInt(actionId.split('_').pop() || '') || null : null);
+        if (schedId) {
+          router.push(`/scheduled-expenses/add?id=${schedId}` as any);
+        } else if (logId) {
+          router.push({
+            pathname: '/(tabs)/add',
+            params: { sched_log_id: String(logId) }
+          });
+        }
         return;
       }
 
@@ -253,31 +262,7 @@ export default function RootLayout() {
           router.push('/(tabs)/analytics');
           break;
 
-        case 'SCHED_APPROVE': {
-          const logId = data.logId;
-          if (logId) {
-            const { approveScheduled } = await import('../src/scheduled/ScheduledExpenseEngine');
-            await approveScheduled(logId);
-          }
-          break;
-        }
 
-        case 'SCHED_REJECT': {
-          const logId = data.logId;
-          if (logId) {
-            const { rejectScheduled } = await import('../src/scheduled/ScheduledExpenseEngine');
-            await rejectScheduled(logId);
-          }
-          break;
-        }
-
-        case 'SCHED_EDIT': {
-          const schedId = data.schedId;
-          if (schedId) {
-            router.push(`/scheduled-expenses/add?id=${schedId}` as any);
-          }
-          break;
-        }
 
         case 'ADD_MISSING':
           router.push('/(tabs)/add');

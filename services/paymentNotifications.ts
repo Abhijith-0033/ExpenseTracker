@@ -21,24 +21,31 @@ export const schedulePaymentNotifications = async (item: PaymentItem): Promise<v
   if (!hasPermission) return;
 
   const masterEnabled = await AsyncStorage.getItem(SETTINGS_KEYS.NOTIF_MASTER_ENABLED);
-  if (masterEnabled !== 'true') return;
+  if (masterEnabled === 'false') return;
 
   // Check specific setting based on item type
   let settingKey = '';
+  let timeKey = '';
   switch (item.type) {
     case 'subscription':
       settingKey = SETTINGS_KEYS.NOTIF_SUBSCRIPTIONS;
+      timeKey = SETTINGS_KEYS.NOTIF_SUBSCRIPTIONS_TIME;
       break;
     case 'bill':
       settingKey = SETTINGS_KEYS.NOTIF_UPCOMING_BILLS;
+      timeKey = SETTINGS_KEYS.NOTIF_UPCOMING_BILLS_TIME;
       break;
     case 'recharge':
       settingKey = SETTINGS_KEYS.NOTIF_RECURRING;
+      timeKey = SETTINGS_KEYS.NOTIF_RECURRING_TIME;
       break;
   }
 
   const settingEnabled = await AsyncStorage.getItem(settingKey);
-  if (settingEnabled !== 'true') return;
+  if (settingEnabled === 'false') return;
+
+  const customTimeStr = await AsyncStorage.getItem(timeKey);
+  const [hour, minute] = (customTimeStr || '10:00').split(':').map(Number);
 
   const db = getDatabase();
   if (!db) return;
@@ -51,18 +58,18 @@ export const schedulePaymentNotifications = async (item: PaymentItem): Promise<v
   const now = new Date();
 
   const schedules = [
-    { type: '7d', date: setMinutes(setHours(subDays(dueDate, 7), 10), 0) },
-    { type: '3d', date: setMinutes(setHours(subDays(dueDate, 3), 10), 0) },
-    { type: '2d', date: setMinutes(setHours(subDays(dueDate, 2), 10), 0) },
-    { type: '1d', date: setMinutes(setHours(subDays(dueDate, 1), 10), 0) },
-    { type: '0d', date: setMinutes(setHours(dueDate, 9), 0) },
+    { type: '7d', date: setMinutes(setHours(subDays(dueDate, 7), hour), minute) },
+    { type: '3d', date: setMinutes(setHours(subDays(dueDate, 3), hour), minute) },
+    { type: '2d', date: setMinutes(setHours(subDays(dueDate, 2), hour), minute) },
+    { type: '1d', date: setMinutes(setHours(subDays(dueDate, 1), hour), minute) },
+    { type: '0d', date: setMinutes(setHours(dueDate, hour), minute) },
     { type: '0d_eve', date: setMinutes(setHours(dueDate, 19), 0), category: 'PAYMENT_EVENING_ACTIONS' },
-    { type: 'overdue', date: setMinutes(setHours(addDays(dueDate, 1), 10), 0) },
+    { type: 'overdue', date: setMinutes(setHours(addDays(dueDate, 1), hour), minute) },
   ];
 
   // Daily reminders for last 2 days
   for (let i = 2; i >= 0; i--) {
-    const d = setMinutes(setHours(subDays(dueDate, i), 10), 0);
+    const d = setMinutes(setHours(subDays(dueDate, i), hour), minute);
     const dateStr = d.toISOString().split('T')[0];
     schedules.push({ type: `daily_${dateStr}`, date: d });
   }

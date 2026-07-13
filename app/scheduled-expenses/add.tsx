@@ -64,17 +64,20 @@ export default function AddEditScheduledExpense() {
   const loadMeta = async () => {
     try {
       const db = getDatabase();
-      const accs = await db.getAllAsync('SELECT * FROM accounts');
+      const accs = await db.getAllAsync<any>('SELECT * FROM accounts');
       setAccounts(accs);
       
-      const cats = await db.getAllAsync("SELECT * FROM categories WHERE name NOT IN ('Transfer')");
+      const cats = await db.getAllAsync<any>("SELECT * FROM categories WHERE name NOT IN ('Transfer')");
       setCategories(cats);
 
-      const subCats = await db.getAllAsync('SELECT * FROM category_subcategories');
+      const subCats = await db.getAllAsync<any>('SELECT * FROM category_subcategories');
       setSubcategories(subCats);
 
       if (editId) {
-        const item = await getScheduledExpenseById(editId);
+        const item = await db.getFirstAsync<any>(
+          'SELECT * FROM scheduled_expenses WHERE id = ?',
+          [editId]
+        );
         if (item) {
           setName(item.name);
           setAmount(item.amount.toString());

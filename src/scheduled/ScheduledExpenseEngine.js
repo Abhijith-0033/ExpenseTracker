@@ -40,7 +40,6 @@ export async function unregisterScheduledExpenseTask() {
 export async function checkAndProcessScheduled() {
   await initDatabase();
   const db = getDatabase();
-  
   const now = new Date();
   const todayDayOfWeek = now.getDay() + 1; // 1=Sun...7=Sat
   const todayISO = now.toISOString().split('T')[0];
@@ -48,7 +47,7 @@ export async function checkAndProcessScheduled() {
   const currentMin = now.getMinutes().toString().padStart(2, '0');
   const currentTime = `${currentHour}:${currentMin}`;
   
-  // Query active scheduled expenses due today
+  // 1. Process today's scheduled expenses
   const schedules = await db.getAllAsync(`
     SELECT se.*, c.name as category_name, a.name as account_name,
            cs.name as subcategory_name
@@ -63,7 +62,6 @@ export async function checkAndProcessScheduled() {
   `, [currentTime, todayISO]);
   
   for (const se of schedules) {
-    // Check if today is a scheduled day
     let daysArray;
     try {
       daysArray = JSON.parse(se.days_of_week);
@@ -72,11 +70,10 @@ export async function checkAndProcessScheduled() {
     }
     if (!daysArray.includes(todayDayOfWeek)) continue;
     
-    // Check if already logged/processed today
     const existingLog = await db.getFirstAsync(`
       SELECT id FROM scheduled_expense_log
       WHERE scheduled_expense_id = ? AND scheduled_date = ?
-      AND action IN ('auto_created', 'approved', 'rejected', 'pending')
+      AND action IN ('auto_created', 'approved', 'rejected', 'pending', 'missed')
     `, [se.id, todayISO]);
     
     if (existingLog) continue;
@@ -87,9 +84,59 @@ export async function checkAndProcessScheduled() {
       await sendApprovalNotification(se, todayISO);
     }
   }
-  
-  // Mark old pending logs as missed
-  await markMissedLogs(db, todayISO);
+
+  // 2. 7-day historical catch-up for days the user missed/app wasn't running
+  for (let i = 1; i <= 7; i++) {
+    const pastDate = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+    const pastISO = pastDate.toISOString().split('T')[0];
+    const pastDayOfWeek = pastDate.getDay() + 1;
+
+    const pastSchedules = await db.getAllAsync(`
+      SELECT se.*, c.name as category_name, a.name as account_name,
+             cs.name as subcategory_name
+      FROM scheduled_expenses se
+      LEFT JOIN categories c ON se.category_id = c.id
+      LEFT JOIN accounts a ON se.account_id = a.id
+      LEFT JOIN category_subcategories cs ON se.subcategory_id = cs.id
+      WHERE se.is_active = 1
+      AND se.status = 'active'
+      AND date(se.created_at) <= ?
+      AND (se.last_created_date IS NULL OR se.last_created_date < ?)
+    `, [pastISO, pastISO]);
+
+    for (const se of pastSchedules) {
+      let daysArray;
+      try {
+        daysArray = JSON.parse(se.days_of_week);
+      } catch {
+        continue;
+      }
+      if (!daysArray.includes(pastDayOfWeek)) continue;
+
+      const existingLog = await db.getFirstAsync(`
+        SELECT id FROM scheduled_expense_log
+        WHERE scheduled_expense_id = ? AND scheduled_date = ?
+      `, [se.id, pastISO]);
+
+      if (existingLog) continue;
+
+      if (se.auto_create === 1) {
+        // Auto-create schedules that are missed are logged as 'missed' to avoid retroactive transactions
+        await db.runAsync(`
+          INSERT INTO scheduled_expense_log 
+            (scheduled_expense_id, scheduled_date, scheduled_time, action, amount)
+          VALUES (?, ?, ?, 'missed', ?)
+        `, [se.id, pastISO, se.scheduled_time, se.amount]);
+      } else {
+        // Manual approval schedules remain 'pending' so user can approve them anytime
+        await db.runAsync(`
+          INSERT INTO scheduled_expense_log 
+            (scheduled_expense_id, scheduled_date, scheduled_time, action, amount)
+          VALUES (?, ?, ?, 'pending', ?)
+        `, [se.id, pastISO, se.scheduled_time, se.amount]);
+      }
+    }
+  }
 }
 
 async function autoCreateExpense(se, todayISO) {
@@ -99,7 +146,7 @@ async function autoCreateExpense(se, todayISO) {
     // Create transaction using direct function (bypass limits/throttles)
     const txId = await addTransactionDirect({
       amount: se.amount,
-      category: se.category_name,
+      category: se.category_name || 'Other',
       subcategory: se.subcategory_name || '',
       account_id: se.account_id,
       date: new Date().toISOString(),
@@ -124,7 +171,7 @@ async function autoCreateExpense(se, todayISO) {
     const masterEnabled = await AsyncStorage.getItem(SETTINGS_KEYS.NOTIF_MASTER_ENABLED);
     const autoConfirmEnabled = await AsyncStorage.getItem(SETTINGS_KEYS.NOTIF_SCHED_AUTO_CONFIRM);
     
-    if (masterEnabled === 'true' && autoConfirmEnabled === 'true') {
+    if (masterEnabled !== 'false' && autoConfirmEnabled !== 'false') {
       // Send confirmation notification
       await Notifications.scheduleNotificationAsync({
         identifier: `sched_created_${se.id}_${todayISO}`,
@@ -150,7 +197,7 @@ async function sendApprovalNotification(se, todayISO) {
   const masterEnabled = await AsyncStorage.getItem(SETTINGS_KEYS.NOTIF_MASTER_ENABLED);
   const approvalEnabled = await AsyncStorage.getItem(SETTINGS_KEYS.NOTIF_SCHED_APPROVAL);
   
-  if (masterEnabled !== 'true' || approvalEnabled !== 'true') {
+  if (masterEnabled === 'false' || approvalEnabled === 'false') {
     return; // User disabled approvals
   }
 
@@ -170,7 +217,7 @@ async function sendApprovalNotification(se, todayISO) {
     identifier: notifId,
     content: {
       title: `💸 Expense Due: ${se.name}`,
-      body: `₹${se.amount} · ${se.category_name} · ${se.account_name}\nTap to approve or reject`,
+      body: `₹${se.amount} · ${se.category_name || 'Other'} · ${se.account_name || 'Account'}\nTap to approve or reject`,
       sound: true,
       data: {
         type: 'sched_approval',
@@ -184,13 +231,42 @@ async function sendApprovalNotification(se, todayISO) {
   });
 }
 
-export async function approveScheduled(logId) {
+/**
+ * Approve a scheduled expense.
+ * @param {number|null} logId
+ * @param {number|null} [schedId=null]
+ * @param {string|null} [dateISO=null]
+ */
+export async function approveScheduled(logId, schedId = null, dateISO = null) {
   await initDatabase();
   const db = getDatabase();
+  let resolvedLogId = logId;
   
   try {
+    if (!resolvedLogId && schedId && dateISO) {
+      const existing = await db.getFirstAsync(
+        `SELECT id FROM scheduled_expense_log 
+         WHERE scheduled_expense_id = ? AND scheduled_date = ? 
+         AND action IN ('pending', 'auto_created', 'approved', 'rejected')`,
+        [schedId, dateISO]
+      );
+      if (existing) {
+        resolvedLogId = existing.id;
+      } else {
+        const se = await db.getFirstAsync(`SELECT * FROM scheduled_expenses WHERE id = ?`, [schedId]);
+        const result = await db.runAsync(
+          `INSERT INTO scheduled_expense_log (scheduled_expense_id, scheduled_date, scheduled_time, action, amount)
+           VALUES (?, ?, ?, 'pending', ?)`,
+          [schedId, dateISO, se?.scheduled_time || '00:00', se?.amount || 0]
+        );
+        resolvedLogId = result.lastInsertRowId;
+      }
+    }
+
+    if (!resolvedLogId) return;
+
     const log = await db.getFirstAsync(
-      'SELECT * FROM scheduled_expense_log WHERE id = ?', [logId]
+      'SELECT * FROM scheduled_expense_log WHERE id = ?', [resolvedLogId]
     );
     if (!log || log.action !== 'pending') return;
     
@@ -206,7 +282,7 @@ export async function approveScheduled(logId) {
     // Create the transaction
     const txId = await addTransactionDirect({
       amount: log.amount,
-      category: se.category_name,
+      category: se.category_name || 'Other',
       subcategory: se.subcategory_name || '',
       account_id: se.account_id,
       date: new Date().toISOString(),
@@ -217,7 +293,7 @@ export async function approveScheduled(logId) {
     // Update log
     await db.runAsync(
       `UPDATE scheduled_expense_log SET action = 'approved', transaction_id = ? WHERE id = ?`,
-      [txId, logId]
+      [txId, resolvedLogId]
     );
     
     // Update last_created_date
@@ -233,7 +309,7 @@ export async function approveScheduled(logId) {
     
     // Show brief confirmation
     await Notifications.scheduleNotificationAsync({
-      identifier: `sched_approved_${logId}`,
+      identifier: `sched_approved_${resolvedLogId}`,
       content: {
         title: `✅ ${se.name} expense saved`,
         body: `₹${log.amount} added to your account`,
@@ -248,19 +324,48 @@ export async function approveScheduled(logId) {
   }
 }
 
-export async function rejectScheduled(logId) {
+/**
+ * Reject a scheduled expense.
+ * @param {number|null} logId
+ * @param {number|null} [schedId=null]
+ * @param {string|null} [dateISO=null]
+ */
+export async function rejectScheduled(logId, schedId = null, dateISO = null) {
   await initDatabase();
   const db = getDatabase();
+  let resolvedLogId = logId;
   
   try {
+    if (!resolvedLogId && schedId && dateISO) {
+      const existing = await db.getFirstAsync(
+        `SELECT id FROM scheduled_expense_log 
+         WHERE scheduled_expense_id = ? AND scheduled_date = ? 
+         AND action IN ('pending', 'auto_created', 'approved', 'rejected')`,
+        [schedId, dateISO]
+      );
+      if (existing) {
+        resolvedLogId = existing.id;
+      } else {
+        const se = await db.getFirstAsync(`SELECT * FROM scheduled_expenses WHERE id = ?`, [schedId]);
+        const result = await db.runAsync(
+          `INSERT INTO scheduled_expense_log (scheduled_expense_id, scheduled_date, scheduled_time, action, amount)
+           VALUES (?, ?, ?, 'pending', ?)`,
+          [schedId, dateISO, se?.scheduled_time || '00:00', se?.amount || 0]
+        );
+        resolvedLogId = result.lastInsertRowId;
+      }
+    }
+
+    if (!resolvedLogId) return;
+
     const log = await db.getFirstAsync(
-      'SELECT * FROM scheduled_expense_log WHERE id = ?', [logId]
+      'SELECT * FROM scheduled_expense_log WHERE id = ?', [resolvedLogId]
     );
     if (!log || log.action !== 'pending') return;
     
     await db.runAsync(
       `UPDATE scheduled_expense_log SET action = 'rejected' WHERE id = ?`,
-      [logId]
+      [resolvedLogId]
     );
     
     if (log.notification_id) {
@@ -268,7 +373,7 @@ export async function rejectScheduled(logId) {
     }
     
     await Notifications.scheduleNotificationAsync({
-      identifier: `sched_rejected_${logId}`,
+      identifier: `sched_rejected_${resolvedLogId}`,
       content: {
         title: '❌ Expense rejected',
         body: `₹${log.amount} scheduled expense was rejected`,
@@ -281,15 +386,6 @@ export async function rejectScheduled(logId) {
   } catch (e) {
     console.error('rejectScheduled failed:', e);
   }
-}
-
-async function markMissedLogs(db, todayISO) {
-  await db.runAsync(`
-    UPDATE scheduled_expense_log
-    SET action = 'missed'
-    WHERE action = 'pending'
-    AND scheduled_date < ?
-  `, [todayISO]);
 }
 
 export async function scheduleNotificationsForExpense(se) {
@@ -305,9 +401,12 @@ export async function scheduleNotificationsForExpense(se) {
       identifier: `sched_trigger_${se.id}_day${day}`,
       content: {
         title: `💸 Scheduled: ${se.name}`,
-        body: `₹${se.amount} scheduled expense is due`,
+        body: se.auto_create === 1
+          ? `₹${se.amount} scheduled expense is due`
+          : `₹${se.amount} scheduled expense is due. Tap to approve or reject`,
         sound: true,
         data: { type: 'sched_trigger', schedId: se.id },
+        categoryIdentifier: se.auto_create === 0 ? 'SCHED_APPROVAL_ACTIONS' : undefined,
         channelId: 'scheduled-expenses',
       },
       trigger: {
@@ -315,6 +414,7 @@ export async function scheduleNotificationsForExpense(se) {
         weekday: day,
         hour,
         minute,
+        channelId: 'scheduled-expenses',
       },
     });
   }

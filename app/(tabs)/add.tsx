@@ -162,12 +162,12 @@ function AddTransactionContent() {
                 try {
                     const { getDatabase } = await import('../../services/database');
                     const db = getDatabase();
-                    const log = await db.getFirstAsync(
+                    const log = await db.getFirstAsync<any>(
                         'SELECT * FROM scheduled_expense_log WHERE id = ?', [parseInt(sched_log_id)]
                     );
                     if (log) {
                         setDisplay(log.amount.toString());
-                        const se = await db.getFirstAsync(`
+                        const se = await db.getFirstAsync<any>(`
                             SELECT se.*, c.name as category_name, cs.name as subcategory_name
                             FROM scheduled_expenses se
                             LEFT JOIN categories c ON se.category_id = c.id
@@ -436,7 +436,7 @@ function AddTransactionContent() {
                     [txId, logId]
                 );
                 
-                const log = await db.getFirstAsync(
+                const log = await db.getFirstAsync<any>(
                     'SELECT scheduled_expense_id, scheduled_date FROM scheduled_expense_log WHERE id = ?',
                     [logId]
                 );

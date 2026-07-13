@@ -61,7 +61,7 @@ export default function AddEditUpcomingBill() {
       const db = getDatabase();
       
       // Load accounts
-      const accs = await db.getAllAsync('SELECT * FROM accounts');
+      const accs = await db.getAllAsync<any>('SELECT * FROM accounts');
       setAccounts(accs);
       
       // Load categories is no longer needed here as CategoryPicker uses AppContext categories

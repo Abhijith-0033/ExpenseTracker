@@ -23,25 +23,34 @@ export default function NotificationSettingsScreen() {
   
   // Settings state
   const [masterEnabled, setMasterEnabled] = useState(true);
-  const [dailyReminderEnabled, setDailyReminderEnabled] = useState(false);
-  const [dailyReportEnabled, setDailyReportEnabled] = useState(false);
+  const [dailyReminderEnabled, setDailyReminderEnabled] = useState(true);
+  const [dailyReportEnabled, setDailyReportEnabled] = useState(true);
   const [dailyReminderTime, setDailyReminderTime] = useState('21:00');
   const [dailyReportTime, setDailyReportTime] = useState('22:00');
-  const [upcomingBillsEnabled, setUpcomingBillsEnabled] = useState(false);
-  const [subscriptionsEnabled, setSubscriptionsEnabled] = useState(false);
-  const [recurringEnabled, setRecurringEnabled] = useState(false);
-  const [debtOverdueEnabled, setDebtOverdueEnabled] = useState(false);
-  const [debtRemindersEnabled, setDebtRemindersEnabled] = useState(false);
-  const [chitMonthlyEnabled, setChitMonthlyEnabled] = useState(false);
-  const [chitWinningEnabled, setChitWinningEnabled] = useState(false);
-  const [savingsGoalsEnabled, setSavingsGoalsEnabled] = useState(false);
-  const [budgetAlertsEnabled, setBudgetAlertsEnabled] = useState(false);
-  const [emiRemindersEnabled, setEMIRemindersEnabled] = useState(false);
-  const [emiAutopayEnabled, setEMIAutopayEnabled] = useState(false);
-  const [telegramAlertsEnabled, setTelegramAlertsEnabled] = useState(false);
-  const [scheduledAutoConfirmEnabled, setScheduledAutoConfirmEnabled] = useState(false);
-  const [scheduledApprovalEnabled, setScheduledApprovalEnabled] = useState(false);
+  const [upcomingBillsEnabled, setUpcomingBillsEnabled] = useState(true);
+  const [subscriptionsEnabled, setSubscriptionsEnabled] = useState(true);
+  const [recurringEnabled, setRecurringEnabled] = useState(true);
+  const [debtOverdueEnabled, setDebtOverdueEnabled] = useState(true);
+  const [debtRemindersEnabled, setDebtRemindersEnabled] = useState(true);
+  const [chitMonthlyEnabled, setChitMonthlyEnabled] = useState(true);
+  const [chitWinningEnabled, setChitWinningEnabled] = useState(true);
+  const [savingsGoalsEnabled, setSavingsGoalsEnabled] = useState(true);
+  const [budgetAlertsEnabled, setBudgetAlertsEnabled] = useState(true);
+  const [emiRemindersEnabled, setEMIRemindersEnabled] = useState(true);
+  const [emiAutopayEnabled, setEMIAutopayEnabled] = useState(true);
+  const [telegramAlertsEnabled, setTelegramAlertsEnabled] = useState(true);
+  const [scheduledAutoConfirmEnabled, setScheduledAutoConfirmEnabled] = useState(true);
+  const [scheduledApprovalEnabled, setScheduledApprovalEnabled] = useState(true);
   
+  // Custom time states
+  const [upcomingBillsTime, setUpcomingBillsTime] = useState('09:00');
+  const [subscriptionsTime, setSubscriptionsTime] = useState('09:00');
+  const [recurringTime, setRecurringTime] = useState('09:00');
+  const [debtOverdueTime, setDebtOverdueTime] = useState('09:00');
+  const [debtRemindersTime, setDebtRemindersTime] = useState('09:00');
+  const [chitMonthlyTime, setChitMonthlyTime] = useState('09:00');
+  const [emiRemindersTime, setEMIRemindersTime] = useState('09:00');
+
   // UI state
   const [_loading, _setLoading] = useState(false);
   const [snackbarVisible, setSnackbarVisible] = useState(false);
@@ -49,7 +58,7 @@ export default function NotificationSettingsScreen() {
   
   // Custom time picker state
   const [showTimePickerModal, setShowTimePickerModal] = useState(false);
-  const [timePickerTarget, setTimePickerTarget] = useState<'reminder' | 'report'>('reminder');
+  const [timePickerTarget, setTimePickerTarget] = useState<'reminder' | 'report' | 'upcoming_bills' | 'subscriptions' | 'recurring' | 'debt_overdue' | 'debt_reminders' | 'chit_monthly' | 'emi_reminders'>('reminder');
   const [timePickerValue, setTimePickerValue] = useState(new Date());
 
   // Load settings on mount
@@ -80,27 +89,42 @@ export default function NotificationSettingsScreen() {
         AsyncStorage.getItem(SETTINGS_KEYS.NOTIF_TELEGRAM),
         AsyncStorage.getItem(SETTINGS_KEYS.NOTIF_SCHED_AUTO_CONFIRM),
         AsyncStorage.getItem(SETTINGS_KEYS.NOTIF_SCHED_APPROVAL),
+        AsyncStorage.getItem(SETTINGS_KEYS.NOTIF_UPCOMING_BILLS_TIME),
+        AsyncStorage.getItem(SETTINGS_KEYS.NOTIF_SUBSCRIPTIONS_TIME),
+        AsyncStorage.getItem(SETTINGS_KEYS.NOTIF_RECURRING_TIME),
+        AsyncStorage.getItem(SETTINGS_KEYS.NOTIF_DEBT_OVERDUE_TIME),
+        AsyncStorage.getItem(SETTINGS_KEYS.NOTIF_DEBT_REMINDERS_TIME),
+        AsyncStorage.getItem(SETTINGS_KEYS.NOTIF_CHIT_MONTHLY_TIME),
+        AsyncStorage.getItem(SETTINGS_KEYS.NOTIF_EMI_REMINDERS_TIME),
       ]);
 
-      setMasterEnabled(settings[0] === 'true');
-      setDailyReminderEnabled(settings[1] === 'true');
-      setDailyReportEnabled(settings[2] === 'true');
+      setMasterEnabled(settings[0] !== 'false');
+      setDailyReminderEnabled(settings[1] !== 'false');
+      setDailyReportEnabled(settings[2] !== 'false');
       setDailyReminderTime(settings[3] || '21:00');
       setDailyReportTime(settings[4] || '22:00');
-      setUpcomingBillsEnabled(settings[5] === 'true');
-      setSubscriptionsEnabled(settings[6] === 'true');
-      setRecurringEnabled(settings[7] === 'true');
-      setDebtOverdueEnabled(settings[8] === 'true');
-      setDebtRemindersEnabled(settings[9] === 'true');
-      setChitMonthlyEnabled(settings[10] === 'true');
-      setChitWinningEnabled(settings[11] === 'true');
-      setSavingsGoalsEnabled(settings[12] === 'true');
-      setBudgetAlertsEnabled(settings[13] === 'true');
-      setEMIRemindersEnabled(settings[14] === 'true');
-      setEMIAutopayEnabled(settings[15] === 'true');
-      setTelegramAlertsEnabled(settings[16] === 'true');
-      setScheduledAutoConfirmEnabled(settings[17] === 'true');
-      setScheduledApprovalEnabled(settings[18] === 'true');
+      setUpcomingBillsEnabled(settings[5] !== 'false');
+      setSubscriptionsEnabled(settings[6] !== 'false');
+      setRecurringEnabled(settings[7] !== 'false');
+      setDebtOverdueEnabled(settings[8] !== 'false');
+      setDebtRemindersEnabled(settings[9] !== 'false');
+      setChitMonthlyEnabled(settings[10] !== 'false');
+      setChitWinningEnabled(settings[11] !== 'false');
+      setSavingsGoalsEnabled(settings[12] !== 'false');
+      setBudgetAlertsEnabled(settings[13] !== 'false');
+      setEMIRemindersEnabled(settings[14] !== 'false');
+      setEMIAutopayEnabled(settings[15] !== 'false');
+      setTelegramAlertsEnabled(settings[16] !== 'false');
+      setScheduledAutoConfirmEnabled(settings[17] !== 'false');
+      setScheduledApprovalEnabled(settings[18] !== 'false');
+      
+      setUpcomingBillsTime(settings[19] || '09:00');
+      setSubscriptionsTime(settings[20] || '09:00');
+      setRecurringTime(settings[21] || '09:00');
+      setDebtOverdueTime(settings[22] || '09:00');
+      setDebtRemindersTime(settings[23] || '09:00');
+      setChitMonthlyTime(settings[24] || '09:00');
+      setEMIRemindersTime(settings[25] || '09:00');
     } catch (error) {
       console.error('Failed to load notification settings:', error);
     }
@@ -138,6 +162,8 @@ export default function NotificationSettingsScreen() {
         await scheduleDailyReminder();
       } else if (key === SETTINGS_KEYS.NOTIF_DAILY_REPORT_TIME) {
         await scheduleDailyReport();
+      } else {
+        await rescheduleAll();
       }
     } catch (error) {
       console.error('Failed to update time setting:', error);
@@ -202,7 +228,7 @@ export default function NotificationSettingsScreen() {
     Linking.openSettings();
   };
 
-  const showTimePicker = (currentTime: string, type: 'reminder' | 'report') => {
+  const showTimePicker = (currentTime: string, type: typeof timePickerTarget) => {
     const [h, m] = currentTime.split(':').map(Number);
     const d = new Date();
     d.setHours(h, m, 0, 0);
@@ -211,13 +237,44 @@ export default function NotificationSettingsScreen() {
     setShowTimePickerModal(true);
   };
 
-  const handleTimeSelect = (time: string, type: 'reminder' | 'report') => {
-    if (type === 'reminder') {
-      setDailyReminderTime(time);
-      updateTimeSetting(SETTINGS_KEYS.NOTIF_DAILY_REMINDER_TIME, time);
-    } else {
-      setDailyReportTime(time);
-      updateTimeSetting(SETTINGS_KEYS.NOTIF_DAILY_REPORT_TIME, time);
+  const handleTimeSelect = (time: string, type: typeof timePickerTarget) => {
+    switch (type) {
+      case 'reminder':
+        setDailyReminderTime(time);
+        updateTimeSetting(SETTINGS_KEYS.NOTIF_DAILY_REMINDER_TIME, time);
+        break;
+      case 'report':
+        setDailyReportTime(time);
+        updateTimeSetting(SETTINGS_KEYS.NOTIF_DAILY_REPORT_TIME, time);
+        break;
+      case 'upcoming_bills':
+        setUpcomingBillsTime(time);
+        updateTimeSetting(SETTINGS_KEYS.NOTIF_UPCOMING_BILLS_TIME, time);
+        break;
+      case 'subscriptions':
+        setSubscriptionsTime(time);
+        updateTimeSetting(SETTINGS_KEYS.NOTIF_SUBSCRIPTIONS_TIME, time);
+        break;
+      case 'recurring':
+        setRecurringTime(time);
+        updateTimeSetting(SETTINGS_KEYS.NOTIF_RECURRING_TIME, time);
+        break;
+      case 'debt_overdue':
+        setDebtOverdueTime(time);
+        updateTimeSetting(SETTINGS_KEYS.NOTIF_DEBT_OVERDUE_TIME, time);
+        break;
+      case 'debt_reminders':
+        setDebtRemindersTime(time);
+        updateTimeSetting(SETTINGS_KEYS.NOTIF_DEBT_REMINDERS_TIME, time);
+        break;
+      case 'chit_monthly':
+        setChitMonthlyTime(time);
+        updateTimeSetting(SETTINGS_KEYS.NOTIF_CHIT_MONTHLY_TIME, time);
+        break;
+      case 'emi_reminders':
+        setEMIRemindersTime(time);
+        updateTimeSetting(SETTINGS_KEYS.NOTIF_EMI_REMINDERS_TIME, time);
+        break;
     }
   };
 
@@ -388,6 +445,15 @@ export default function NotificationSettingsScreen() {
             disabled={!masterEnabled}
           />
           
+          {upcomingBillsEnabled && (
+            <TimeRow
+              title="Bill Reminder Time"
+              time={upcomingBillsTime}
+              onPress={() => showTimePicker(upcomingBillsTime, 'upcoming_bills')}
+              disabled={!masterEnabled}
+            />
+          )}
+          
           <ToggleRow
             title="Subscription Renewals"
             subtitle="Reminders before subscriptions renew"
@@ -399,6 +465,15 @@ export default function NotificationSettingsScreen() {
             disabled={!masterEnabled}
           />
           
+          {subscriptionsEnabled && (
+            <TimeRow
+              title="Subscription Reminder Time"
+              time={subscriptionsTime}
+              onPress={() => showTimePicker(subscriptionsTime, 'subscriptions')}
+              disabled={!masterEnabled}
+            />
+          )}
+          
           <ToggleRow
             title="Recurring Transactions"
             subtitle="Reminders for scheduled transactions"
@@ -409,6 +484,15 @@ export default function NotificationSettingsScreen() {
             }}
             disabled={!masterEnabled}
           />
+          
+          {recurringEnabled && (
+            <TimeRow
+              title="Recurring Reminder Time"
+              time={recurringTime}
+              onPress={() => showTimePicker(recurringTime, 'recurring')}
+              disabled={!masterEnabled}
+            />
+          )}
         </View>
 
         {/* Debt Tracker Section */}
@@ -426,6 +510,15 @@ export default function NotificationSettingsScreen() {
             disabled={!masterEnabled}
           />
           
+          {debtOverdueEnabled && (
+            <TimeRow
+              title="Overdue Alert Time"
+              time={debtOverdueTime}
+              onPress={() => showTimePicker(debtOverdueTime, 'debt_overdue')}
+              disabled={!masterEnabled}
+            />
+          )}
+          
           <ToggleRow
             title="Upcoming Payment Reminders"
             subtitle="Alerts 7, 3, and 1 day before due date"
@@ -436,6 +529,15 @@ export default function NotificationSettingsScreen() {
             }}
             disabled={!masterEnabled}
           />
+          
+          {debtRemindersEnabled && (
+            <TimeRow
+              title="Reminder Alert Time"
+              time={debtRemindersTime}
+              onPress={() => showTimePicker(debtRemindersTime, 'debt_reminders')}
+              disabled={!masterEnabled}
+            />
+          )}
         </View>
 
         {/* Chit Funds Section */}
@@ -452,6 +554,15 @@ export default function NotificationSettingsScreen() {
             }}
             disabled={!masterEnabled}
           />
+          
+          {chitMonthlyEnabled && (
+            <TimeRow
+              title="Monthly Reminder Time"
+              time={chitMonthlyTime}
+              onPress={() => showTimePicker(chitMonthlyTime, 'chit_monthly')}
+              disabled={!masterEnabled}
+            />
+          )}
           
           <ToggleRow
             title="Winning Month Alerts"
@@ -506,6 +617,15 @@ export default function NotificationSettingsScreen() {
             }}
             disabled={!masterEnabled}
           />
+          
+          {emiRemindersEnabled && (
+            <TimeRow
+              title="EMI Reminder Time"
+              time={emiRemindersTime}
+              onPress={() => showTimePicker(emiRemindersTime, 'emi_reminders')}
+              disabled={!masterEnabled}
+            />
+          )}
           
           <ToggleRow
             title="EMI AutoPay Notifications"

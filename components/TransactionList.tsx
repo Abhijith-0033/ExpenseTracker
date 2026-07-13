@@ -33,7 +33,7 @@ interface TransactionListProps {
     startDate?: Date | null;
     endDate?: Date | null;
     type?: 'income' | 'expense' | 'transfer' | 'debt' | null;
-    ListHeaderComponent?: React.ComponentType<any> | React.ReactElement | null;
+    ListHeaderComponent?: React.ReactNode;
     contentContainerStyle?: any;
 }
 

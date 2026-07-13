@@ -55,7 +55,21 @@ export const SETTINGS_KEYS = {
   NOTIF_TELEGRAM: 'notif_telegram',
   NOTIF_SCHED_AUTO_CONFIRM: 'notif_sched_auto_confirm',
   NOTIF_SCHED_APPROVAL: 'notif_sched_approval',
+  NOTIF_UPCOMING_BILLS_TIME: 'notif_upcoming_bills_time',
+  NOTIF_SUBSCRIPTIONS_TIME: 'notif_subscriptions_time',
+  NOTIF_RECURRING_TIME: 'notif_recurring_time',
+  NOTIF_DEBT_REMINDERS_TIME: 'notif_debt_reminders_time',
+  NOTIF_CHIT_MONTHLY_TIME: 'notif_chit_monthly_time',
+  NOTIF_EMI_REMINDERS_TIME: 'notif_emi_reminders_time',
+  NOTIF_DEBT_OVERDUE_TIME: 'notif_debt_overdue_time',
 };
+
+export const getSettingEnabled = async (key: string, defaultValue = true): Promise<boolean> => {
+  const value = await AsyncStorage.getItem(key);
+  if (value === null) return defaultValue;
+  return value === 'true';
+};
+
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // PERMISSION HELPER
@@ -484,7 +498,7 @@ export const scheduleDebtNotifications = async (debtId: number): Promise<void> =
   const overdueEnabled = await AsyncStorage.getItem(SETTINGS_KEYS.NOTIF_DEBT_OVERDUE);
   const remindersEnabled = await AsyncStorage.getItem(SETTINGS_KEYS.NOTIF_DEBT_REMINDERS);
   
-  if (masterEnabled !== 'true') return;
+  if (masterEnabled === 'false') return;
 
   const db = getDatabase();
   if (!db) return;
@@ -538,8 +552,14 @@ export const scheduleDebtNotifications = async (debtId: number): Promise<void> =
   const today = new Date();
   const daysUntilDue = differenceInDays(nextDueDate, today);
 
+  const overdueTimeStr = await AsyncStorage.getItem(SETTINGS_KEYS.NOTIF_DEBT_OVERDUE_TIME);
+  const [overdueHour, overdueMinute] = (overdueTimeStr || '09:00').split(':').map(Number);
+
+  const customTimeStr = await AsyncStorage.getItem(SETTINGS_KEYS.NOTIF_DEBT_REMINDERS_TIME);
+  const [hour, minute] = (customTimeStr || '09:00').split(':').map(Number);
+
   // Overdue notification
-  if (daysUntilDue < 0 && overdueEnabled === 'true') {
+  if (daysUntilDue < 0 && overdueEnabled !== 'false') {
     const daysOverdue = Math.abs(daysUntilDue);
     const title = debt.direction === 'borrowed' ? "🚨 Overdue Payment" : "🚨 Overdue Payment";
     const body = debt.direction === 'borrowed'
@@ -564,14 +584,14 @@ export const scheduleDebtNotifications = async (debtId: number): Promise<void> =
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DAILY,
-          hour: 9,
-          minute: 0,
+          hour: overdueHour,
+          minute: overdueMinute,
         },
       });
   }
 
   // Due soon notifications
-  if (remindersEnabled === 'true' && daysUntilDue >= 0) {
+  if (remindersEnabled !== 'false' && daysUntilDue >= 0) {
     if (daysUntilDue === 7) {
       await Notifications.scheduleNotificationAsync({
         identifier: `${NOTIFICATION_IDS.DEBT_DUE_SOON_PREFIX}${debtId}_due_7`,
@@ -590,7 +610,7 @@ export const scheduleDebtNotifications = async (debtId: number): Promise<void> =
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DATE,
-          date: setMinutes(setHours(nextDueDate, 9), 0),
+          date: setMinutes(setHours(nextDueDate, hour), minute),
         },
       });
     } else if (daysUntilDue === 3) {
@@ -611,7 +631,7 @@ export const scheduleDebtNotifications = async (debtId: number): Promise<void> =
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DATE,
-          date: setMinutes(setHours(nextDueDate, 9), 0),
+          date: setMinutes(setHours(nextDueDate, hour), minute),
         },
       });
     } else if (daysUntilDue === 1) {
@@ -632,7 +652,7 @@ export const scheduleDebtNotifications = async (debtId: number): Promise<void> =
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DATE,
-          date: setMinutes(setHours(nextDueDate, 9), 0),
+          date: setMinutes(setHours(nextDueDate, hour), minute),
         },
       });
     } else if (daysUntilDue === 0) {
@@ -652,7 +672,7 @@ export const scheduleDebtNotifications = async (debtId: number): Promise<void> =
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DATE,
-          date: setMinutes(setHours(nextDueDate, 9), 0),
+          date: setMinutes(setHours(nextDueDate, hour), minute),
         },
       });
     }
@@ -676,7 +696,7 @@ export const scheduleChitNotifications = async (chitId: number): Promise<void> =
   const monthlyEnabled = await AsyncStorage.getItem(SETTINGS_KEYS.NOTIF_CHIT_MONTHLY);
   const winningEnabled = await AsyncStorage.getItem(SETTINGS_KEYS.NOTIF_CHIT_WINNING);
   
-  if (masterEnabled !== 'true') return;
+  if (masterEnabled === 'false') return;
 
   const db = getDatabase();
   if (!db) return;
@@ -715,7 +735,7 @@ export const scheduleChitNotifications = async (chitId: number): Promise<void> =
   }
 
   const monthlyRecords = await db.getAllAsync<ChitMonthlyRecord>(
-    'SELECT month_number, month_date, payment_status FROM chit_monthly_records WHERE chit_id = ?',
+    'SELECT month_number, month_date, payment_status, winner_is_me, bid_amount, pot_amount FROM chit_monthly_records WHERE chit_id = ?',
     [chitId]
   );
 
@@ -723,8 +743,11 @@ export const scheduleChitNotifications = async (chitId: number): Promise<void> =
   await cancelByPrefix(`${NOTIFICATION_IDS.CHIT_MONTHLY_PREFIX}${chitId}_`);
   await cancelByPrefix(`${NOTIFICATION_IDS.CHIT_WINNING_PREFIX}${chitId}_`);
 
+  const customTimeStr = await AsyncStorage.getItem(SETTINGS_KEYS.NOTIF_CHIT_MONTHLY_TIME);
+  const [hour, minute] = (customTimeStr || '09:00').split(':').map(Number);
+
   // Monthly payment reminders
-  if (monthlyEnabled === 'true') {
+  if (monthlyEnabled !== 'false') {
     for (const record of monthlyRecords) {
       if (record.payment_status === 'paid') continue;
 
@@ -751,7 +774,7 @@ export const scheduleChitNotifications = async (chitId: number): Promise<void> =
           },
           trigger: {
             type: Notifications.SchedulableTriggerInputTypes.DATE,
-            date: setMinutes(setHours(monthDate, 9), 0),
+            date: setMinutes(setHours(monthDate, hour), minute),
           },
         });
       } else if (daysUntil === 1) {
@@ -773,7 +796,7 @@ export const scheduleChitNotifications = async (chitId: number): Promise<void> =
           },
           trigger: {
             type: Notifications.SchedulableTriggerInputTypes.DATE,
-            date: setMinutes(setHours(monthDate, 9), 0),
+            date: setMinutes(setHours(monthDate, hour), minute),
           },
         });
       } else if (daysUntil === 0) {
@@ -796,7 +819,7 @@ export const scheduleChitNotifications = async (chitId: number): Promise<void> =
           },
           trigger: {
             type: Notifications.SchedulableTriggerInputTypes.DATE,
-            date: setMinutes(setHours(monthDate, 9), 0),
+            date: setMinutes(setHours(monthDate, hour), minute),
           },
         });
 
@@ -826,7 +849,7 @@ export const scheduleChitNotifications = async (chitId: number): Promise<void> =
   }
 
   // Winning month notifications
-  if (winningEnabled === 'true' && chitFund.my_turn_month) {
+  if (winningEnabled !== 'false' && chitFund.my_turn_month) {
     const winningRecord = monthlyRecords.find(r => r.month_number === chitFund.my_turn_month);
     if (winningRecord) {
       const winningDate = new Date(winningRecord.month_date);
@@ -858,7 +881,7 @@ export const scheduleChitNotifications = async (chitId: number): Promise<void> =
           },
           trigger: {
             type: Notifications.SchedulableTriggerInputTypes.DATE,
-            date: setMinutes(setHours(winningDate, 9), 0),
+            date: setMinutes(setHours(winningDate, hour), minute),
           },
         });
       } else if (daysUntil === 7) {
@@ -879,7 +902,7 @@ export const scheduleChitNotifications = async (chitId: number): Promise<void> =
           },
           trigger: {
             type: Notifications.SchedulableTriggerInputTypes.DATE,
-            date: setMinutes(setHours(winningDate, 9), 0),
+            date: setMinutes(setHours(winningDate, hour), minute),
           },
         });
       } else if (daysUntil === 0) {
@@ -900,7 +923,7 @@ export const scheduleChitNotifications = async (chitId: number): Promise<void> =
           },
           trigger: {
             type: Notifications.SchedulableTriggerInputTypes.DATE,
-            date: setMinutes(setHours(winningDate, 9), 0),
+            date: setMinutes(setHours(winningDate, hour), minute),
           },
         });
       }
@@ -1327,7 +1350,7 @@ export const scheduleEMINotifications = async (emiId: number): Promise<void> => 
     const masterEnabled = await AsyncStorage.getItem(SETTINGS_KEYS.NOTIF_MASTER_ENABLED);
     const emiRemindersEnabled = await AsyncStorage.getItem(SETTINGS_KEYS.NOTIF_EMI_REMINDERS);
 
-    if (masterEnabled !== 'true' || emiRemindersEnabled !== 'true') {
+    if (masterEnabled === 'false' || emiRemindersEnabled === 'false') {
       return;
     }
 
@@ -1350,6 +1373,9 @@ export const scheduleEMINotifications = async (emiId: number): Promise<void> => 
 
     const today = new Date();
 
+    const customTimeStr = await AsyncStorage.getItem(SETTINGS_KEYS.NOTIF_EMI_REMINDERS_TIME);
+    const [hour, minute] = (customTimeStr || '09:00').split(':').map(Number);
+
     for (const payment of payments) {
       const dueDate = parseISO(payment.due_date);
       const daysUntilDue = differenceInDays(dueDate, today);
@@ -1359,7 +1385,7 @@ export const scheduleEMINotifications = async (emiId: number): Promise<void> => 
 
       for (const days of reminderDays) {
         if (daysUntilDue === days) {
-          const reminderDate = addDays(today, days);
+          const reminderDate = setMinutes(setHours(addDays(today, days), hour), minute);
           const _notificationId = `${NOTIFICATION_IDS.EMI_PREFIX}${emiId}_${payment.month_number}_${days}d`;
 
           await Notifications.scheduleNotificationAsync({
@@ -1401,7 +1427,7 @@ export const scheduleEMINotifications = async (emiId: number): Promise<void> => 
             categoryIdentifier: 'emi-reminders',
           },
           trigger: {
-            date: setHours(setMinutes(today, 0), 9),
+            date: setMinutes(setHours(today, hour), minute),
             channelId: 'emi-reminders',
           },
         });
@@ -1425,7 +1451,7 @@ export const scheduleEMINotifications = async (emiId: number): Promise<void> => 
             categoryIdentifier: 'emi-reminders',
           },
           trigger: {
-            date: setHours(setMinutes(today, 9), 9),
+            date: setMinutes(setHours(today, hour), minute),
             channelId: 'emi-reminders',
           },
         });

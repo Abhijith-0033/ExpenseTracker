@@ -260,7 +260,7 @@ export default function QuickGuideScreen() {
     {
       id: 'app-lock',
       title: 'App Security & Lock',
-      icon: <Lock size={20} color={Colors.gray[850] || Colors.gray[900]} />,
+      icon: <Lock size={20} color={Colors.gray[800] || Colors.gray[900]} />,
       isPremium: false,
       content: [
         'Keep your financial data private and secure.',

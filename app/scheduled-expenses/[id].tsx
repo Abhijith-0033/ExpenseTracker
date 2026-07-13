@@ -442,7 +442,7 @@ const styles = StyleSheet.create({
     marginTop: 12
   },
   deleteBtnText: {
-    color: Colors.danger[750] || Colors.danger[600],
+    color: Colors.danger[700] || Colors.danger[600],
     fontFamily: Typography.family.bold,
     fontSize: 15
   }

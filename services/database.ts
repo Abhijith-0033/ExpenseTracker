@@ -669,6 +669,43 @@ const runMigrations = async (db: SQLite.SQLiteDatabase) => {
     await setDbVersion(db, version);
   }
 
+  if (version < 7) {
+    // Version 7: Repair orphaned category_id and subcategory_id references
+    let fallbackCatId: number | null = null;
+    const firstCat = await db.getFirstAsync<{ id: number }>('SELECT id FROM categories ORDER BY id ASC LIMIT 1');
+    if (firstCat) {
+      fallbackCatId = firstCat.id;
+    }
+
+    if (fallbackCatId !== null) {
+      // Repair scheduled_expenses orphaned category_id
+      await db.runAsync(`
+        UPDATE scheduled_expenses 
+        SET category_id = ? 
+        WHERE CAST(category_id AS INTEGER) NOT IN (SELECT id FROM categories)
+      `, [fallbackCatId]);
+
+      // Repair sinking_funds orphaned category_id
+      await db.runAsync(`
+        UPDATE sinking_funds 
+        SET category_id = NULL 
+        WHERE category_id IS NOT NULL 
+        AND CAST(category_id AS INTEGER) NOT IN (SELECT id FROM categories)
+      `);
+    }
+
+    // Repair orphaned subcategory_id in scheduled_expenses
+    await db.runAsync(`
+      UPDATE scheduled_expenses 
+      SET subcategory_id = NULL 
+      WHERE subcategory_id IS NOT NULL 
+      AND CAST(subcategory_id AS INTEGER) NOT IN (SELECT id FROM category_subcategories)
+    `);
+
+    version = 7;
+    await setDbVersion(db, version);
+  }
+
   console.log(`Database migrated successfully to version ${version}`);
 };
 
@@ -941,30 +978,85 @@ export const getCategories = async (): Promise<CategoryNode[]> => {
 };
 
 export const saveCategories = async (categories: CategoryNode[]) => {
+  if (!categories || categories.length === 0) return;
   await initDatabase();
   const db = getDatabase();
   
   await db.withTransactionAsync(async () => {
-    await db.runAsync('DELETE FROM category_subcategories');
-    await db.runAsync('DELETE FROM categories');
+    const activeIds: number[] = [];
 
     for (const cat of categories) {
-      const catResult = await db.runAsync(
-        'INSERT INTO categories (name, is_recurring, default_validity) VALUES (?, ?, ?)',
-        [cat.name, cat.is_recurring ? 1 : 0, cat.default_validity ?? null]
-      );
-      const catId = catResult.lastInsertRowId;
+      let catId: number;
+      const numericId = Number(cat.id);
+      
+      let dbCat = (!isNaN(numericId)) 
+        ? await db.getFirstAsync<{ id: number }>('SELECT id FROM categories WHERE id = ?', [numericId])
+        : null;
+        
+      if (!dbCat) {
+        dbCat = await db.getFirstAsync<{ id: number }>('SELECT id FROM categories WHERE name = ?', [cat.name]);
+      }
 
+      if (dbCat) {
+        catId = dbCat.id;
+        await db.runAsync(
+          'UPDATE categories SET name = ?, is_recurring = ?, default_validity = ? WHERE id = ?',
+          [cat.name, cat.is_recurring ? 1 : 0, cat.default_validity ?? null, catId]
+        );
+      } else {
+        const result = await db.runAsync(
+          'INSERT INTO categories (name, is_recurring, default_validity) VALUES (?, ?, ?)',
+          [cat.name, cat.is_recurring ? 1 : 0, cat.default_validity ?? null]
+        );
+        catId = result.lastInsertRowId;
+      }
+      activeIds.push(catId);
+
+      // Sync subcategories for this category
+      const dbSubs = await db.getAllAsync<{ id: number; name: string }>(
+        'SELECT id, name FROM category_subcategories WHERE category_id = ?',
+        [catId]
+      );
+      
+      const activeSubNames = new Set(cat.subcategories);
+
+      // Delete removed subcategories
+      for (const dbSub of dbSubs) {
+        if (!activeSubNames.has(dbSub.name)) {
+          await db.runAsync('DELETE FROM category_subcategories WHERE id = ?', [dbSub.id]);
+        }
+      }
+
+      // Add or update subcategories
       for (const subName of cat.subcategories) {
         const subSettings = cat.subcategory_settings?.[subName];
         const isRecur = subSettings?.is_recurring ? 1 : 0;
         const validity = subSettings?.default_validity ?? null;
-
-        await db.runAsync(
-          'INSERT INTO category_subcategories (category_id, name, is_recurring, default_validity) VALUES (?, ?, ?, ?)',
-          [catId, subName, isRecur, validity]
-        );
+        
+        const existingSub = dbSubs.find(s => s.name === subName);
+        if (existingSub) {
+          await db.runAsync(
+            'UPDATE category_subcategories SET is_recurring = ?, default_validity = ? WHERE id = ?',
+            [isRecur, validity, existingSub.id]
+          );
+        } else {
+          await db.runAsync(
+            'INSERT INTO category_subcategories (category_id, name, is_recurring, default_validity) VALUES (?, ?, ?, ?)',
+            [catId, subName, isRecur, validity]
+          );
+        }
       }
+    }
+
+    // Delete categories not in the active list
+    if (activeIds.length > 0) {
+      const placeholders = activeIds.map(() => '?').join(', ');
+      await db.runAsync(
+        `DELETE FROM categories WHERE id NOT IN (${placeholders})`,
+        activeIds
+      );
+    } else {
+      await db.runAsync('DELETE FROM categories');
     }
   });
 };
@@ -1678,15 +1770,21 @@ export const getDataDeletionLog = async (): Promise<any[]> => {
 
 
 export const checkTransactionsExistForAccount = async (accountId: number): Promise<boolean> => {
+    await initDatabase();
+    const db = getDatabase();
     const result = await db.getFirstAsync<{count: number}>('SELECT COUNT(*) as count FROM transactions WHERE account_id = ?', [accountId]);
     return (result?.count || 0) > 0;
 };
 
 export const deleteAccount = async (accountId: number): Promise<void> => {
+    await initDatabase();
+    const db = getDatabase();
     await db.runAsync('DELETE FROM accounts WHERE id = ?', [accountId]);
 };
 
 export const checkTransactionsExistForCategory = async (categoryName: string): Promise<boolean> => {
+    await initDatabase();
+    const db = getDatabase();
     const result = await db.getFirstAsync<{count: number}>('SELECT COUNT(*) as count FROM transactions WHERE category = ? OR subcategory = ?', [categoryName, categoryName]);
     return (result?.count || 0) > 0;
 };

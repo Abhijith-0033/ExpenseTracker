@@ -552,7 +552,7 @@ export default function SubscriptionsScreen() {
                                         setShowAddModal(false);
                                         // Slight delay to allow modal to close smoothly before showing alert
                                         setTimeout(() => {
-                                            handleDelete(editingSub.id, editingSub.name);
+                                            requestDelete(editingSub.id, editingSub.name);
                                         }, 300);
                                     }}
                                 >

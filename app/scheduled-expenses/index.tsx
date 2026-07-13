@@ -1,8 +1,14 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator, Switch, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator, Switch, Alert, TextInput } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { ArrowLeft, Plus, Calendar, Clock, AlertTriangle, ShieldCheck, CheckCircle2, XCircle } from 'lucide-react-native';
+import { 
+  ArrowLeft, Plus, Calendar, Clock, AlertTriangle, ShieldCheck, 
+  CheckCircle2, XCircle, Search, X, Coffee, Car, Home, Film, 
+  ShoppingBag, DollarSign, Tag, RefreshCw, ChevronRight
+} from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Colors, Typography, Layout } from '../../constants/Theme';
 import { formatCurrency } from '../../utils/currency';
 import { getDatabase , getAllScheduledExpenses, getScheduledExpenseStats, updateScheduledExpense, ScheduledExpenseJoined } from '../../services/database';
@@ -24,6 +30,11 @@ export default function ScheduledExpensesIndex() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [pendingLogs, setPendingLogs] = useState<any[]>([]);
+  
+  // Search & Filter state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'paused' | 'auto_run'>('all');
+
   const [confirmSheet, setConfirmSheet] = useState<{
     title: string;
     description: string;
@@ -167,6 +178,57 @@ export default function ScheduledExpensesIndex() {
     }
   };
 
+  const getCategoryIcon = (category: string) => {
+    switch (category) {
+      case 'Food': return <Coffee size={18} color={Colors.warning[500]} />;
+      case 'Transport': return <Car size={18} color={Colors.primary[500]} />;
+      case 'Housing': return <Home size={18} color={Colors.success[500]} />;
+      case 'Entertainment': return <Film size={18} color={Colors.danger[500]} />;
+      case 'Shopping': return <ShoppingBag size={18} color={Colors.primary[700]} />;
+      case 'Income': return <DollarSign size={18} color={Colors.success.text} />;
+      default: return <Tag size={18} color={Colors.gray[500]} />;
+    }
+  };
+
+  const getCategoryIconBg = (category: string) => {
+    switch (category) {
+      case 'Food': return Colors.warning.bg;
+      case 'Transport': return Colors.primary[100];
+      case 'Housing': return Colors.success.bg;
+      case 'Entertainment': return Colors.danger.bg;
+      case 'Shopping': return Colors.primary[100];
+      case 'Income': return Colors.success.bg;
+      default: return Colors.gray[100];
+    }
+  };
+
+  // Search/Filters application
+  const filteredSchedules = schedules.filter(item => {
+    const nameMatch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const catMatch = (item.category_name || '').toLowerCase().includes(searchQuery.toLowerCase());
+    const descMatch = (item.description || '').toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = nameMatch || catMatch || descMatch;
+
+    if (!matchesSearch) return false;
+    if (statusFilter === 'active') return item.is_active === 1;
+    if (statusFilter === 'paused') return item.is_active === 0;
+    if (statusFilter === 'auto_run') return item.auto_create === 1;
+    return true;
+  });
+
+  const filteredLogs = logs.filter(log => {
+    const nameMatch = (log.expense_name || '').toLowerCase().includes(searchQuery.toLowerCase());
+    const catMatch = (log.category_name || '').toLowerCase().includes(searchQuery.toLowerCase());
+    const actionMatch = getLogActionLabel(log.action).toLowerCase().includes(searchQuery.toLowerCase());
+    return nameMatch || catMatch || actionMatch;
+  });
+
+  const filteredPendingLogs = pendingLogs.filter(log => {
+    const nameMatch = (log.expense_name || '').toLowerCase().includes(searchQuery.toLowerCase());
+    const catMatch = (log.category_name || '').toLowerCase().includes(searchQuery.toLowerCase());
+    return nameMatch || catMatch;
+  });
+
   if (loading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
@@ -179,11 +241,11 @@ export default function ScheduledExpensesIndex() {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.7}>
           <ArrowLeft size={22} color={Colors.gray[800]} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Scheduled Expenses</Text>
-        <TouchableOpacity onPress={() => router.push('/scheduled-expenses/add')} style={styles.addBtn}>
+        <TouchableOpacity onPress={() => router.push('/scheduled-expenses/add')} style={styles.addBtn} activeOpacity={0.7}>
           <Plus size={22} color={Colors.white} />
         </TouchableOpacity>
       </View>
@@ -195,9 +257,21 @@ export default function ScheduledExpensesIndex() {
       >
         {/* Stats Summary Card */}
         {stats && (
-          <View style={styles.statsCard}>
-            <Text style={styles.statsLabel}>{"THIS WEEK'S AUTO-RUN SAVINGS"}</Text>
-            <Text style={styles.statsValue}>{formatCurrency(stats.autoCreatedAmount)}</Text>
+          <LinearGradient
+            colors={['#1A1A2E', '#342624']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.statsCard}
+          >
+            <View style={styles.statsHeaderRow}>
+              <View>
+                <Text style={styles.statsLabel}>{"THIS WEEK'S AUTO-RUN SAVINGS"}</Text>
+                <Text style={styles.statsValue}>{formatCurrency(stats.autoCreatedAmount)}</Text>
+              </View>
+              <View style={styles.statsIconContainer}>
+                <RefreshCw size={20} color={Colors.primary[200]} />
+              </View>
+            </View>
             <View style={styles.statsDivider} />
             <View style={styles.statsGrid}>
               <View style={styles.statItem}>
@@ -213,28 +287,84 @@ export default function ScheduledExpensesIndex() {
                 <Text style={styles.statLabelSub}>Rejected</Text>
               </View>
             </View>
-          </View>
+          </LinearGradient>
         )}
+
+        {/* Search and Filters */}
+        <View style={styles.searchFilterContainer}>
+          <View style={styles.searchBar}>
+            <Search size={18} color={Colors.gray[400]} style={styles.searchIcon} />
+            <TextInput
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder={
+                activeTab === 'schedules' ? "Search schedules..." :
+                activeTab === 'logs' ? "Search execution history..." : "Search pending approvals..."
+              }
+              placeholderTextColor={Colors.gray[400]}
+              style={styles.searchInput}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearSearchBtn}>
+                <X size={16} color={Colors.gray[500]} />
+              </TouchableOpacity>
+            )}
+          </View>
+          
+          {activeTab === 'schedules' && (
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false} 
+              contentContainerStyle={styles.filterScroll}
+            >
+              <TouchableOpacity
+                style={[styles.filterChip, statusFilter === 'all' && styles.activeFilterChip]}
+                onPress={() => setStatusFilter('all')}
+              >
+                <Text style={[styles.filterChipText, statusFilter === 'all' && styles.activeFilterChipText]}>All</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.filterChip, statusFilter === 'active' && styles.activeFilterChip]}
+                onPress={() => setStatusFilter('active')}
+              >
+                <Text style={[styles.filterChipText, statusFilter === 'active' && styles.activeFilterChipText]}>Active</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.filterChip, statusFilter === 'paused' && styles.activeFilterChip]}
+                onPress={() => setStatusFilter('paused')}
+              >
+                <Text style={[styles.filterChipText, statusFilter === 'paused' && styles.activeFilterChipText]}>Paused</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.filterChip, statusFilter === 'auto_run' && styles.activeFilterChip]}
+                onPress={() => setStatusFilter('auto_run')}
+              >
+                <Text style={[styles.filterChipText, statusFilter === 'auto_run' && styles.activeFilterChipText]}>Auto-Run</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          )}
+        </View>
 
         {/* Tab Selector */}
         <View style={styles.tabContainer}>
           <TouchableOpacity 
             style={[styles.tab, activeTab === 'schedules' && styles.activeTab]} 
             onPress={() => setActiveTab('schedules')}
+            activeOpacity={0.8}
           >
-            <Text style={[styles.tabText, activeTab === 'schedules' && styles.activeTabText]}>Active Schedules</Text>
+            <View style={styles.tabContent}>
+              <Calendar size={14} color={activeTab === 'schedules' ? Colors.gray[900] : Colors.gray[500]} />
+              <Text style={[styles.tabText, activeTab === 'schedules' && styles.activeTabText]}>Schedules</Text>
+            </View>
           </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.tab, activeTab === 'logs' && styles.activeTab]} 
-            onPress={() => setActiveTab('logs')}
-          >
-            <Text style={[styles.tabText, activeTab === 'logs' && styles.activeTabText]}>Execution Log</Text>
-          </TouchableOpacity>
+          
           <TouchableOpacity 
             style={[styles.tab, activeTab === 'pending' && styles.activeTab]} 
             onPress={() => setActiveTab('pending')}
+            activeOpacity={0.8}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <View style={styles.tabContent}>
+              <Clock size={14} color={activeTab === 'pending' ? Colors.gray[900] : Colors.gray[500]} />
               <Text style={[styles.tabText, activeTab === 'pending' && styles.activeTabText]}>Pending</Text>
               {pendingLogs.length > 0 && (
                 <View style={styles.tabBadge}>
@@ -243,119 +373,194 @@ export default function ScheduledExpensesIndex() {
               )}
             </View>
           </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[styles.tab, activeTab === 'logs' && styles.activeTab]} 
+            onPress={() => setActiveTab('logs')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.tabContent}>
+              <RefreshCw size={14} color={activeTab === 'logs' ? Colors.gray[900] : Colors.gray[500]} />
+              <Text style={[styles.tabText, activeTab === 'logs' && styles.activeTabText]}>History</Text>
+            </View>
+          </TouchableOpacity>
         </View>
 
         {/* Schedules Tab */}
         {activeTab === 'schedules' ? (
           <View style={styles.listContainer}>
-            {schedules.length === 0 ? (
+            {filteredSchedules.length === 0 ? (
               <View style={styles.emptyContainer}>
-                <Calendar size={48} color={Colors.gray[300]} style={{ marginBottom: 12 }} />
-                <Text style={styles.emptyTitle}>No scheduled expenses</Text>
-                <Text style={styles.emptySub}>Set up daily, weekly, or monthly automatic expense logging or approvals.</Text>
-                <TouchableOpacity style={styles.emptyBtn} onPress={() => router.push('/scheduled-expenses/add')}>
-                  <Text style={styles.emptyBtnText}>Create Schedule</Text>
-                </TouchableOpacity>
+                <Calendar size={56} color={Colors.gray[300]} style={{ marginBottom: 16 }} />
+                <Text style={styles.emptyTitle}>{searchQuery ? 'No schedules match search' : 'No scheduled expenses'}</Text>
+                <Text style={styles.emptySub}>
+                  {searchQuery ? 'Check your filters or spelling and try again.' : 'Set up daily, weekly, or monthly automatic expense logging or approvals.'}
+                </Text>
+                {!searchQuery && (
+                  <TouchableOpacity style={styles.emptyBtn} onPress={() => router.push('/scheduled-expenses/add')}>
+                    <Text style={styles.emptyBtnText}>Create Schedule</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             ) : (
-              schedules.map((item) => (
-                <TouchableOpacity 
-                  key={item.id} 
-                  style={[styles.scheduleCard, item.is_active === 0 && styles.pausedCard]}
-                  activeOpacity={0.8}
-                  onPress={() => router.push(`/scheduled-expenses/${item.id}`)}
+              filteredSchedules.map((item, index) => (
+                <Animated.View 
+                  key={item.id}
+                  entering={FadeInDown.delay(index * 50).duration(300)}
                 >
-                  <View style={styles.cardTop}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.cardName}>{item.name}</Text>
-                      <Text style={styles.cardMeta}>{item.category_name} · {item.account_name}</Text>
+                  <TouchableOpacity 
+                    style={[styles.scheduleCard, item.is_active === 0 && styles.pausedCard]}
+                    activeOpacity={0.8}
+                    onPress={() => router.push(`/scheduled-expenses/${item.id}`)}
+                  >
+                    <View style={styles.cardHeader}>
+                      <View style={[styles.iconContainer, { backgroundColor: getCategoryIconBg(item.category_name) }]}>
+                        {getCategoryIcon(item.category_name)}
+                      </View>
+                      <View style={styles.cardMainInfo}>
+                        <Text style={styles.cardName}>{item.name}</Text>
+                        <View style={styles.cardSubRow}>
+                          <View style={styles.categoryBadge}>
+                            <Text style={styles.categoryBadgeText}>{item.category_name || 'Other'}</Text>
+                          </View>
+                          <Text style={styles.bullet}>•</Text>
+                          <Text style={styles.accountText}>{item.account_name}</Text>
+                        </View>
+                      </View>
+                      <View style={styles.switchWrapper}>
+                        <Switch
+                          value={item.is_active === 1}
+                          onValueChange={() => toggleScheduleActive(item)}
+                          trackColor={{ false: Colors.gray[200], true: Colors.primary[200] }}
+                          thumbColor={item.is_active === 1 ? Colors.primary[500] : Colors.gray[400]}
+                          ios_backgroundColor={Colors.gray[200]}
+                        />
+                      </View>
                     </View>
-                    <View style={styles.switchWrapper}>
-                      <Switch
-                        value={item.is_active === 1}
-                        onValueChange={() => toggleScheduleActive(item)}
-                        trackColor={{ false: Colors.gray[200], true: Colors.primary[500] }}
-                        thumbColor={Colors.white}
-                      />
+                    <View style={styles.cardDivider} />
+                    <View style={styles.cardBottom}>
+                      <View style={styles.scheduleInfo}>
+                        <Clock size={13} color={Colors.gray[400]} style={{ marginRight: 6 }} />
+                        <Text style={styles.scheduleDays} numberOfLines={1}>
+                          {getDaysFormatted(item.days_of_week)} at {item.scheduled_time}
+                        </Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={styles.cardAmount}>{formatCurrency(item.amount)}</Text>
+                        {item.auto_create === 1 ? (
+                          <View style={styles.autoCreateBadge}>
+                            <ShieldCheck size={10} color={Colors.success[600]} style={{ marginRight: 4 }} />
+                            <Text style={styles.autoCreateBadgeText}>Auto-Run</Text>
+                          </View>
+                        ) : (
+                          <View style={styles.approvalBadge}>
+                            <AlertTriangle size={10} color={Colors.warning[600]} style={{ marginRight: 4 }} />
+                            <Text style={styles.approvalBadgeText}>Requires Approval</Text>
+                          </View>
+                        )}
+                      </View>
                     </View>
-                  </View>
-                  <View style={styles.cardDivider} />
-                  <View style={styles.cardBottom}>
-                    <View style={styles.scheduleInfo}>
-                      <Clock size={14} color={Colors.gray[400]} style={{ marginRight: 6 }} />
-                      <Text style={styles.scheduleDays} numberOfLines={1}>
-                        {getDaysFormatted(item.days_of_week)} at {item.scheduled_time}
-                      </Text>
-                    </View>
-                    <Text style={styles.cardAmount}>{formatCurrency(item.amount)}</Text>
-                  </View>
-                  {item.auto_create === 1 && (
-                    <View style={styles.autoCreateBadge}>
-                      <ShieldCheck size={10} color={Colors.success[600]} style={{ marginRight: 4 }} />
-                      <Text style={styles.autoCreateBadgeText}>Auto-Create enabled</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
+                  </TouchableOpacity>
+                </Animated.View>
               ))
             )}
           </View>
         ) : activeTab === 'logs' ? (
           /* Logs Tab */
           <View style={styles.listContainer}>
-            {logs.length === 0 ? (
+            {filteredLogs.length === 0 ? (
               <View style={styles.emptyContainer}>
-                <Clock size={48} color={Colors.gray[300]} style={{ marginBottom: 12 }} />
-                <Text style={styles.emptyTitle}>No runs logged yet</Text>
-                <Text style={styles.emptySub}>History of executions, automated runs, and approvals will show here.</Text>
+                <Clock size={56} color={Colors.gray[300]} style={{ marginBottom: 16 }} />
+                <Text style={styles.emptyTitle}>{searchQuery ? 'No history matches search' : 'No runs logged yet'}</Text>
+                <Text style={styles.emptySub}>
+                  {searchQuery ? 'Check your spelling or filter query and try again.' : 'History of executions, automated runs, and approvals will show here.'}
+                </Text>
               </View>
             ) : (
-              logs.map((log) => (
-                <View key={log.id} style={styles.logCard}>
-                  <View style={styles.logLeft}>
-                    <View style={[styles.logIconContainer, { backgroundColor: log.action === 'rejected' ? Colors.danger[50] : (log.action === 'missed' ? Colors.warning[50] : Colors.success[50]) }]}>
-                      {getLogActionIcon(log.action)}
+              filteredLogs.map((log, index) => (
+                <Animated.View 
+                  key={log.id}
+                  entering={FadeInDown.delay(index * 30).duration(300)}
+                >
+                  <View style={styles.logCard}>
+                    <View style={styles.logLeft}>
+                      <View style={[styles.logIconContainer, { backgroundColor: log.action === 'rejected' ? Colors.danger[50] : (log.action === 'missed' ? Colors.warning[50] : Colors.success[50]) }]}>
+                        {getLogActionIcon(log.action)}
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.logTitle}>{log.expense_name || 'Deleted Schedule'}</Text>
+                        <View style={styles.logMetaRow}>
+                          <Text style={styles.logMeta}>{log.scheduled_date}</Text>
+                          <Text style={styles.bullet}>•</Text>
+                          <View style={[
+                            styles.statusBadge, 
+                            log.action === 'approved' || log.action === 'auto_created' ? styles.statusSuccess :
+                            log.action === 'rejected' ? styles.statusDanger : styles.statusWarning
+                          ]}>
+                            <Text style={[
+                              styles.statusBadgeText,
+                              log.action === 'approved' || log.action === 'auto_created' ? styles.statusSuccessText :
+                              log.action === 'rejected' ? styles.statusDangerText : styles.statusWarningText
+                            ]}>
+                              {getLogActionLabel(log.action)}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
                     </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.logTitle}>{log.expense_name || 'Deleted Schedule'}</Text>
-                      <Text style={styles.logMeta}>{log.scheduled_date} · {getLogActionLabel(log.action)}</Text>
-                    </View>
+                    <Text style={[styles.logAmount, log.action === 'rejected' && { textDecorationLine: 'line-through', color: Colors.gray[400] }]}>
+                      {formatCurrency(log.amount)}
+                    </Text>
                   </View>
-                  <Text style={[styles.logAmount, log.action === 'rejected' && { textDecorationLine: 'line-through', color: Colors.gray[400] }]}>
-                    {formatCurrency(log.amount)}
-                  </Text>
-                </View>
+                </Animated.View>
               ))
             )}
           </View>
         ) : (
           /* Pending Tab */
           <View style={styles.listContainer}>
-            {pendingLogs.length === 0 ? (
+            {filteredPendingLogs.length === 0 ? (
               <View style={styles.emptyContainer}>
-                <CheckCircle2 size={48} color={Colors.gray[300]} style={{ marginBottom: 12 }} />
-                <Text style={styles.emptyTitle}>No pending approvals</Text>
-                <Text style={styles.emptySub}>Scheduled expenses requiring your approval will appear here.</Text>
+                <CheckCircle2 size={56} color={Colors.gray[300]} style={{ marginBottom: 16 }} />
+                <Text style={styles.emptyTitle}>{searchQuery ? 'No pending items match search' : 'No pending approvals'}</Text>
+                <Text style={styles.emptySub}>
+                  {searchQuery ? 'Check spelling and try again.' : 'Scheduled expenses requiring your approval will appear here.'}
+                </Text>
               </View>
             ) : (
-              pendingLogs.map((log) => (
-                <View key={log.id} style={styles.pendingCard}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.cardName}>{log.expense_name || 'Deleted Schedule'}</Text>
-                    <Text style={styles.cardMeta}>{log.category_name} · {log.account_name}</Text>
-                    <Text style={styles.cardMeta}>Due: {log.scheduled_date}</Text>
+              filteredPendingLogs.map((log, index) => (
+                <Animated.View 
+                  key={log.id} 
+                  entering={FadeInDown.delay(index * 50).duration(300)}
+                  style={styles.pendingCard}
+                >
+                  <View style={styles.pendingCardHeader}>
+                    <View style={[styles.iconContainer, { backgroundColor: getCategoryIconBg(log.category_name) }]}>
+                      {getCategoryIcon(log.category_name)}
+                    </View>
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <Text style={styles.pendingCardName}>{log.expense_name || 'Deleted Schedule'}</Text>
+                      <Text style={styles.pendingCardMeta}>{log.category_name || 'Other'} · {log.account_name}</Text>
+                    </View>
+                    <Text style={styles.pendingAmount}>{formatCurrency(log.amount)}</Text>
                   </View>
-                  <Text style={styles.cardAmount}>{formatCurrency(log.amount)}</Text>
+                  <View style={styles.pendingCardBody}>
+                    <View style={styles.dueTag}>
+                      <Clock size={12} color={Colors.warning[600]} style={{ marginRight: 4 }} />
+                      <Text style={styles.dueTagText}>Due: {log.scheduled_date}</Text>
+                    </View>
+                  </View>
                   <View style={styles.approvalBtns}>
-                    <TouchableOpacity style={styles.approveBtn} onPress={() => handleApprove(log.id)}>
-                      <CheckCircle2 size={16} color={Colors.white} />
+                    <TouchableOpacity style={styles.approveBtn} onPress={() => handleApprove(log.id)} activeOpacity={0.8}>
+                      <CheckCircle2 size={15} color={Colors.white} />
                       <Text style={styles.approveBtnText}>Approve</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.rejectBtn} onPress={() => handleReject(log.id)}>
-                      <XCircle size={16} color={Colors.white} />
+                    <TouchableOpacity style={styles.rejectBtn} onPress={() => handleReject(log.id)} activeOpacity={0.8}>
+                      <XCircle size={15} color={Colors.white} />
                       <Text style={styles.rejectBtnText}>Reject</Text>
                     </TouchableOpacity>
                   </View>
-                </View>
+                </Animated.View>
               ))
             )}
           </View>
@@ -387,12 +592,16 @@ const styles = StyleSheet.create({
     paddingVertical: 12, 
     justifyContent: 'space-between',
     backgroundColor: Colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.gray[100],
     ...Layout.shadows.sm
   },
   backBtn: { 
     padding: 10, 
     backgroundColor: Colors.white, 
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.gray[200],
     ...Layout.shadows.sm
   },
   addBtn: { 
@@ -401,14 +610,26 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     ...Layout.shadows.sm
   },
-  headerTitle: { fontSize: 20, fontFamily: Typography.family.bold, color: Colors.gray[900] },
+  headerTitle: { fontSize: 18, fontFamily: Typography.family.bold, color: Colors.gray[900] },
   scrollContent: { padding: 20, paddingBottom: 100 },
   statsCard: { 
-    backgroundColor: Colors.gray[900], 
     padding: 24, 
     borderRadius: 24,
-    marginBottom: 24,
+    marginBottom: 20,
     ...Layout.shadows.md
+  },
+  statsHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center'
+  },
+  statsIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   statsLabel: { 
     fontSize: 10, 
@@ -418,25 +639,84 @@ const styles = StyleSheet.create({
     marginBottom: 4
   },
   statsValue: { 
-    fontSize: 32, 
+    fontSize: 30, 
     fontFamily: Typography.family.bold, 
     color: Colors.white 
   },
   statsDivider: {
     height: 1,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(255,255,255,0.08)',
     marginVertical: 16,
   },
   statsGrid: { flexDirection: 'row', justifyContent: 'space-between' },
   statItem: { alignItems: 'center', flex: 1 },
   statCount: { fontSize: 18, fontFamily: Typography.family.bold, color: Colors.white, marginBottom: 2 },
   statLabelSub: { fontSize: 11, color: Colors.gray[400], fontFamily: Typography.family.medium },
+  
+  // Search & Filter styles
+  searchFilterContainer: {
+    marginBottom: 20,
+    gap: 12,
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.gray[200],
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    height: 48,
+    ...Layout.shadows.sm
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: Typography.family.medium,
+    color: Colors.gray[800],
+  },
+  clearSearchBtn: {
+    padding: 4,
+  },
+  filterScroll: {
+    gap: 8,
+    paddingRight: 20,
+  },
+  filterChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.gray[200],
+    ...Layout.shadows.sm
+  },
+  activeFilterChip: {
+    backgroundColor: Colors.primary[500],
+    borderColor: Colors.primary[500],
+  },
+  filterChipText: {
+    fontSize: 12,
+    fontFamily: Typography.family.medium,
+    color: Colors.gray[600],
+  },
+  activeFilterChipText: {
+    color: Colors.white,
+    fontFamily: Typography.family.bold,
+  },
+
+  // Tab switcher
   tabContainer: { 
     flexDirection: 'row', 
-    backgroundColor: Colors.gray[200], 
+    backgroundColor: Colors.gray[100], 
     borderRadius: 14, 
     padding: 4,
-    marginBottom: 24
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: Colors.gray[200]
   },
   tab: { 
     flex: 1, 
@@ -445,36 +725,88 @@ const styles = StyleSheet.create({
     borderRadius: 10 
   },
   activeTab: { backgroundColor: Colors.white, ...Layout.shadows.sm },
-  tabText: { fontSize: 14, fontFamily: Typography.family.medium, color: Colors.gray[500] },
+  tabContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  tabText: { fontSize: 13, fontFamily: Typography.family.medium, color: Colors.gray[500] },
   activeTabText: { color: Colors.gray[900], fontFamily: Typography.family.bold },
+  tabBadge: {
+    backgroundColor: Colors.primary[500],
+    borderRadius: 10,
+    minWidth: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  tabBadgeText: {
+    fontSize: 9,
+    fontFamily: Typography.family.bold,
+    color: Colors.white,
+  },
+
+  // Lists and Cards
   listContainer: { gap: 16 },
   scheduleCard: {
     backgroundColor: Colors.white,
     borderRadius: 20,
     padding: 16,
-    ...Layout.shadows.sm,
     borderWidth: 1,
-    borderColor: Colors.gray[100]
+    borderColor: Colors.gray[100],
+    ...Layout.shadows.sm,
   },
   pausedCard: {
-    opacity: 0.6
+    opacity: 0.55,
   },
-  cardTop: {
+  cardHeader: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12
+  },
+  iconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cardMainInfo: {
+    flex: 1,
+    marginLeft: 12,
+    marginRight: 8,
   },
   cardName: {
-    fontSize: 16,
+    fontSize: 15,
     fontFamily: Typography.family.bold,
     color: Colors.gray[900]
   },
-  cardMeta: {
+  cardSubRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  categoryBadge: {
+    backgroundColor: Colors.gray[100],
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  categoryBadgeText: {
+    fontSize: 10,
+    fontFamily: Typography.family.bold,
+    color: Colors.gray[600],
+  },
+  bullet: {
+    fontSize: 12,
+    color: Colors.gray[300],
+    marginHorizontal: 6,
+  },
+  accountText: {
     fontSize: 12,
     fontFamily: Typography.family.medium,
-    color: Colors.gray[400],
-    marginTop: 2
+    color: Colors.gray[500],
   },
   switchWrapper: {
     justifyContent: 'center',
@@ -509,18 +841,33 @@ const styles = StyleSheet.create({
   autoCreateBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
     backgroundColor: Colors.success[50],
     borderRadius: 6,
     paddingHorizontal: 6,
     paddingVertical: 3,
-    marginTop: 10
+    marginTop: 6
   },
   autoCreateBadgeText: {
     fontSize: 9,
     fontFamily: Typography.family.bold,
     color: Colors.success[700]
   },
+  approvalBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.warning[50],
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    marginTop: 6
+  },
+  approvalBadgeText: {
+    fontSize: 9,
+    fontFamily: Typography.family.bold,
+    color: Colors.warning[700]
+  },
+
+  // Empty container
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -552,13 +899,17 @@ const styles = StyleSheet.create({
     fontFamily: Typography.family.bold,
     fontSize: 14
   },
+
+  // Logs
   logCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: Colors.white,
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 14,
+    borderWidth: 1,
+    borderColor: Colors.gray[100],
     ...Layout.shadows.sm
   },
   logLeft: {
@@ -568,8 +919,8 @@ const styles = StyleSheet.create({
     marginRight: 12
   },
   logIconContainer: {
-    width: 36,
-    height: 36,
+    width: 40,
+    height: 40,
     borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
@@ -580,54 +931,102 @@ const styles = StyleSheet.create({
     fontFamily: Typography.family.bold,
     color: Colors.gray[900]
   },
+  logMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
   logMeta: {
     fontSize: 11,
     fontFamily: Typography.family.medium,
-    color: Colors.gray[400],
-    marginTop: 2
+    color: Colors.gray[400]
   },
+  statusBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  statusBadgeText: {
+    fontSize: 9,
+    fontFamily: Typography.family.bold,
+  },
+  statusSuccess: { backgroundColor: Colors.success[50] },
+  statusSuccessText: { color: Colors.success[700] },
+  statusDanger: { backgroundColor: Colors.danger[50] },
+  statusDangerText: { color: Colors.danger[700] },
+  statusWarning: { backgroundColor: Colors.warning[50] },
+  statusWarningText: { color: Colors.warning[700] },
   logAmount: {
     fontSize: 14,
     fontFamily: Typography.family.bold,
     color: Colors.gray[800]
   },
-  tabBadge: {
-    backgroundColor: Colors.danger[500],
-    borderRadius: 10,
-    minWidth: 18,
-    height: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 4,
-  },
-  tabBadgeText: {
-    fontSize: 10,
-    fontFamily: Typography.family.bold,
-    color: Colors.white,
-  },
+
+  // Pending
   pendingCard: {
-    backgroundColor: Colors.white,
     borderRadius: 20,
     padding: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: Colors.warning[400],
+    borderWidth: 1,
+    borderColor: Colors.warning[200],
+    backgroundColor: '#FFFDF9', // Warm amber tint
     ...Layout.shadows.sm,
-    gap: 8,
+    gap: 12,
+  },
+  pendingCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  pendingCardName: {
+    fontSize: 15,
+    fontFamily: Typography.family.bold,
+    color: Colors.gray[900],
+  },
+  pendingCardMeta: {
+    fontSize: 12,
+    fontFamily: Typography.family.medium,
+    color: Colors.gray[500],
+    marginTop: 2,
+  },
+  pendingAmount: {
+    fontSize: 16,
+    fontFamily: Typography.family.bold,
+    color: Colors.gray[900],
+  },
+  pendingCardBody: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  dueTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.warning[50],
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: Colors.warning[100],
+  },
+  dueTagText: {
+    fontSize: 11,
+    fontFamily: Typography.family.bold,
+    color: Colors.warning[700],
   },
   approvalBtns: {
     flexDirection: 'row',
     gap: 8,
-    marginTop: 8,
+    marginTop: 4,
   },
   approveBtn: {
-    flex: 1,
+    flex: 1.2,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: 6,
     backgroundColor: Colors.success[600],
     borderRadius: 12,
     paddingVertical: 10,
+    ...Layout.shadows.sm
   },
   approveBtnText: {
     fontSize: 13,
@@ -635,14 +1034,15 @@ const styles = StyleSheet.create({
     color: Colors.white,
   },
   rejectBtn: {
-    flex: 1,
+    flex: 0.8,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: 6,
     backgroundColor: Colors.danger[600],
     borderRadius: 12,
     paddingVertical: 10,
+    ...Layout.shadows.sm
   },
   rejectBtnText: {
     fontSize: 13,
