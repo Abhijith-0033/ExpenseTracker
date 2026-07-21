@@ -41,6 +41,7 @@ export default function NotificationSettingsScreen() {
   const [telegramAlertsEnabled, setTelegramAlertsEnabled] = useState(true);
   const [scheduledAutoConfirmEnabled, setScheduledAutoConfirmEnabled] = useState(true);
   const [scheduledApprovalEnabled, setScheduledApprovalEnabled] = useState(true);
+  const [growthNotifsEnabled, setGrowthNotifsEnabled] = useState(true);
   
   // Custom time states
   const [upcomingBillsTime, setUpcomingBillsTime] = useState('09:00');
@@ -96,6 +97,7 @@ export default function NotificationSettingsScreen() {
         AsyncStorage.getItem(SETTINGS_KEYS.NOTIF_DEBT_REMINDERS_TIME),
         AsyncStorage.getItem(SETTINGS_KEYS.NOTIF_CHIT_MONTHLY_TIME),
         AsyncStorage.getItem(SETTINGS_KEYS.NOTIF_EMI_REMINDERS_TIME),
+        AsyncStorage.getItem(SETTINGS_KEYS.NOTIF_GROWTH_ENABLED || 'growth_notif_enabled'),
       ]);
 
       setMasterEnabled(settings[0] !== 'false');
@@ -125,6 +127,7 @@ export default function NotificationSettingsScreen() {
       setDebtRemindersTime(settings[23] || '09:00');
       setChitMonthlyTime(settings[24] || '09:00');
       setEMIRemindersTime(settings[25] || '09:00');
+      setGrowthNotifsEnabled(settings[26] !== 'false');
     } catch (error) {
       console.error('Failed to load notification settings:', error);
     }
@@ -195,6 +198,7 @@ export default function NotificationSettingsScreen() {
         AsyncStorage.setItem(SETTINGS_KEYS.NOTIF_TELEGRAM, 'false'),
         AsyncStorage.setItem(SETTINGS_KEYS.NOTIF_SCHED_AUTO_CONFIRM, 'false'),
         AsyncStorage.setItem(SETTINGS_KEYS.NOTIF_SCHED_APPROVAL, 'false'),
+        AsyncStorage.setItem(SETTINGS_KEYS.NOTIF_GROWTH_ENABLED || 'growth_notif_enabled', 'false'),
       ]);
       
       // Update UI state
@@ -214,6 +218,7 @@ export default function NotificationSettingsScreen() {
       setTelegramAlertsEnabled(false);
       setScheduledAutoConfirmEnabled(false);
       setScheduledApprovalEnabled(false);
+      setGrowthNotifsEnabled(false);
       
       // Cancel all notifications
       await cancelByPrefix('');
@@ -383,6 +388,21 @@ export default function NotificationSettingsScreen() {
               ios_backgroundColor={Colors.gray[300]}
             />
           </View>
+        </View>
+ 
+        {/* Growth & Tips Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>GROWTH & TIPS</Text>
+          <ToggleRow
+            title="Premium Tips & Trial Reminders"
+            subtitle="Notifications about your trial, premium value tips, and feature recommendations"
+            value={growthNotifsEnabled}
+            onToggle={(value) => {
+              setGrowthNotifsEnabled(value);
+              updateSetting(SETTINGS_KEYS.NOTIF_GROWTH_ENABLED || 'growth_notif_enabled', value);
+            }}
+            disabled={!masterEnabled}
+          />
         </View>
 
         {/* Daily Tracking Section */}

@@ -706,6 +706,51 @@ const runMigrations = async (db: SQLite.SQLiteDatabase) => {
     await setDbVersion(db, version);
   }
 
+  if (version < 8) {
+    // Version 8: Onboarding state table for user name + certificate tracking
+    // Create the onboarding_state table (it did not exist before)
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS onboarding_state (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_name TEXT DEFAULT NULL,
+        certificate_generated INTEGER DEFAULT 0,
+        certificate_number TEXT DEFAULT NULL,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+      );
+    `);
+
+    // Insert default row (only if table is empty)
+    const existingRow = await db.getFirstAsync<{ id: number }>(
+      'SELECT id FROM onboarding_state LIMIT 1'
+    );
+    if (!existingRow) {
+      await db.runAsync(
+        `INSERT INTO onboarding_state (user_name, certificate_generated, certificate_number)
+         VALUES (NULL, 0, NULL)`
+      );
+    }
+
+    version = 8;
+    await setDbVersion(db, version);
+  }
+
+  if (version < 9) {
+    // Version 9: Growth tracking table
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS growth_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_type TEXT NOT NULL,
+        fired_at TEXT NOT NULL,
+        metadata TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_growth_events_type ON growth_events(event_type);
+    `);
+
+    version = 9;
+    await setDbVersion(db, version);
+  }
+
   console.log(`Database migrated successfully to version ${version}`);
 };
 
@@ -747,6 +792,42 @@ export const getDatabase = () => {
   return db;
 };
 
+// Helper to trigger growth notification checks in background
+const triggerGrowthEvents = async (tx: Omit<Transaction, 'id' | 'created_at'>) => {
+  try {
+    const isIncome = tx.category === 'Income';
+    const isExpense = tx.category !== 'Income' && tx.category !== 'Transfer' && tx.category !== 'Debt/Credit';
+
+    const { detectAndScheduleSalaryDayNudge, fireHighSpendNudge } = await import('./notifications/GrowthNotifications');
+
+    if (isIncome && tx.date) {
+      const parts = tx.date.split('-');
+      if (parts.length === 3) {
+        const day = parseInt(parts[2], 10);
+        if (!isNaN(day)) {
+          await detectAndScheduleSalaryDayNudge(day);
+        }
+      }
+    }
+
+    if (isExpense && tx.date) {
+      const db = getDatabase();
+      if (db) {
+        const result = await db.getFirstAsync<{ total: number }>(
+          "SELECT SUM(amount) as total FROM transactions WHERE date = ? AND category NOT IN ('Income', 'Transfer', 'Debt/Credit')",
+          [tx.date]
+        );
+        const dailyTotal = result?.total ?? 0;
+        if (dailyTotal > 3000) {
+          await fireHighSpendNudge(dailyTotal, tx.category);
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to trigger growth events from transaction:', e);
+  }
+};
+
 // ... Transactions (Unchanged) ...
 export const addTransaction = async (tx: Omit<Transaction, 'id' | 'created_at'>): Promise<number> => {
   await initDatabase();
@@ -763,7 +844,11 @@ export const addTransaction = async (tx: Omit<Transaction, 'id' | 'created_at'>)
       insertedId = result.lastInsertRowId;
 
       await db.runAsync(`UPDATE accounts SET balance = balance + ? WHERE id = ?`, [getAccountBalanceDelta(tx), tx.account_id]);
+      // Sync RevenueCat attributes on transaction change (non-blocking)
+      import('./revenueCatSync').then(m => m.checkAndSyncOnTransactionChange()).catch(() => {});
     });
+    // Trigger growth checks in background
+    setTimeout(() => triggerGrowthEvents(tx), 100);
     return insertedId;
   } catch (e) {
     console.error("Transaction Error", e);
@@ -802,7 +887,11 @@ export const addTransactionDirect = async (
         `UPDATE accounts SET balance = balance + ? WHERE id = ?`,
         [getAccountBalanceDelta(tx), tx.account_id]
       );
+      // Sync RevenueCat attributes on transaction change (non-blocking)
+      import('./revenueCatSync').then(m => m.checkAndSyncOnTransactionChange()).catch(() => {});
     });
+    // Trigger growth checks in background
+    setTimeout(() => triggerGrowthEvents(tx), 100);
     return insertedId;
   } catch (e) {
     console.error('addTransactionDirect Error', e);
@@ -892,6 +981,8 @@ export const addTransfer = async (
                 [newAmount, isComplete, timestamp, goal.id]
             );
         }
+        // Sync RevenueCat attributes on transaction change (non-blocking)
+        import('./revenueCatSync').then(m => m.checkAndSyncOnTransactionChange()).catch(() => {});
     });
 };
 
@@ -906,6 +997,8 @@ export const deleteTransaction = async (id: number, accountId: number, amount: n
         ? getAccountBalanceDelta(originalTX)
         : getAccountBalanceDelta({ amount, category, subcategory: '' });
       await db.runAsync('UPDATE accounts SET balance = balance - ? WHERE id = ?', [balanceDelta, accountId]);
+      // Sync RevenueCat attributes on transaction change (non-blocking)
+      import('./revenueCatSync').then(m => m.checkAndSyncOnTransactionChange()).catch(() => {});
     });
   } catch (e) { throw e; }
 };

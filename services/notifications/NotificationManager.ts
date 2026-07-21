@@ -62,6 +62,7 @@ export const SETTINGS_KEYS = {
   NOTIF_CHIT_MONTHLY_TIME: 'notif_chit_monthly_time',
   NOTIF_EMI_REMINDERS_TIME: 'notif_emi_reminders_time',
   NOTIF_DEBT_OVERDUE_TIME: 'notif_debt_overdue_time',
+  NOTIF_GROWTH_ENABLED: 'growth_notif_enabled',
 };
 
 export const getSettingEnabled = async (key: string, defaultValue = true): Promise<boolean> => {
@@ -190,6 +191,13 @@ export const setupNotificationChannels = async (): Promise<void> => {
         name: 'Scheduled Expenses',
         importance: Notifications.AndroidImportance.HIGH,
         vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#6366F1',
+      });
+
+      await Notifications.setNotificationChannelAsync('growth-nudges', {
+        name: 'Premium & Growth Tips',
+        importance: Notifications.AndroidImportance.DEFAULT,
+        vibrationPattern: [0, 200],
         lightColor: '#6366F1',
       });
     } catch (error) {
@@ -1331,6 +1339,14 @@ export const rescheduleAll = async (): Promise<void> => {
 
     // Migrate existing notifications
     await migrateExistingNotifications();
+
+    // Reschedule growth notifications
+    try {
+      const { checkAndFireGrowthNotifications } = await import('./GrowthNotifications');
+      await checkAndFireGrowthNotifications();
+    } catch (e) {
+      console.warn('Failed to reschedule growth notifications:', e);
+    }
 
     console.log('✅ All notifications rescheduled successfully');
   } catch (error) {

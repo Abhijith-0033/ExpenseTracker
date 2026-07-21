@@ -5,11 +5,13 @@ import { Platform } from 'react-native';
 const RC_GOOGLE_KEY = 'test_KLXzOTxrisiHSECstDMHluXmxx'; 
 // App Store key starts with appl_
 const RC_APPLE_KEY = 'test_KLXzOTxrisiHSECstDMHluXmxx';
+// Amazon Appstore key starts with amzn_
+const RC_AMAZON_KEY = 'amzn_nnetDlZOEfVAlbtjWDD0uUPrGCU';
 
 export const RC_API_KEY = Platform.select({
-  android: RC_GOOGLE_KEY,
+  android: RC_AMAZON_KEY,
   ios: RC_APPLE_KEY,
-  default: 'test_KLXzOTxrisiHSECstDMHluXmxx'
+  default: RC_GOOGLE_KEY
 });
 
 export const RC_ENTITLEMENT_ID = 'premium';

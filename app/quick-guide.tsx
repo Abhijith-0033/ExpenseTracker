@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, Text, StyleSheet, ScrollView, TouchableOpacity, 
-  LayoutAnimation, Platform, UIManager 
+  LayoutAnimation, Platform, UIManager, Pressable 
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { 
   ArrowLeft, ChevronDown, ChevronUp, Lock, HelpCircle, 
   Wallet, Target, Clock, PiggyBank, Calendar, FileText, Send, Sparkles,
@@ -12,6 +13,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Typography, Layout } from '../constants/Theme';
 import { useSubscription } from '../src/subscription/useSubscription';
+import { LinearGradient } from 'expo-linear-gradient';
+import { getUserDisplayName, getCertificateNumber } from '../services/onboardingState';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -31,6 +34,50 @@ export default function QuickGuideScreen() {
   const isFreeUser = !isPremium && !isTrialActive;
 
   const [expandedId, setExpandedId] = useState<string | null>('getting-started');
+  const [certUserName, setCertUserName] = useState<string>('');
+  const [certNumber, setCertNumber] = useState<string>('');
+  const [showTrialTour, setShowTrialTour] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadCertData() {
+      try {
+        const name = await getUserDisplayName();
+        const cert = await getCertificateNumber();
+        if (!cancelled) {
+          setCertUserName(name ?? '');
+          setCertNumber(cert ?? '');
+        }
+      } catch (e) {
+        console.warn('QuickGuide: failed to load cert data:', e);
+      }
+    }
+    loadCertData();
+
+    async function checkTrialTourStatus() {
+      try {
+        const val = await AsyncStorage.getItem('trial_feature_tour_shown');
+        if (val !== 'true' && isTrialActive) {
+          setShowTrialTour(true);
+        }
+      } catch (e) {
+        console.warn('Failed to check trial feature tour status:', e);
+      }
+    }
+    checkTrialTourStatus();
+
+    return () => { cancelled = true; };
+  }, [isTrialActive]);
+
+  const handleStartTrialTour = async (route: string) => {
+    try {
+      await AsyncStorage.setItem('trial_feature_tour_shown', 'true');
+      setShowTrialTour(false);
+      router.push(route as any);
+    } catch (e) {
+      console.warn('Failed to start trial tour:', e);
+    }
+  };
 
   const toggleSection = (id: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -296,6 +343,100 @@ export default function QuickGuideScreen() {
       </View>
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scrollContent}>
+        {/* ── Certificate Card ── */}
+        <Pressable
+          onPress={() => router.push({
+            pathname: '/certificate' as any,
+            params: { isFirstTime: 'false' },
+          })}
+          style={({ pressed }) => pressed ? { opacity: 0.92 } : {}}
+        >
+          <LinearGradient
+            colors={[Colors.primary[600], Colors.primary[700]]}
+            style={styles.certCard}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <View style={styles.certCardContent}>
+              {/* Left: mini certificate placeholder */}
+              <View style={styles.certMiniPreview}>
+                <Text style={styles.certMiniEmoji}>🏆</Text>
+                <View style={styles.certMiniLine} />
+                <Text style={styles.certMiniText} numberOfLines={1}>
+                  {certUserName || 'Your Name'}
+                </Text>
+              </View>
+
+              {/* Right: details + download button */}
+              <View style={styles.certCardRight}>
+                <Text style={styles.certCardLabel}>🏆 Your Certificate</Text>
+                <Text style={styles.certCardSub}>Financial Commitment</Text>
+                {certUserName ? (
+                  <Text style={styles.certCardName} numberOfLines={1}>
+                    {certUserName}
+                  </Text>
+                ) : null}
+                {certNumber ? (
+                  <Text style={styles.certCardNum}>{certNumber}</Text>
+                ) : null}
+
+                <Pressable
+                  onPress={() => router.push({
+                    pathname: '/certificate' as any,
+                    params: { isFirstTime: 'false' },
+                  })}
+                  style={({ pressed }) => [
+                    styles.certDownloadBtn,
+                    pressed && { opacity: 0.85 },
+                  ]}
+                >
+                  <Text style={styles.certDownloadBtnText}>Download</Text>
+                </Pressable>
+              </View>
+            </View>
+          </LinearGradient>
+        </Pressable>
+
+        {/* Start Your Trial (Guided Tour Card) */}
+        {showTrialTour && (
+          <LinearGradient
+            colors={['#7C3AED', '#4F46E5']}
+            style={styles.trialTourCard}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <View style={styles.trialTourContent}>
+              <View style={styles.trialTourHeader}>
+                <Sparkles size={20} color="#FBBF24" />
+                <Text style={styles.trialTourTitle}>Premium Trial is Live!</Text>
+              </View>
+              <Text style={styles.trialTourBody}>
+                {"Let's explore 3 premium features together. Tap any module below to start your guided tour."}
+              </Text>
+              <View style={styles.trialTourGrid}>
+                <Pressable
+                  style={({ pressed }) => [styles.trialTourBtn, pressed && styles.trialTourBtnPressed]}
+                  onPress={() => handleStartTrialTour('/emi-tracker')}
+                >
+                  <Text style={styles.trialTourBtnText}>EMI Tracker</Text>
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [styles.trialTourBtn, pressed && styles.trialTourBtnPressed]}
+                  onPress={() => handleStartTrialTour('/tax-planner')}
+                >
+                  <Text style={styles.trialTourBtnText}>Tax Planner</Text>
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [styles.trialTourBtn, pressed && styles.trialTourBtnPressed]}
+                  onPress={() => handleStartTrialTour('/scheduled-expenses')}
+                >
+                  <Text style={styles.trialTourBtnText}>Scheduled Logs</Text>
+                </Pressable>
+              </View>
+            </View>
+          </LinearGradient>
+        )}
+
         {/* Intro Card */}
         <View style={styles.introCard}>
           <HelpCircle size={32} color={Colors.primary[600]} style={{ marginBottom: 12 }} />
@@ -483,5 +624,134 @@ const styles = StyleSheet.create({
     color: Colors.primary[600],
     fontFamily: Typography.family.bold,
     fontSize: Typography.size.sm,
+  },
+  // ── Certificate Card ──
+  certCard: {
+    borderRadius: Layout.radius.xl,
+    marginBottom: Layout.spacing.sm,
+    overflow: 'hidden',
+  },
+  certCardContent: {
+    flexDirection: 'row',
+    padding: Layout.spacing.lg,
+    gap: Layout.spacing.md,
+    alignItems: 'center',
+  },
+  certMiniPreview: {
+    width: 80,
+    aspectRatio: 1.414,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: Layout.radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Layout.spacing.sm,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  certMiniEmoji: {
+    fontSize: 20,
+    marginBottom: 4,
+  },
+  certMiniLine: {
+    width: '80%',
+    height: 0.5,
+    backgroundColor: 'rgba(255,255,255,0.5)',
+    marginBottom: 4,
+  },
+  certMiniText: {
+    fontSize: 7,
+    color: 'rgba(255,255,255,0.8)',
+    fontFamily: Typography.family.bold,
+    textAlign: 'center',
+  },
+  certCardRight: {
+    flex: 1,
+  },
+  certCardLabel: {
+    fontSize: Typography.size.md,
+    fontFamily: Typography.family.bold,
+    color: '#FFFFFF',
+  },
+  certCardSub: {
+    fontSize: Typography.size.xs,
+    fontFamily: Typography.family.regular,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 2,
+  },
+  certCardName: {
+    fontSize: Typography.size.sm,
+    fontFamily: Typography.family.bold,
+    color: '#FFFFFF',
+    fontStyle: 'italic',
+    marginTop: Layout.spacing.xs,
+  },
+  certCardNum: {
+    fontSize: 10,
+    fontFamily: Typography.family.regular,
+    color: 'rgba(255,255,255,0.6)',
+    marginTop: 2,
+  },
+  certDownloadBtn: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: Layout.radius.full,
+    paddingHorizontal: Layout.spacing.md,
+    paddingVertical: Layout.spacing.xs,
+    alignSelf: 'flex-start',
+    marginTop: Layout.spacing.sm,
+  },
+  certDownloadBtnText: {
+    fontSize: Typography.size.xs,
+    fontFamily: Typography.family.bold,
+    color: Colors.primary[600],
+  },
+  trialTourCard: {
+    borderRadius: Layout.radius.xl,
+    marginBottom: Layout.spacing.md,
+    overflow: 'hidden',
+    ...Layout.shadows.md,
+  },
+  trialTourContent: {
+    padding: 20,
+  },
+  trialTourHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  trialTourTitle: {
+    fontSize: Typography.size.md,
+    fontFamily: Typography.family.bold,
+    color: '#FFFFFF',
+  },
+  trialTourBody: {
+    fontSize: Typography.size.xs + 1,
+    fontFamily: Typography.family.regular,
+    color: 'rgba(255,255,255,0.9)',
+    lineHeight: 18,
+    marginBottom: 16,
+  },
+  trialTourGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  trialTourBtn: {
+    flex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+    borderRadius: Layout.radius.md,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  trialTourBtnText: {
+    fontSize: 11,
+    fontFamily: Typography.family.bold,
+    color: '#FFFFFF',
+  },
+  trialTourBtnPressed: {
+    opacity: 0.8,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
   },
 });

@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import Purchases from 'react-native-purchases';
 import { RC_API_KEY, RC_ENTITLEMENT_ID, RC_MONTHLY_PACKAGE_ID, RC_YEARLY_PACKAGE_ID } from './config';
 import { getDatabase, initDatabase } from '../../services/database';
@@ -5,7 +6,10 @@ import { getDatabase, initDatabase } from '../../services/database';
 export async function initialize() {
   try {
     // Configure RevenueCat (anonymous device ID)
-    await Purchases.configure({ apiKey: RC_API_KEY });
+    await Purchases.configure({ 
+      apiKey: RC_API_KEY,
+      useAmazon: Platform.OS === 'android',
+    });
     await syncSubscriptionStatus();
   } catch (e) {
     console.warn('RevenueCat initialization failed:', e);

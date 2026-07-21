@@ -22,6 +22,7 @@ import { runAutoPay } from '../services/emitracker/AutoPayEngine';
 import { startPolling, stopPolling, registerBackgroundTask } from '../telegram/TelegramPoller';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { OnboardingTour } from '../components/OnboardingTour';
+import { getUserDisplayName } from '../services/onboardingState';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -42,6 +43,7 @@ export default function RootLayout() {
   const [isLocked, setIsLocked] = useState(false);
   const [lockChecked, setLockChecked] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showUserName, setShowUserName] = useState(false);
   const appStateRef = useRef<AppStateStatus>('active');
 
   // Check lock on mount
@@ -57,6 +59,12 @@ export default function RootLayout() {
         const complete = await AsyncStorage.getItem('onboarding_complete_v1');
         if (complete !== 'true') {
           setShowOnboarding(true);
+        } else {
+          // Onboarding already done — check if user has entered their name
+          const existingName = await getUserDisplayName();
+          if (!existingName) {
+            setShowUserName(true);
+          }
         }
       } catch (e) {
         console.warn('Failed to check onboarding:', e);
@@ -64,6 +72,14 @@ export default function RootLayout() {
     };
     checkLock();
   }, []);
+
+  // Navigate to user-name screen if needed
+  useEffect(() => {
+    if (showUserName && lockChecked && fontsLoaded) {
+      router.push('/user-name' as any);
+      setShowUserName(false); // prevent re-navigation
+    }
+  }, [showUserName, lockChecked, fontsLoaded, router]);
 
   // AppState listener
   useEffect(() => {
@@ -87,6 +103,13 @@ export default function RootLayout() {
         } catch (e) {
           console.warn('Failed to process scheduled expenses on foreground:', e);
         }
+
+        try {
+          const { maybeShowTrialEndScreen } = await import('../services/growthGate');
+          await maybeShowTrialEndScreen(router);
+        } catch (e) {
+          console.warn('Failed to check trial end screen on foreground:', e);
+        }
       }
     });
     return () => subscription.remove();
@@ -100,6 +123,14 @@ export default function RootLayout() {
         await initializeNotificationManager();
         // Run AutoPay for EMI payments
         await runAutoPay();
+
+        // Sync user attributes to RevenueCat (non-blocking)
+        try {
+          const { syncUserAttributes } = await import('../services/revenueCatSync');
+          await syncUserAttributes();
+        } catch (e) {
+          console.warn('Launch RevenueCat sync failed (non-critical):', e);
+        }
         
         // Start Telegram polling (silently fails if not linked)
         startPolling();
@@ -122,6 +153,23 @@ export default function RootLayout() {
           }, 60000);
         } catch (e) {
           console.warn('Failed to register scheduled expense task:', e);
+        }
+
+        // Schedule / check trial journey and growth notifications
+        try {
+          const { scheduleTrialJourney, checkAndFireGrowthNotifications } = await import('../services/notifications/GrowthNotifications');
+          await scheduleTrialJourney();
+          await checkAndFireGrowthNotifications();
+        } catch (e) {
+          console.warn('Failed to setup growth notifications:', e);
+        }
+
+        // Check if trial-end screen needs to be shown
+        try {
+          const { maybeShowTrialEndScreen } = await import('../services/growthGate');
+          await maybeShowTrialEndScreen(router);
+        } catch (e) {
+          console.warn('Failed to check trial end screen on mount:', e);
         }
       } catch (e) {
         console.warn('Error initializing notifications:', e);
@@ -372,11 +420,25 @@ export default function RootLayout() {
                     <Stack.Screen name="upcoming-bills/add" options={{ headerShown: false }} />
                     <Stack.Screen name="quick-guide" options={{ headerShown: false }} />
                     <Stack.Screen name="paywall" options={{ headerShown: false }} />
+                    <Stack.Screen name="user-name" options={{ headerShown: false }} />
+                    <Stack.Screen name="certificate" options={{ headerShown: false }} />
+                    <Stack.Screen name="trial-end" options={{ headerShown: false }} />
                     <Stack.Screen name="+not-found" />
                   </Stack>
                   <OnboardingTour 
                     visible={showOnboarding} 
-                    onClose={() => setShowOnboarding(false)} 
+                    onClose={async () => {
+                      setShowOnboarding(false);
+                      // After tour completes, check if user needs to enter name
+                      try {
+                        const existingName = await getUserDisplayName();
+                        if (!existingName) {
+                          setShowUserName(true);
+                        }
+                      } catch (e) {
+                        console.warn('Failed to check user name after onboarding:', e);
+                      }
+                    }} 
                   />
                 </ErrorBoundary>
               </View>

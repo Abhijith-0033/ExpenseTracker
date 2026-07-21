@@ -2,7 +2,7 @@
   "expo": {
     "name": "Gastos",
     "slug": "ExpenseTracker",
-    "version": "3.5.0",
+    "version": "3.6.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "gastos",
@@ -12,8 +12,8 @@
       "supportsTablet": true
     },
     "android": {
-      "package": "com.expensetracker.app",
-      "versionCode": 45,
+      "package": "com.gastos.expensetracker",
+      "versionCode": 46,
       "adaptiveIcon": {
         "backgroundColor": "#0F172A",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -42,7 +42,8 @@
       ],
       "@react-native-community/datetimepicker",
       "expo-secure-store",
-      "expo-local-authentication"
+      "expo-local-authentication",
+      "expo-media-library"
     ],
     "experiments": {
       "typedRoutes": true,
