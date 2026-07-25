@@ -100,7 +100,7 @@ export default function DebtCalculatorScreen() {
             style={[styles.container, { paddingTop: insets.top }]} 
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-            <StatusBar barStyle="dark-content" />
+            <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
 
             {/* Header */}
             <View style={styles.header}>

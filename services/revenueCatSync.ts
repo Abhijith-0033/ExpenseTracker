@@ -62,6 +62,9 @@ export async function syncUserAttributes(): Promise<void> {
     if (displayName) {
       attributes['$displayName'] = displayName;
       attributes['has_certificate'] = 'true';
+      if (typeof (Purchases as any).setDisplayName === 'function') {
+        await (Purchases as any).setDisplayName(displayName);
+      }
     }
     if (certNumber) {
       attributes['certificate_number'] = certNumber;

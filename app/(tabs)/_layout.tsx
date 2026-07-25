@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Platform, View, StyleSheet, Modal, Text, TouchableOpacity, Dimensions, Animated } from 'react-native';
 import { LayoutDashboard, Calendar, Plus, PieChart, Settings, X, ArrowUpCircle, ArrowDownCircle, ArrowDownUp } from 'lucide-react-native';
 import { Colors, Layout } from '../../constants/Theme';
+import { useTheme } from '../../context/ThemeContext';
 import { PanGestureHandler, State, GestureHandlerRootView } from 'react-native-gesture-handler';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -11,6 +12,7 @@ const ROUTES = ['/(tabs)/', '/(tabs)/calendar', '/(tabs)/analytics', '/(tabs)/se
 export default function TabLayout() {
   const router = useRouter();
   const pathname = usePathname();
+  const { colors, themeConfig, isDark } = useTheme();
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
 
   // Swipe Navigation Logic
@@ -33,6 +35,33 @@ export default function TabLayout() {
     const idx = routeMap[cleanPath] ?? 0;
     currentIndex.current = idx;
   }, [pathname]);
+
+  const showLabels = themeConfig.tabBarStyle === 'minimal';
+  const isStandard = themeConfig.tabBarStyle === 'standard';
+
+  const dynamicTabBarStyle: any = isStandard ? {
+    height: 70,
+    paddingBottom: 10,
+    paddingTop: 8,
+    elevation: 4,
+    borderTopWidth: 1,
+    borderTopColor: colors.gray[200],
+    backgroundColor: colors.gray[50],
+  } : {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    right: 20,
+    borderRadius: 30,
+    height: showLabels ? 65 : 60,
+    borderTopWidth: 0,
+    backgroundColor: colors.gray[50],
+    shadowColor: colors.gray[900],
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 8,
+  };
 
   const onGestureEvent = Animated.event(
     [{ nativeEvent: { translationX: translateX } }],
@@ -100,31 +129,10 @@ export default function TabLayout() {
           <Tabs
             screenOptions={{
               headerShown: false,
-              tabBarStyle: {
-                ...Platform.select({
-                  ios: {
-                    position: 'absolute',
-                    bottom: 20,
-                    left: 20,
-                    right: 20,
-                    borderRadius: 30,
-                    height: 60,
-                    borderTopWidth: 0,
-                  },
-                  android: {
-                    height: 70,
-                    paddingBottom: 10,
-                    paddingTop: 10,
-                    elevation: 0,
-                    borderTopWidth: 1,
-                    borderTopColor: Colors.gray[200],
-                  },
-                }),
-                backgroundColor: Colors.gray[50], // Warm white
-              },
-              tabBarShowLabel: false,
-              tabBarActiveTintColor: Colors.primary[500],
-              tabBarInactiveTintColor: Colors.gray[400],
+              tabBarStyle: dynamicTabBarStyle,
+              tabBarShowLabel: showLabels,
+              tabBarActiveTintColor: colors.primary[500],
+              tabBarInactiveTintColor: colors.gray[400],
             }}>
             <Tabs.Screen
               name="index"

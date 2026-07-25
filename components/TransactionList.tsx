@@ -8,6 +8,7 @@ import { useRouter } from 'expo-router';
 import { Colors, Layout, Typography } from '../constants/Theme';
 import { AnimatedItem } from './ui/AnimatedItem';
 import { useApp } from '../context/AppContext';
+import { useTheme } from '../context/ThemeContext';
 import { useInfiniteQuery } from '@tanstack/react-query';
 
 import { SwipeableRow } from './SwipeableRow';
@@ -62,6 +63,15 @@ export const TransactionList: React.FC<TransactionListProps> = ({
 
     const router = useRouter();
     const { refreshData, accounts } = useApp();
+    const { colors, themeConfig, radius } = useTheme();
+    const density = themeConfig.transactionDensity || 'comfortable';
+
+    const densityStyles = {
+        comfortable: { paddingV: 18, paddingH: 20, iconSize: 40, iconRadius: 14, showSub: true },
+        compact:     { paddingV: 12, paddingH: 16, iconSize: 34, iconRadius: 10, showSub: true },
+        ultra:       { paddingV: 8,  paddingH: 12, iconSize: 28, iconRadius: 8,  showSub: false },
+    }[density];
+
     const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
     const [recurringTx, setRecurringTx] = useState<Transaction | null>(null);
     const [showRecurring, setShowRecurring] = useState(false);
@@ -209,24 +219,24 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                     deleteConfirmTitle="Delete Transaction"
                     deleteConfirmMessage="Are you sure you want to delete this record?"
                 >
-                    <View style={styles.item}>
+                    <View style={[styles.item, { borderRadius: radius.lg, backgroundColor: colors.white }]}>
                         <TouchableOpacity
-                            style={styles.itemContent}
+                            style={[styles.itemContent, { paddingVertical: densityStyles.paddingV, paddingHorizontal: densityStyles.paddingH }]}
                             activeOpacity={0.7}
                             onPress={() => setSelectedTx(item)}
                         >
-                            <View style={[styles.iconContainer, { backgroundColor: getIconBg(item.category) }]}>
+                            <View style={[styles.iconContainer, { width: densityStyles.iconSize, height: densityStyles.iconSize, borderRadius: densityStyles.iconRadius, backgroundColor: getIconBg(item.category) }]}>
                                 {getIcon(item.category)}
                             </View>
                             <View style={styles.details}>
-                                <Text style={styles.category}>{item.category}</Text>
-                                <Text style={styles.subcategory}>{item.subcategory}</Text>
+                                <Text style={[styles.category, { color: colors.gray[900] }]}>{item.category}</Text>
+                                {densityStyles.showSub && <Text style={[styles.subcategory, { color: colors.gray[500] }]}>{item.subcategory}</Text>}
                             </View>
                             <View style={styles.rightSection}>
                                 <Text style={[styles.amount, { color: amtColor }]}>
                                     {amtText}
                                 </Text>
-                                <Text style={styles.date}>{format(new Date(item.date), 'MMM dd')}</Text>
+                                <Text style={[styles.date, { color: colors.gray[400] }]}>{format(new Date(item.date), 'MMM dd')}</Text>
                             </View>
                         </TouchableOpacity>
                     </View>

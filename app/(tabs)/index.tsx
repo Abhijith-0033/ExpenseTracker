@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 import { useApp } from '../../context/AppContext';
 import {  TrendingUp, TrendingDown, ArrowRight, BookOpen, Activity , CalendarDays, CalendarRange, Calendar, BarChart3, X , Grid, Lock } from 'lucide-react-native';
 import { Colors, Layout, Typography } from '../../constants/Theme';
+import { useTheme } from '../../context/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { formatCurrency } from '../../utils/currency';
 import { _addMonths, format } from 'date-fns';
@@ -39,6 +40,7 @@ function DashboardContent() {
   const router = useRouter();
   const _insets = useSafeAreaInsets();
   const { accounts, refreshData, dataVersion } = useApp();
+  const { colors, typography, radius, isDark, themeConfig, dashboardWidgets } = useTheme();
   const [refreshing, setRefreshing] = useState(false);
   const { isPremium: _isPremium, isTrialActive, trialHoursRemaining } = useSubscription();
   const [showBanner, setShowBanner] = useState(false);
@@ -82,7 +84,6 @@ function DashboardContent() {
       const emiSum = await getEMISummary();
       setEMISummary(emiSum);
 
-      // Fetch new metrics
       const now = new Date();
       const [dStats, wStats, mStats, yStats, bStatus] = await Promise.all([
         getDailyIncomeExpense(now),
@@ -116,12 +117,271 @@ function DashboardContent() {
 
   const totalBalance = useMemo(() => accounts.reduce((sum, acc) => sum + acc.balance, 0), [accounts]);
 
+  // Widget Renderers Map
+  const renderers: Record<string, () => React.ReactNode> = {
+    balance_card: () => (
+      <View key="balance_card">
+        <FlippableBalanceCard 
+          totalBalance={totalBalance}
+          accounts={accounts}
+          variant={themeConfig.balanceCardVariant}
+        />
+      </View>
+    ),
+    metrics_grid: () => (
+      <View key="metrics_grid" style={styles.metricsGridContainer}>
+        <View style={styles.metricsGridRow}>
+          <View style={[styles.metricCardHalf, { backgroundColor: colors.white, borderRadius: radius.xl }]}>
+            <View style={[styles.metricAccentBar, { backgroundColor: '#2F9E44' }]} />
+            <View style={[styles.metricCardIcon, { backgroundColor: colors.accent.mint }]}>
+              <CalendarDays size={18} color={colors.success[600]} />
+            </View>
+            <Text style={[styles.metricGridLabel, { color: colors.gray[600] }]}>{"Today's Income"}</Text>
+            <Text style={[styles.metricGridValue, { color: colors.success[700] }]} numberOfLines={1}>
+              {formatAmount(dailyStats.income, 'income').text}
+            </Text>
+          </View>
+          <View style={[styles.metricCardHalf, { backgroundColor: colors.white, borderRadius: radius.xl }]}>
+            <View style={[styles.metricAccentBar, { backgroundColor: '#F97066' }]} />
+            <View style={[styles.metricCardIcon, { backgroundColor: colors.accent.rose }]}>
+              <CalendarDays size={18} color={colors.danger[600]} />
+            </View>
+            <Text style={[styles.metricGridLabel, { color: colors.gray[600] }]}>{"Today's Expense"}</Text>
+            <Text style={[styles.metricGridValue, { color: colors.danger[700] }]} numberOfLines={1}>
+              {formatAmount(dailyStats.expense, 'expense').text}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.metricsGridRow}>
+          <View style={[styles.metricCardHalf, { backgroundColor: colors.white, borderRadius: radius.xl }]}>
+            <View style={[styles.metricAccentBar, { backgroundColor: '#1C7C3A' }]} />
+            <View style={[styles.metricCardIcon, { backgroundColor: colors.accent.mint }]}>
+              <CalendarRange size={18} color={colors.success[600]} />
+            </View>
+            <Text style={[styles.metricGridLabel, { color: colors.gray[600] }]}>This Week (Inc)</Text>
+            <Text style={[styles.metricGridValue, { color: colors.success[700] }]} numberOfLines={1}>
+              {formatAmount(weeklyStats.income, 'income').text}
+            </Text>
+          </View>
+          <View style={[styles.metricCardHalf, { backgroundColor: colors.white, borderRadius: radius.xl }]}>
+            <View style={[styles.metricAccentBar, { backgroundColor: '#FB8C00' }]} />
+            <View style={[styles.metricCardIcon, { backgroundColor: colors.accent.rose }]}>
+              <CalendarRange size={18} color={colors.danger[600]} />
+            </View>
+            <Text style={[styles.metricGridLabel, { color: colors.gray[600] }]}>This Week (Exp)</Text>
+            <Text style={[styles.metricGridValue, { color: colors.danger[700] }]} numberOfLines={1}>
+              {formatAmount(weeklyStats.expense, 'expense').text}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.metricsGridRow}>
+          <View style={[styles.metricCardHalf, { backgroundColor: colors.white, borderRadius: radius.xl }]}>
+            <View style={[styles.metricAccentBar, { backgroundColor: '#0CA678' }]} />
+            <View style={[styles.metricCardIcon, { backgroundColor: colors.accent.mint }]}>
+              <BarChart3 size={18} color={colors.success[600]} />
+            </View>
+            <Text style={[styles.metricGridLabel, { color: colors.gray[600] }]}>This Year (Inc)</Text>
+            <Text style={[styles.metricGridValue, { color: colors.success[700] }]} numberOfLines={1}>{formatCurrency(yearlyStats.income)}</Text>
+          </View>
+          <View style={[styles.metricCardHalf, { backgroundColor: colors.white, borderRadius: radius.xl }]}>
+            <View style={[styles.metricAccentBar, { backgroundColor: '#C92A2A' }]} />
+            <View style={[styles.metricCardIcon, { backgroundColor: colors.accent.rose }]}>
+              <BarChart3 size={18} color={colors.danger[600]} />
+            </View>
+            <Text style={[styles.metricGridLabel, { color: colors.gray[600] }]}>This Year (Exp)</Text>
+            <Text style={[styles.metricGridValue, { color: colors.danger[700] }]} numberOfLines={1}>{formatCurrency(yearlyStats.expense)}</Text>
+          </View>
+        </View>
+      </View>
+    ),
+    monthly_spending: () => (
+      <PressableScale 
+         key="monthly_spending"
+         style={[styles.metricCardFull, { backgroundColor: colors.white, borderRadius: radius.xl, padding: 16, marginBottom: 16, justifyContent: 'space-between' }]}
+         onPress={() => setShowPieModal(true)}
+      >
+         <View style={{ flex: 1 }}>
+             <Text style={[styles.metricGridLabel, { fontSize: typography.size.sm, color: colors.gray[800] }]}>{"This Month's Spending"}</Text>
+             <Text style={{ fontSize: 10, color: colors.gray[500], marginTop: 2 }}>Tap to view breakdown</Text>
+             
+             <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 16, gap: 16 }}>
+                 <View>
+                     <Text style={{ fontSize: 10, color: colors.gray[500], marginBottom: 2 }}>Income</Text>
+                     <Text style={[styles.metricGridValue, { color: colors.success[700], fontSize: 16 }]}>
+                       {formatAmount(monthlyStats.income, 'income').text}
+                     </Text>
+                 </View>
+                 <View>
+                     <Text style={{ fontSize: 10, color: colors.gray[500], marginBottom: 2 }}>Expense</Text>
+                     <Text style={[styles.metricGridValue, { color: colors.danger[700], fontSize: 16 }]}>
+                       {formatAmount(monthlyStats.expense, 'expense').text}
+                     </Text>
+                 </View>
+             </View>
+         </View>
+         
+         <View style={{ width: 80, height: 80, alignItems: 'center', justifyContent: 'center' }}>
+             <MonthlyExpensePieChart initialMonth={new Date()} variant="mini" />
+         </View>
+      </PressableScale>
+    ),
+    satisfaction_card: () => (
+      <View key="satisfaction_card" style={{ marginBottom: 16 }}>
+         <SatisfactionCard />
+      </View>
+    ),
+    cashflow_emi: () => (
+      <View key="cashflow_emi" style={{ gap: 12, marginBottom: 16 }}>
+        <PressableScale style={[styles.metricCardFull, { backgroundColor: colors.accent.lavender, borderRadius: radius.xl }]} onPress={() => {}}>
+          <View style={styles.metricCardIconRow}>
+            <View style={[styles.metricCardIcon, { backgroundColor: 'rgba(255,255,255,0.6)', marginBottom: 0 }]}>
+              <Activity size={20} color={colors.primary[600]} />
+            </View>
+          </View>
+          <View style={{ flex: 1, marginLeft: 16 }}>
+            <Text style={[styles.metricTitle, { color: colors.gray[700] }]}>Net Cash Flow (Monthly)</Text>
+            <Text style={[styles.metricValue, { color: colors.primary[700] }]}>{formatCurrency(monthlyStats.income - monthlyStats.expense)}</Text>
+          </View>
+        </PressableScale>
+
+        <PressableScale style={[styles.metricCardFull, { backgroundColor: colors.accent.lavender, borderRadius: radius.xl }]} onPress={() => router.push('/emi-tracker' as any)}>
+          <View style={styles.metricCardIconRow}>
+            <View style={[styles.metricCardIcon, { backgroundColor: 'rgba(255, 255, 255, 0.8)', marginBottom: 0 }]}>
+              <Calendar size={20} color={colors.primary[600]} />
+            </View>
+            {emiSummary.total_overdue > 0 && (
+              <View style={[styles.badge, { backgroundColor: colors.danger[500] }]}>
+                <Text style={styles.badgeText}>{emiSummary.total_overdue}</Text>
+              </View>
+            )}
+          </View>
+          <View style={{ flex: 1, marginLeft: 16 }}>
+            <Text style={[styles.metricTitle, { color: colors.gray[700] }]}>EMI Tracker</Text>
+            <Text style={[styles.metricValue, { color: colors.primary[700] }]}>{emiSummary.total_active} Active</Text>
+            <Text style={[styles.metricSubtitle, { color: colors.gray[500] }]}>{emiSummary.total_pending} pending • {formatCurrency(emiSummary.total_emi_amount)}/month</Text>
+          </View>
+        </PressableScale>
+      </View>
+    ),
+    budget_progress: () => (
+      budgetStatuses.length > 0 ? (
+        <View key="budget_progress" style={{ marginBottom: 24 }}>
+          <View style={[styles.header, { marginBottom: 12, paddingHorizontal: 4 }]}>
+            <Text style={[styles.sectionHeaderTitle, { color: colors.gray[400] }]}>Budget Progress</Text>
+            <TouchableOpacity onPress={() => router.push('/budgets')}>
+              <Text style={{ fontSize: typography.size.sm, fontFamily: typography.family.bold, color: colors.primary[600] }}>Manage →</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
+            {budgetStatuses.map((budget, idx) => {
+              let progressColor = colors.success[500];
+              let statusText = "On Track";
+              if (budget.percentage >= 100) { progressColor = colors.danger[500]; statusText = "Over Budget"; }
+              else if (budget.percentage >= 85) { progressColor = colors.danger[400]; statusText = "Warning"; }
+              else if (budget.percentage >= 60) { progressColor = '#F59E0B'; statusText = "Caution"; }
+
+              return (
+                <PressableScale 
+                  key={`budget-${idx}`} 
+                  style={[styles.miniBudgetCard, { backgroundColor: colors.white, borderRadius: radius.lg }]}
+                  onPress={() => router.push({ pathname: '/category-detail', params: { category_name: budget.category } })}
+                >
+                  <Text style={[styles.miniBudgetCategory, { color: colors.gray[900] }]} numberOfLines={1}>{budget.category}</Text>
+                  
+                  <View style={styles.miniBudgetNumbers}>
+                    <Text style={[styles.miniBudgetSpent, { color: colors.gray[900] }]}>{formatCurrency(budget.spent)}</Text>
+                    <Text style={[styles.miniBudgetLimit, { color: colors.gray[500] }]}> / {formatCurrency(budget.budget)}</Text>
+                  </View>
+
+                  <View style={[styles.miniBudgetBarBg, { backgroundColor: colors.gray[100] }]}>
+                    <Animated.View style={[styles.miniBudgetBarFill, { width: `${Math.min(budget.percentage, 100)}%`, backgroundColor: progressColor }]} />
+                  </View>
+                  
+                  <Text style={[styles.miniBudgetStatus, { color: progressColor }]}>{statusText}</Text>
+                </PressableScale>
+              );
+            })}
+          </ScrollView>
+        </View>
+      ) : null
+    ),
+    financial_modules: () => (
+      <View key="financial_modules" style={{ marginBottom: 16 }}>
+        <Text style={[styles.sectionHeaderTitle, { color: colors.gray[400] }]}>Financial Modules</Text>
+
+        <PressableScale
+          style={[styles.bookModuleCard, { backgroundColor: colors.accent.rose, borderRadius: radius.xl }]}
+          onPress={() => router.push('/books' as any)}
+        >
+          <View style={styles.bookModuleInner}>
+            <View style={[styles.iconContainerPrimary, { backgroundColor: 'rgba(255,255,255,0.6)' }]}>
+              <BookOpen size={24} color={colors.danger[500]} />
+            </View>
+            <View style={styles.moduleContent}>
+              <Text style={[styles.moduleTitle, { color: colors.gray[900] }]}>Expense Books</Text>
+              <Text style={[styles.moduleSubtitle, { color: colors.gray[600] }]}>{bookSummary.count} Active Projects</Text>
+            </View>
+            <View style={styles.moduleRight}>
+              <Text style={[styles.moduleAmount, { color: colors.gray[900] }]}>{formatCurrency(bookSummary.total)}</Text>
+              <Text style={[styles.moduleLabel, { color: colors.gray[500] }]}>Total Tracked</Text>
+            </View>
+          </View>
+        </PressableScale>
+
+        <View style={styles.debtRow}>
+          <PressableScale
+            style={[styles.debtModuleCard, { backgroundColor: colors.gray[100], borderRadius: radius.xl }]}
+            onPress={() => router.push('/debts?type=debt' as any)}
+          >
+            <View style={[styles.iconContainer, { backgroundColor: colors.white }]}>
+              <TrendingDown size={22} color={colors.danger[500]} />
+            </View>
+            <View style={styles.debtContent}>
+              <Text style={[styles.debtLabel, { color: colors.gray[600] }]}>I Owe</Text>
+              <Text style={[styles.debtAmount, { color: colors.danger[600] }]} numberOfLines={1}>
+                {formatCurrency(debtSummary.totalDebt)}
+              </Text>
+            </View>
+            <View style={styles.actionIcon}>
+              <ArrowRight size={14} color={colors.gray[400]} />
+            </View>
+          </PressableScale>
+
+          <PressableScale
+            style={[styles.debtModuleCard, { backgroundColor: colors.accent.mint, borderRadius: radius.xl }]}
+            onPress={() => router.push('/debts?type=receivable' as any)}
+          >
+            <View style={[styles.iconContainer, { backgroundColor: colors.white }]}>
+              <TrendingUp size={22} color={colors.success[500]} />
+            </View>
+            <View style={styles.debtContent}>
+              <Text style={[styles.debtLabel, { color: colors.gray[600] }]}>They Owe</Text>
+              <Text style={[styles.debtAmount, { color: colors.success[600] }]} numberOfLines={1}>
+                {formatCurrency(debtSummary.totalReceivable)}
+              </Text>
+            </View>
+            <View style={styles.actionIcon}>
+              <ArrowRight size={14} color={colors.gray[400]} />
+            </View>
+          </PressableScale>
+        </View>
+      </View>
+    ),
+  };
+
+  const visibleWidgets = dashboardWidgets
+    .filter(w => w.visible)
+    .sort((a, b) => a.order - b.order);
+
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaView style={styles.mainContainer} edges={['top']}>
-        <StatusBar barStyle="dark-content" />
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.gray[50] }}>
+      <SafeAreaView style={[styles.mainContainer, { backgroundColor: colors.gray[50] }]} edges={['top']}>
+        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
         <LinearGradient
-          colors={[Colors.gray[50], Colors.gray[50]]}
+          colors={[colors.gray[50], colors.gray[50]]}
           style={StyleSheet.absoluteFill}
         />
 
@@ -129,37 +389,34 @@ function DashboardContent() {
           style={styles.container}
           contentContainerStyle={[styles.contentContainer, { paddingBottom: 100 }]}
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary[500]} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary[500]} />}
         >
-          <Animated.View entering={FadeInDown.duration(600)} style={styles.header}>
+          <View style={styles.header}>
             <View>
-              <Text style={styles.greeting}>{getGreeting()}</Text>
-              <Text style={styles.date}>{format(new Date(), 'EEEE, do MMMM')}</Text>
+              {themeConfig.showGreeting && <Text style={[styles.greeting, { color: colors.gray[900] }]}>{getGreeting()}</Text>}
+              {themeConfig.showDate && <Text style={[styles.date, { color: colors.gray[500] }]}>{format(new Date(), 'EEEE, do MMMM')}</Text>}
             </View>
             <View style={{ flexDirection: 'row', gap: 12 }}>
               <TouchableOpacity
                 activeOpacity={0.7}
-                style={styles.profilePlaceholder}
-                onPress={() => { }}
+                style={[styles.profilePlaceholder, { backgroundColor: colors.primary[50], borderColor: colors.primary[100] }]}
+                onPress={() => router.push('/user-name' as any)}
               >
-                <Text style={styles.profileInitials}>ME</Text>
+                <Text style={[styles.profileInitials, { color: colors.primary[600] }]}>ME</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 activeOpacity={0.7}
-                style={styles.gridBtn}
+                style={[styles.gridBtn, { backgroundColor: colors.gray[100] }]}
                 onPress={() => setShowSidePanel(true)}
               >
-                <Grid size={20} color={Colors.primary[600]} />
+                <Grid size={20} color={colors.primary[600]} />
               </TouchableOpacity>
             </View>
-          </Animated.View>
+          </View>
 
           {/* Trial Expiry Banner */}
           {showBanner && (
-            <Animated.View 
-              entering={FadeInDown.duration(400)} 
-              style={styles.trialBanner}
-            >
+            <View style={styles.trialBanner}>
               <TouchableOpacity 
                 activeOpacity={0.9} 
                 style={styles.trialBannerContent}
@@ -167,7 +424,7 @@ function DashboardContent() {
               >
                 <View style={styles.trialBannerLeft}>
                   <View style={styles.trialBannerIconContainer}>
-                    <Lock size={16} color={Colors.white} />
+                    <Lock size={16} color="#FFF" />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.trialBannerTitle}>Premium Trial Active</Text>
@@ -182,250 +439,11 @@ function DashboardContent() {
                   <X size={16} color="rgba(255,255,255,0.7)" />
                 </TouchableOpacity>
               </TouchableOpacity>
-            </Animated.View>
+            </View>
           )}
 
-          {/* Main Balance Card */}
-          <Animated.View entering={FadeInDown.delay(100).duration(600)}>
-            <FlippableBalanceCard 
-              totalBalance={totalBalance}
-              accounts={accounts}
-            />
-          </Animated.View>
-
-          {/* Dashboard Metrics Grid */}
-          <Animated.View entering={FadeInDown.delay(150).duration(600)} style={styles.metricsGridContainer}>
-            <View style={styles.metricsGridRow}>
-              <View style={styles.metricCardHalf}>
-                <View style={[styles.metricCardIcon, { backgroundColor: Colors.accent.mint }]}>
-                  <CalendarDays size={18} color={Colors.success[600]} />
-                </View>
-                <Text style={styles.metricGridLabel}>{"Today's Income"}</Text>
-                <Text style={[styles.metricGridValue, { color: Colors.success[700] }]} numberOfLines={1}>
-                  {formatAmount(dailyStats.income, 'income').text}
-                </Text>
-              </View>
-              <View style={styles.metricCardHalf}>
-                <View style={[styles.metricCardIcon, { backgroundColor: Colors.accent.rose }]}>
-                  <CalendarDays size={18} color={Colors.danger[600]} />
-                </View>
-                <Text style={styles.metricGridLabel}>{"Today's Expense"}</Text>
-                <Text style={[styles.metricGridValue, { color: Colors.danger[700] }]} numberOfLines={1}>
-                  {formatAmount(dailyStats.expense, 'expense').text}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.metricsGridRow}>
-              <View style={styles.metricCardHalf}>
-                <View style={[styles.metricCardIcon, { backgroundColor: Colors.accent.mint }]}>
-                  <CalendarRange size={18} color={Colors.success[600]} />
-                </View>
-                <Text style={styles.metricGridLabel}>This Week (Inc)</Text>
-                <Text style={[styles.metricGridValue, { color: Colors.success[700] }]} numberOfLines={1}>
-                  {formatAmount(weeklyStats.income, 'income').text}
-                </Text>
-              </View>
-              <View style={styles.metricCardHalf}>
-                <View style={[styles.metricCardIcon, { backgroundColor: Colors.accent.rose }]}>
-                  <CalendarRange size={18} color={Colors.danger[600]} />
-                </View>
-                <Text style={styles.metricGridLabel}>This Week (Exp)</Text>
-                <Text style={[styles.metricGridValue, { color: Colors.danger[700] }]} numberOfLines={1}>
-                  {formatAmount(weeklyStats.expense, 'expense').text}
-                </Text>
-              </View>
-            </View>
-
-            {/* Combined This Month & Mini Pie Chart Metric */}
-            <PressableScale 
-               style={[styles.metricCardFull, { padding: 16, marginVertical: 4, justifyContent: 'space-between' }]}
-               onPress={() => setShowPieModal(true)}
-            >
-               <View style={{ flex: 1 }}>
-                   <Text style={[styles.metricGridLabel, { fontSize: Typography.size.sm }]}>{"This Month's Spending"}</Text>
-                   <Text style={{ fontSize: 10, color: Colors.gray[500], marginTop: 2 }}>Tap to view breakdown</Text>
-                   
-                   <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 16, gap: 16 }}>
-                       <View>
-                           <Text style={{ fontSize: 10, color: Colors.gray[500], marginBottom: 2 }}>Income</Text>
-                           <Text style={[styles.metricGridValue, { color: Colors.success[700], fontSize: 16 }]}>
-                             {formatAmount(monthlyStats.income, 'income').text}
-                           </Text>
-                       </View>
-                       <View>
-                           <Text style={{ fontSize: 10, color: Colors.gray[500], marginBottom: 2 }}>Expense</Text>
-                           <Text style={[styles.metricGridValue, { color: Colors.danger[700], fontSize: 16 }]}>
-                             {formatAmount(monthlyStats.expense, 'expense').text}
-                           </Text>
-                       </View>
-                   </View>
-               </View>
-               
-               <View style={{ width: 80, height: 80, alignItems: 'center', justifyContent: 'center' }}>
-                   <MonthlyExpensePieChart initialMonth={new Date()} variant="mini" />
-               </View>
-            </PressableScale>
-
-            <View style={styles.metricsGridRow}>
-              <View style={styles.metricCardHalf}>
-                <View style={[styles.metricCardIcon, { backgroundColor: Colors.accent.mint }]}>
-                  <BarChart3 size={18} color={Colors.success[600]} />
-                </View>
-                <Text style={styles.metricGridLabel}>This Year (Inc)</Text>
-                <Text style={[styles.metricGridValue, { color: Colors.success[700] }]} numberOfLines={1}>{formatCurrency(yearlyStats.income)}</Text>
-              </View>
-              <View style={styles.metricCardHalf}>
-                <View style={[styles.metricCardIcon, { backgroundColor: Colors.accent.rose }]}>
-                  <BarChart3 size={18} color={Colors.danger[600]} />
-                </View>
-                <Text style={styles.metricGridLabel}>This Year (Exp)</Text>
-                <Text style={[styles.metricGridValue, { color: Colors.danger[700] }]} numberOfLines={1}>{formatCurrency(yearlyStats.expense)}</Text>
-              </View>
-            </View>
-
-            <View style={{ marginBottom: 4 }}>
-               <SatisfactionCard />
-            </View>
-
-            <PressableScale style={[styles.metricCardFull, { backgroundColor: Colors.accent.lavender }]} onPress={() => {}}>
-              <View style={styles.metricCardIconRow}>
-                <View style={[styles.metricCardIcon, { backgroundColor: 'rgba(255,255,255,0.6)', marginBottom: 0 }]}>
-                  <Activity size={20} color={Colors.primary[600]} />
-                </View>
-              </View>
-              <View style={{ flex: 1, marginLeft: 16 }}>
-                <Text style={styles.metricTitle}>Net Cash Flow (Monthly)</Text>
-                <Text style={[styles.metricValue, { color: Colors.primary[700] }]}>{formatCurrency(monthlyStats.income - monthlyStats.expense)}</Text>
-              </View>
-            </PressableScale>
-
-            <PressableScale style={[styles.metricCardFull, { backgroundColor: Colors.accent.lavender }]} onPress={() => router.push('/emi-tracker' as any)}>
-              <View style={styles.metricCardIconRow}>
-                <View style={[styles.metricCardIcon, { backgroundColor: 'rgba(255, 255, 255, 0.8)', marginBottom: 0 }]}>
-                  <Calendar size={20} color={Colors.primary[600]} />
-                </View>
-                {emiSummary.total_overdue > 0 && (
-                  <View style={[styles.badge, { backgroundColor: Colors.danger[500] }]}>
-                    <Text style={styles.badgeText}>{emiSummary.total_overdue}</Text>
-                  </View>
-                )}
-              </View>
-              <View style={{ flex: 1, marginLeft: 16 }}>
-                <Text style={styles.metricTitle}>EMI Tracker</Text>
-                <Text style={[styles.metricValue, { color: Colors.primary[700] }]}>{emiSummary.total_active} Active</Text>
-                <Text style={styles.metricSubtitle}>{emiSummary.total_pending} pending • {formatCurrency(emiSummary.total_emi_amount)}/month</Text>
-              </View>
-            </PressableScale>
-          </Animated.View>
-
-          {/* Budget Progress */}
-          {budgetStatuses.length > 0 && (
-            <Animated.View entering={FadeInDown.delay(200).duration(600)} style={{ marginBottom: 32 }}>
-              <View style={[styles.header, { marginBottom: 16, paddingHorizontal: Layout.spacing.lg }]}>
-                <Text style={styles.sectionHeaderTitle}>Budget Progress</Text>
-                <TouchableOpacity onPress={() => router.push('/budgets')}>
-                  <Text style={{ fontSize: Typography.size.sm, fontFamily: Typography.family.bold, color: Colors.primary[600] }}>Manage →</Text>
-                </TouchableOpacity>
-              </View>
-              
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: Layout.spacing.lg, gap: 12 }}>
-                {budgetStatuses.map((budget, idx) => {
-                  let progressColor = Colors.success[500];
-                  let statusText = "On Track";
-                  if (budget.percentage >= 100) { progressColor = Colors.danger[500]; statusText = "Over Budget"; }
-                  else if (budget.percentage >= 85) { progressColor = Colors.danger[400]; statusText = "Warning"; }
-                  else if (budget.percentage >= 60) { progressColor = '#F59E0B'; statusText = "Caution"; }
-
-                  return (
-                    <PressableScale 
-                      key={`budget-${idx}`} 
-                      style={styles.miniBudgetCard}
-                      onPress={() => router.push({ pathname: '/category-detail', params: { category_name: budget.category } })}
-                    >
-                      <Text style={styles.miniBudgetCategory} numberOfLines={1}>{budget.category}</Text>
-                      
-                      <View style={styles.miniBudgetNumbers}>
-                        <Text style={styles.miniBudgetSpent}>{formatCurrency(budget.spent)}</Text>
-                        <Text style={styles.miniBudgetLimit}> / {formatCurrency(budget.budget)}</Text>
-                      </View>
-
-                      <View style={styles.miniBudgetBarBg}>
-                        <Animated.View style={[styles.miniBudgetBarFill, { width: `${Math.min(budget.percentage, 100)}%`, backgroundColor: progressColor }]} />
-                      </View>
-                      
-                      <Text style={[styles.miniBudgetStatus, { color: progressColor }]}>{statusText}</Text>
-                    </PressableScale>
-                  );
-                })}
-              </ScrollView>
-            </Animated.View>
-          )}
-
-          <Animated.View entering={FadeInDown.delay(300).duration(600)}>
-            <Text style={styles.sectionHeaderTitle}>Financial Modules</Text>
-
-            {/* Expense Books Section */}
-            <PressableScale
-              style={[styles.bookModuleCard, { backgroundColor: Colors.accent.rose }]}
-              onPress={() => router.push('/books' as any)}
-            >
-              <View style={styles.bookModuleInner}>
-                <View style={[styles.iconContainerPrimary, { backgroundColor: 'rgba(255,255,255,0.6)' }]}>
-                  <BookOpen size={24} color={Colors.danger[500]} />
-                </View>
-                <View style={styles.moduleContent}>
-                  <Text style={styles.moduleTitle}>Expense Books</Text>
-                  <Text style={styles.moduleSubtitle}>{bookSummary.count} Active Projects</Text>
-                </View>
-                <View style={styles.moduleRight}>
-                  <Text style={styles.moduleAmount}>{formatCurrency(bookSummary.total)}</Text>
-                  <Text style={styles.moduleLabel}>Total Tracked</Text>
-                </View>
-              </View>
-            </PressableScale>
-
-            {/* Debts & Receivables */}
-            <View style={styles.debtRow}>
-              <PressableScale
-                style={[styles.debtModuleCard, { backgroundColor: Colors.gray[100] }]}
-                onPress={() => router.push('/debts?type=debt' as any)}
-              >
-                <View style={[styles.iconContainer, { backgroundColor: Colors.white }]}>
-                  <TrendingDown size={22} color={Colors.danger[500]} />
-                </View>
-                <View style={styles.debtContent}>
-                  <Text style={styles.debtLabel}>I Owe</Text>
-                  <Text style={[styles.debtAmount, { color: Colors.danger[600] }]} numberOfLines={1}>
-                    {formatCurrency(debtSummary.totalDebt)}
-                  </Text>
-                </View>
-                <View style={styles.actionIcon}>
-                  <ArrowRight size={14} color={Colors.gray[400]} />
-                </View>
-              </PressableScale>
-
-              <PressableScale
-                style={[styles.debtModuleCard, { backgroundColor: Colors.accent.mint }]}
-                onPress={() => router.push('/debts?type=receivable' as any)}
-              >
-                <View style={[styles.iconContainer, { backgroundColor: Colors.white }]}>
-                  <TrendingUp size={22} color={Colors.success[500]} />
-                </View>
-                <View style={styles.debtContent}>
-                  <Text style={styles.debtLabel}>They Owe</Text>
-                  <Text style={[styles.debtAmount, { color: Colors.success[600] }]} numberOfLines={1}>
-                    {formatCurrency(debtSummary.totalReceivable)}
-                  </Text>
-                </View>
-                <View style={styles.actionIcon}>
-                  <ArrowRight size={14} color={Colors.gray[400]} />
-                </View>
-              </PressableScale>
-            </View>
-          </Animated.View>
-
-
+          {/* Dynamically Rendered Widget Sections */}
+          {visibleWidgets.map(widget => renderers[widget.id]?.())}
         </ScrollView>
 
         {/* Pie Chart Detailed Modal */}
@@ -709,7 +727,17 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     padding: 16,
     borderRadius: 24,
+    overflow: 'hidden',
     ...Layout.shadows.sm,
+  },
+  metricAccentBar: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
+    borderTopLeftRadius: 24,
+    borderBottomLeftRadius: 24,
   },
   metricCardFull: {
     flexDirection: 'row',

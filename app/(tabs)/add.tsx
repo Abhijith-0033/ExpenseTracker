@@ -520,7 +520,7 @@ function AddTransactionContent() {
 
     return (
         <View style={[styles.container, { paddingTop: insets.top }]}>
-            <StatusBar barStyle="dark-content" />
+            <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
 
             {/* Subtle top gradient */}
             <LinearGradient
@@ -529,7 +529,7 @@ function AddTransactionContent() {
             />
 
             {/* Header */}
-            <Animated.View entering={FadeIn.duration(400)} style={styles.header}>
+            <View style={styles.header}>
                 <PressableScale onPress={() => router.back()} style={styles.closeBtn}>
                     <X size={24} color={Colors.gray[800]} />
                 </PressableScale>
@@ -543,10 +543,10 @@ function AddTransactionContent() {
                 >
                     <Sparkles size={20} color={Colors.primary[600]} />
                 </TouchableOpacity>
-            </Animated.View>
+            </View>
 
             {/* Main Display */}
-            <Animated.View entering={FadeInDown.delay(100).duration(600)} style={styles.displayContainer}>
+            <View style={styles.displayContainer}>
                 <View style={styles.amountWrapper}>
                     <Text style={[styles.currencySymbol, errors.amount && { color: Colors.danger[400] }]}>₹</Text>
                     <Text style={[styles.amountDisplay, errors.amount && { color: Colors.danger[600] }]} numberOfLines={1} adjustsFontSizeToFit>{display}</Text>
@@ -556,7 +556,7 @@ function AddTransactionContent() {
                         {errors.amount}
                     </Animated.Text>
                 )}
-            </Animated.View>
+            </View>
 
             <ScrollView
                 style={styles.formContainer}
@@ -588,7 +588,7 @@ function AddTransactionContent() {
                 )}
 
                 {/* Row 1: Date & Account */}
-                <Animated.View entering={FadeInDown.delay(200).duration(600)} style={styles.selectorsRow}>
+                <View style={styles.selectorsRow}>
                     <PressableScale style={[styles.pill, { flex: 1 }]} onPress={() => setShowDatePicker(true)}>
                         <View style={styles.pillIconContainer}>
                             <CalendarIcon size={20} color={Colors.primary[600]} />
@@ -618,10 +618,10 @@ function AddTransactionContent() {
                             </Text>
                         )}
                     </View>
-                </Animated.View>
+                </View>
 
                 {/* Category Selector */}
-                <Animated.View entering={FadeInDown.delay(300).duration(600)} style={{ marginBottom: 16 }}>
+                <View style={{ marginBottom: 16 }}>
                     <PressableScale 
                         style={[styles.pill, styles.widePill, { marginBottom: 0 }, errors.category && { borderColor: Colors.danger[300] }]} 
                         onPress={() => setShowCategoryPicker(true)}
@@ -643,10 +643,10 @@ function AddTransactionContent() {
                     {lastUsedHint && !errors.category && (
                         <Text style={styles.hintText}>{lastUsedHint}</Text>
                     )}
-                </Animated.View>
+                </View>
 
                 {/* Note Input */}
-                <Animated.View entering={FadeInDown.delay(400).duration(600)} style={styles.noteWrapper}>
+                <View style={styles.noteWrapper}>
                     <TextInput
                         placeholder="What was this for? (optional)"
                         placeholderTextColor={Colors.gray[400]}
@@ -654,7 +654,7 @@ function AddTransactionContent() {
                         onChangeText={handleDescriptionChange}
                         style={styles.input}
                     />
-                </Animated.View>
+                </View>
 
                 {/* Repetitive Status & Validity Options */}
                 {isRecharge && (
@@ -704,7 +704,7 @@ function AddTransactionContent() {
             </ScrollView>
 
 
-            <Animated.View entering={FadeInUp.delay(500).duration(600)}>
+            <View>
                 <Keypad
                     onPress={handleKeyPress}
                     onDelete={handleDelete}
@@ -713,7 +713,7 @@ function AddTransactionContent() {
                     onEvaluate={handleEvaluate}
                     disabled={isSubmitting}
                 />
-            </Animated.View>
+            </View>
 
             {/* Date Picker Modal */}
             {showDatePicker && (

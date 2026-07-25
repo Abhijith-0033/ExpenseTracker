@@ -1,19 +1,18 @@
-
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Dimensions, ScrollView } from 'react-native';
-import Animated, { 
-  useAnimatedStyle, 
-  useSharedValue, 
-  withTiming, 
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
   interpolate,
-  Extrapolate
+  Extrapolate,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Wallet, ChevronRight } from 'lucide-react-native';
-import { Colors, Typography, Layout } from '../constants/Theme';
+import { Wallet, ChevronRight, TrendingUp, TrendingDown, Layers } from 'lucide-react-native';
 import { formatCurrency } from '../utils/currency';
 import { AnimatedBalance } from './AnimatedBalance';
 import { PressableScale } from './ui/PressableScale';
+import { useTheme, BalanceCardVariant } from '../context/ThemeContext';
 
 const { width: _SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -27,9 +26,17 @@ interface Account {
 interface FlippableBalanceCardProps {
   totalBalance: number;
   accounts: Account[];
+  variant?: BalanceCardVariant;
 }
 
-export const FlippableBalanceCard: React.FC<FlippableBalanceCardProps> = ({ totalBalance, accounts }) => {
+export const FlippableBalanceCard: React.FC<FlippableBalanceCardProps> = ({
+  totalBalance,
+  accounts,
+  variant: propVariant,
+}) => {
+  const { colors, radius, themeConfig } = useTheme();
+  const variant = propVariant || themeConfig.balanceCardVariant || 'gradient_flip';
+
   const [isFlipped, setIsFlipped] = useState(false);
   const rotateY = useSharedValue(0);
 
@@ -56,20 +63,102 @@ export const FlippableBalanceCard: React.FC<FlippableBalanceCardProps> = ({ tota
     };
   });
 
+  // Calculate Assets & Liabilities for Net Worth view
+  const assets = accounts.filter(a => a.balance > 0).reduce((sum, a) => sum + a.balance, 0);
+  const liabilities = Math.abs(accounts.filter(a => a.balance < 0).reduce((sum, a) => sum + a.balance, 0));
+
+  if (variant === 'minimal_white') {
+    return (
+      <View style={[styles.variantContainer, { backgroundColor: colors.white, borderRadius: radius.xl, borderColor: colors.gray[200], borderWidth: 1 }]}>
+        <View style={styles.header}>
+          <View>
+            <Text style={[styles.label, { color: colors.gray[500] }]}>Total Balance</Text>
+            <AnimatedBalance value={totalBalance} style={[styles.balanceText, { color: colors.gray[900] }]} />
+          </View>
+          <View style={[styles.iconBadge, { backgroundColor: colors.primary[50] }]}>
+            <Wallet size={24} color={colors.primary[600]} />
+          </View>
+        </View>
+        <View style={styles.footerRow}>
+          <Text style={[styles.subText, { color: colors.gray[500] }]}>{accounts.length} Active Accounts</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (variant === 'compact_dark') {
+    return (
+      <View style={[styles.variantContainer, { backgroundColor: colors.gray[900], borderRadius: radius.xl }]}>
+        <View style={styles.header}>
+          <View>
+            <Text style={[styles.label, { color: 'rgba(255,255,255,0.7)' }]}>Total Balance</Text>
+            <AnimatedBalance value={totalBalance} style={[styles.balanceText, { color: '#FFF' }]} />
+          </View>
+          <Wallet size={28} color="rgba(255,255,255,0.3)" />
+        </View>
+        <View style={styles.compactAccountList}>
+          {accounts.slice(0, 3).map(acc => (
+            <View key={acc.id} style={styles.compactAccountChip}>
+              <Text style={styles.compactAccountName} numberOfLines={1}>{acc.name}</Text>
+              <Text style={styles.compactAccountBalance}>{formatCurrency(acc.balance)}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+    );
+  }
+
+  if (variant === 'net_worth') {
+    return (
+      <LinearGradient
+        colors={[colors.primary[700], colors.primary[900]]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.variantContainer, { borderRadius: radius.xl }]}
+      >
+        <View style={styles.header}>
+          <View>
+            <Text style={[styles.label, { color: 'rgba(255,255,255,0.8)' }]}>Net Position</Text>
+            <AnimatedBalance value={totalBalance} style={[styles.balanceText, { color: '#FFF' }]} />
+          </View>
+          <Layers size={28} color="rgba(255,255,255,0.4)" />
+        </View>
+
+        <View style={styles.netWorthRow}>
+          <View style={styles.netWorthCol}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <TrendingUp size={14} color="#34D399" />
+              <Text style={styles.netWorthLabel}>Assets</Text>
+            </View>
+            <Text style={styles.netWorthValue}>{formatCurrency(assets)}</Text>
+          </View>
+          <View style={styles.netWorthCol}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <TrendingDown size={14} color="#F87171" />
+              <Text style={styles.netWorthLabel}>Liabilities</Text>
+            </View>
+            <Text style={styles.netWorthValue}>{formatCurrency(liabilities)}</Text>
+          </View>
+        </View>
+      </LinearGradient>
+    );
+  }
+
+  // Default: Gradient Flip Card
   return (
     <PressableScale onPress={flip} style={styles.container}>
       <View style={styles.cardContainer}>
         {/* Front Side */}
-        <Animated.View style={[styles.card, frontAnimatedStyle]}>
+        <Animated.View style={[styles.card, { borderRadius: radius.xl }, frontAnimatedStyle]}>
           <LinearGradient
-            colors={[Colors.primary[600], Colors.primary[400]]}
+            colors={[colors.primary[600], colors.primary[400]]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.gradient}
+            style={[styles.gradient, { borderRadius: radius.xl }]}
           >
             <View style={styles.decCircle1} />
             <View style={styles.decCircle2} />
-            
+
             <View style={styles.header}>
               <View style={styles.labelContainer}>
                 <Text style={styles.label}>Total Balance</Text>
@@ -91,20 +180,20 @@ export const FlippableBalanceCard: React.FC<FlippableBalanceCardProps> = ({ tota
         </Animated.View>
 
         {/* Back Side */}
-        <Animated.View style={[styles.card, styles.cardBack, backAnimatedStyle]}>
+        <Animated.View style={[styles.card, styles.cardBack, { borderRadius: radius.xl, backgroundColor: colors.success[700] }, backAnimatedStyle]}>
           <LinearGradient
-            colors={[Colors.success[600], Colors.success[700]]}
+            colors={[colors.success[600], colors.success[700]]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.gradient}
+            style={[styles.gradient, { borderRadius: radius.xl }]}
           >
             <Text style={styles.backTitle}>Account Breakdown</Text>
-            <ScrollView 
-              style={styles.accountList} 
+            <ScrollView
+              style={styles.accountList}
               showsVerticalScrollIndicator={true}
               nestedScrollEnabled={true}
             >
-              {accounts.map((acc) => (
+              {accounts.map(acc => (
                 <View key={acc.id} style={styles.accountItem}>
                   <View style={styles.accountInfo}>
                     <Text style={styles.accountName}>{acc.name}</Text>
@@ -123,9 +212,15 @@ export const FlippableBalanceCard: React.FC<FlippableBalanceCardProps> = ({ tota
 
 const styles = StyleSheet.create({
   container: {
-    marginHorizontal: 20,
+    marginHorizontal: 0,
     marginVertical: 10,
     height: 200,
+  },
+  variantContainer: {
+    padding: 20,
+    marginVertical: 10,
+    justifyContent: 'space-between',
+    minHeight: 160,
   },
   cardContainer: {
     flex: 1,
@@ -136,16 +231,13 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    borderRadius: 24,
-    ...Layout.shadows.md,
     backfaceVisibility: 'hidden',
   },
   cardBack: {
-    backgroundColor: Colors.success[700],
+    backgroundColor: '#377A55',
   },
   gradient: {
     flex: 1,
-    borderRadius: 24,
     padding: 24,
     overflow: 'hidden',
   },
@@ -177,8 +269,8 @@ const styles = StyleSheet.create({
   },
   label: {
     color: 'rgba(255,255,255,0.8)',
-    fontSize: Typography.size.sm,
-    fontFamily: Typography.family.medium,
+    fontSize: 12,
+    fontFamily: 'DMSans_500Medium',
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
@@ -189,18 +281,25 @@ const styles = StyleSheet.create({
   },
   balanceText: {
     color: 'white',
-    fontSize: 42,
-    fontFamily: Typography.family.bold,
+    fontSize: 38,
+    fontFamily: 'DMSans_700Bold',
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  footerRow: {
+    marginTop: 16,
+  },
+  subText: {
+    fontSize: 12,
+    fontFamily: 'DMSans_500Medium',
+  },
   accountCount: {
     color: 'rgba(255,255,255,0.7)',
-    fontSize: Typography.size.xs,
-    fontFamily: Typography.family.medium,
+    fontSize: 12,
+    fontFamily: 'DMSans_500Medium',
   },
   flipIndicator: {
     width: 24,
@@ -210,10 +309,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  iconBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   backTitle: {
     color: 'white',
-    fontSize: Typography.size.md,
-    fontFamily: Typography.family.bold,
+    fontSize: 16,
+    fontFamily: 'DMSans_700Bold',
     marginBottom: 16,
   },
   accountList: {
@@ -232,17 +338,60 @@ const styles = StyleSheet.create({
   },
   accountName: {
     color: 'white',
-    fontSize: Typography.size.sm,
-    fontFamily: Typography.family.bold,
+    fontSize: 14,
+    fontFamily: 'DMSans_700Bold',
   },
   accountType: {
     color: 'rgba(255,255,255,0.5)',
     fontSize: 10,
-    fontFamily: Typography.family.medium,
+    fontFamily: 'DMSans_500Medium',
   },
   accountBalance: {
     color: 'white',
-    fontSize: Typography.size.sm,
-    fontFamily: Typography.family.bold,
+    fontSize: 14,
+    fontFamily: 'DMSans_700Bold',
+  },
+  compactAccountList: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 16,
+  },
+  compactAccountChip: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    padding: 10,
+    borderRadius: 12,
+  },
+  compactAccountName: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 10,
+    fontFamily: 'DMSans_500Medium',
+  },
+  compactAccountBalance: {
+    color: '#FFF',
+    fontSize: 12,
+    fontFamily: 'DMSans_700Bold',
+    marginTop: 2,
+  },
+  netWorthRow: {
+    flexDirection: 'row',
+    marginTop: 20,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.15)',
+  },
+  netWorthCol: {
+    flex: 1,
+  },
+  netWorthLabel: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 11,
+    fontFamily: 'DMSans_500Medium',
+  },
+  netWorthValue: {
+    color: '#FFF',
+    fontSize: 15,
+    fontFamily: 'DMSans_700Bold',
+    marginTop: 4,
   },
 });

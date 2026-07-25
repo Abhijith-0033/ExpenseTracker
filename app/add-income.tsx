@@ -231,7 +231,7 @@ export default function AddIncomeScreen() {
 
     return (
         <View style={[commonStyles.screenContainer, { paddingTop: insets.top, paddingBottom: insets.bottom + 16 }]}>
-            <StatusBar barStyle="dark-content" />
+            <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
 
             <LinearGradient
                 colors={['rgba(34, 197, 94, 0.08)', 'rgba(255, 255, 255, 0)']}
@@ -239,7 +239,7 @@ export default function AddIncomeScreen() {
             />
 
             {/* Header */}
-            <Animated.View entering={FadeIn.duration(400)} style={styles.header}>
+            <View style={styles.header}>
                 <PressableScale onPress={() => router.back()} style={styles.closeBtn}>
                     <X size={24} color={Colors.gray[800]} />
                 </PressableScale>
@@ -248,7 +248,7 @@ export default function AddIncomeScreen() {
                     <Text style={styles.headerTitle}>New Income</Text>
                 </View>
                 <View style={{ width: 44 }} />
-            </Animated.View>
+            </View>
 
             <ScrollView
                 style={styles.mainScroll}
@@ -257,7 +257,7 @@ export default function AddIncomeScreen() {
                 showsVerticalScrollIndicator={false}
             >
                 {/* Main Display */}
-                <Animated.View entering={FadeInDown.delay(100).duration(600)} style={styles.displayContainer}>
+                <View style={styles.displayContainer}>
                     <View style={styles.amountWrapper}>
                         <Text style={[styles.currencySymbol, errors.amount && { color: Colors.danger[400] }]}>₹</Text>
                         <Text style={[styles.amountDisplay, errors.amount && { color: Colors.danger[600] }]} numberOfLines={1} adjustsFontSizeToFit>{display}</Text>
@@ -271,10 +271,10 @@ export default function AddIncomeScreen() {
                         <TrendingUp size={14} color={Colors.success[700]} />
                         <Text style={styles.incomeBadgeText}>Income Entry</Text>
                     </View>
-                </Animated.View>
+                </View>
 
                 {/* Row 1: Date & Account */}
-                <Animated.View entering={FadeInDown.delay(200).duration(600)} style={styles.selectorsRow}>
+                <View style={styles.selectorsRow}>
                     <PressableScale style={[styles.pill, { flex: 1 }]} onPress={() => setShowDatePicker(true)}>
                         <View style={styles.pillIconContainer}>
                             <CalendarIcon size={20} color={Colors.success[600]} />
@@ -299,10 +299,10 @@ export default function AddIncomeScreen() {
                         </PressableScale>
                         {errors.account && <Text style={styles.pillErrorText}>{errors.account}</Text>}
                     </View>
-                </Animated.View>
+                </View>
 
                 {/* Source Selection */}
-                <Animated.View entering={FadeInDown.delay(300).duration(600)}>
+                <View>
                     <PressableScale style={[styles.pill, styles.widePill]} onPress={cycleSource}>
                         <View style={styles.pillIconContainer}>
                             {/* Simple dynamic icon render */}
@@ -324,10 +324,10 @@ export default function AddIncomeScreen() {
                             <ChevronDown size={14} color={Colors.gray[400]} />
                         </View>
                     </PressableScale>
-                </Animated.View>
+                </View>
 
                 {/* Note Input */}
-                <Animated.View entering={FadeInDown.delay(400).duration(600)} style={styles.noteWrapper}>
+                <View style={styles.noteWrapper}>
                     <TextInput
                         placeholder="Add a remark for this entry..."
                         placeholderTextColor={Colors.gray[400]}
@@ -335,10 +335,10 @@ export default function AddIncomeScreen() {
                         onChangeText={setDescription}
                         style={commonStyles.input}
                     />
-                </Animated.View>
+                </View>
             </ScrollView>
 
-            <Animated.View entering={FadeInUp.delay(500).duration(600)}>
+            <View>
                 <Keypad
                     onPress={handleKeyPress}
                     onDelete={handleDelete}
@@ -348,7 +348,7 @@ export default function AddIncomeScreen() {
                     submitColor={Colors.success[600]}
                     submitLabel="Save Income"
                 />
-            </Animated.View>
+            </View>
 
             {/* Date Picker Modal */}
             {showDatePicker && (

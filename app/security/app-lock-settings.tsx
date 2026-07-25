@@ -14,11 +14,11 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import { Snackbar } from '../../components/Snackbar';
 
 const TIMEOUT_OPTIONS = [
-  { label: 'Immediately', value: 0 },
-  { label: 'After 1 minute', value: 1 },
-  { label: 'After 5 minutes', value: 5 },
-  { label: 'After 15 minutes', value: 15 },
-  { label: 'After 1 hour', value: 60 },
+  { label: 'Immediately', val: 0 },
+  { label: 'After 1 minute', val: 1 },
+  { label: 'After 5 minutes', val: 5 },
+  { label: 'After 15 minutes', val: 15 },
+  { label: 'After 1 hour', val: 60 },
 ];
 
 export default function AppLockSettingsScreen() {
@@ -116,7 +116,7 @@ export default function AppLockSettingsScreen() {
     );
   };
 
-  const currentTimeoutLabel = TIMEOUT_OPTIONS.find(o => o.value === timeoutMinutes)?.label || 'Immediately';
+  const currentTimeoutLabel = TIMEOUT_OPTIONS.find(o => o.val === timeoutMinutes)?.label || 'Immediately';
 
   return (
     <View style={styles.container}>
@@ -209,16 +209,16 @@ export default function AppLockSettingsScreen() {
                     <View style={styles.timerOptions}>
                       {TIMEOUT_OPTIONS.map(opt => (
                         <TouchableOpacity
-                          key={opt.value}
+                          key={opt.val}
                           style={[
                             styles.timerOption,
-                            opt.value === timeoutMinutes && styles.timerOptionSelected
+                            opt.val === timeoutMinutes && styles.timerOptionSelected
                           ]}
-                          onPress={() => handleSelectTimeout(opt.value)}
+                          onPress={() => handleSelectTimeout(opt.val)}
                         >
                           <Text style={[
                             styles.timerOptionText,
-                            opt.value === timeoutMinutes && styles.timerOptionTextSelected
+                            opt.val === timeoutMinutes && styles.timerOptionTextSelected
                           ]}>
                             {opt.label}
                           </Text>

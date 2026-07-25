@@ -3,8 +3,9 @@ import { ErrorBoundary } from 'react-error-boundary';
 import { TabErrorFallback } from '../../components/ErrorBoundary';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Switch } from 'react-native';
 import { useRouter, Link } from 'expo-router';
-import { ChevronRight, Wallet, Tag, Database, Bell, FileUp, FileDown, FileText, Info, Calendar, Users, Target, CalendarClock, RefreshCw, FileBarChart, Send, Lock, PiggyBank, Trash2 } from 'lucide-react-native';
+import { ChevronRight, Wallet, Tag, Database, Bell, FileUp, FileDown, FileText, Info, Calendar, Users, Target, CalendarClock, RefreshCw, FileBarChart, Send, Lock, PiggyBank, Trash2, Palette } from 'lucide-react-native';
 import { useApp } from '../../context/AppContext';
+import { useTheme } from '../../context/ThemeContext';
 import { Colors, Typography, Layout } from '../../constants/Theme';
 import { checkReminderStatus, scheduleDailyReminder } from '../../services/notifications';
 import { exportData, exportCSV, restoreData } from '../../services/backup';
@@ -121,6 +122,20 @@ function SettingsContent() {
 
             <View style={styles.section}>
                 <Text style={styles.sectionTitle}>General</Text>
+
+                <TouchableOpacity
+                    style={styles.row}
+                    onPress={() => router.push('/theme-settings' as any)}
+                >
+                    <View style={[styles.rowIcon, { backgroundColor: 'rgba(232, 145, 122, 0.15)' }]}>
+                        <Palette size={20} color={Colors.primary[600]} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.rowText}>Appearance & Dashboard</Text>
+                        <Text style={styles.rowSubtext}>Themes, dark mode, colors & widget layout</Text>
+                    </View>
+                    <ChevronRight size={20} color="#9ca3af" />
+                </TouchableOpacity>
 
                 <TouchableOpacity
                     style={styles.row}

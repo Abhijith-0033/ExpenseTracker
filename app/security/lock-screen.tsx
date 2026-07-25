@@ -127,7 +127,7 @@ export default function LockScreen({ onUnlock }: LockScreenProps) {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
 
       {/* App branding */}
       <View style={styles.brandSection}>

@@ -203,7 +203,6 @@ export default function CertificateScreen() {
               ref={certificateRef}
               options={{ format: 'png', quality: 1.0 }}
               style={styles.viewShotWrapper}
-              collapsable={false}
             >
               <CertificateView
                 userName={userName || 'Friend'}
@@ -286,7 +285,6 @@ export default function CertificateScreen() {
             ref={certificateRef}
             options={{ format: 'png', quality: 1.0 }}
             style={styles.viewShotWrapper}
-            collapsable={false}
           >
             <CertificateView
               userName={userName || 'Friend'}

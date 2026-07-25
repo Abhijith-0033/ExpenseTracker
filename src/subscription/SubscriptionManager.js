@@ -11,6 +11,12 @@ export async function initialize() {
       useAmazon: Platform.OS === 'android',
     });
     await syncSubscriptionStatus();
+    
+    // Sync attributes now that Purchases is initialized
+    try {
+      const { syncUserAttributes } = await import('../../services/revenueCatSync');
+      await syncUserAttributes();
+    } catch (_err) {}
   } catch (e) {
     console.warn('RevenueCat initialization failed:', e);
   }

@@ -9,11 +9,14 @@ import { isLockEnabled, shouldLockAfterBackground, recordBackground } from '../s
 import 'react-native-reanimated';
 import { useColorScheme, View, AppState, AppStateStatus } from 'react-native';
 import { AppProvider } from '../context/AppContext';
+import { ThemeProvider as CustomThemeProvider } from '../context/ThemeContext';
 import { SubscriptionProvider } from '../src/subscription/SubscriptionContext';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErrorBoundary } from 'react-error-boundary';
 import { RootErrorFallback } from '../components/ErrorBoundary';
+import { Colors } from '../constants/Theme';
+import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 import { initDatabase } from '../services/database';
 import { initNotifications } from '../services/notifications';
 import { initializeNotificationManager } from '../services/notifications/NotificationManager';
@@ -341,7 +344,8 @@ export default function RootLayout() {
 
   if (isLocked) {
     return (
-      <GestureHandlerRootView style={{ flex: 1 }}>
+      <GestureHandlerRootView style={{ flex: 1, backgroundColor: Colors.gray[50] }}>
+        <ExpoStatusBar style="dark" translucent backgroundColor="transparent" />
         <LockScreen onUnlock={async () => {
           const { recordUnlock } = await import('../services/security/AppLockService');
           await recordUnlock();
@@ -352,23 +356,26 @@ export default function RootLayout() {
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: Colors.gray[50] }}>
       <QueryClientProvider client={queryClient}>
         <SubscriptionProvider>
           <AppProvider>
-            <SafeAreaProvider>
-            {/* Force DefaultTheme per absolute rules (light theme only) */}
-            <ThemeProvider value={DefaultTheme}>
-              <View style={{ flex: 1 }}>
-                <ErrorBoundary
-                  FallbackComponent={RootErrorFallback}
-                  onReset={() => {
-                    router.replace('/');
-                  }}
-                >
-                  <Stack>
-                    <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                    <Stack.Screen name="budgets" options={{ headerShown: false }} />
+            <CustomThemeProvider>
+              <SafeAreaProvider style={{ flex: 1, backgroundColor: Colors.gray[50] }}>
+              {/* Force DefaultTheme per absolute rules (light theme only) */}
+              <ThemeProvider value={DefaultTheme}>
+                <View style={{ flex: 1, backgroundColor: Colors.gray[50] }}>
+                  <ExpoStatusBar style="dark" translucent backgroundColor="transparent" />
+                  <ErrorBoundary
+                    FallbackComponent={RootErrorFallback}
+                    onReset={() => {
+                      router.replace('/');
+                    }}
+                  >
+                    <Stack screenOptions={{ headerShown: false, animation: 'none', gestureEnabled: true }}>
+                      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                      <Stack.Screen name="theme-settings" options={{ headerShown: false }} />
+                      <Stack.Screen name="budgets" options={{ headerShown: false }} />
                     <Stack.Screen name="add-transfer" options={{ headerShown: false }} />
                     <Stack.Screen name="add-income" options={{ headerShown: false }} />
                     <Stack.Screen name="edit-transaction" options={{ headerShown: false }} />
@@ -444,7 +451,8 @@ export default function RootLayout() {
               </View>
             </ThemeProvider>
           </SafeAreaProvider>
-        </AppProvider>
+        </CustomThemeProvider>
+      </AppProvider>
       </SubscriptionProvider>
     </QueryClientProvider>
   </GestureHandlerRootView>

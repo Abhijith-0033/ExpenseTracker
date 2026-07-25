@@ -278,7 +278,7 @@ function AnalyticsContent() {
 
     return (
         <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-            <StatusBar barStyle="dark-content" />
+            <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
 
             {renderHeader()}
 
@@ -323,7 +323,7 @@ function AnalyticsContent() {
 
             {/* Premium Forecast Section */}
             {forecast && viewMode === 'month' && (
-                <Animated.View entering={FadeInDown.delay(200).duration(800)}>
+                <View>
                     <TouchableOpacity activeOpacity={0.9} onPress={() => setShowForecastModal(true)}>
                     <LinearGradient
                         colors={[Colors.primary[500], Colors.accent.peach]}
@@ -362,7 +362,7 @@ function AnalyticsContent() {
                         </View>
                     </LinearGradient>
                     </TouchableOpacity>
-                </Animated.View>
+                </View>
             )}
 
             {/* Category Breakdown Section */}

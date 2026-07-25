@@ -47,13 +47,13 @@ function CalendarContent() {
 
     return (
         <SafeAreaView style={styles.mainContainer} edges={['top']}>
-            <StatusBar barStyle="dark-content" />
+            <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
             <ScrollView
                 style={styles.container}
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={{ paddingBottom: 100 }}
             >
-                <Animated.View entering={FadeInDown.duration(600)} style={styles.headerCard}>
+                <View style={styles.headerCard}>
                     <LinearGradient
                         colors={[Colors.white, Colors.gray[50]]}
                         style={styles.headerGradient}
@@ -88,18 +88,18 @@ function CalendarContent() {
                             </TouchableOpacity>
                         </View>
                     </LinearGradient>
-                </Animated.View>
+                </View>
 
-                <Animated.View entering={FadeInDown.delay(100).duration(600)} style={styles.calendarWrapper}>
+                <View style={styles.calendarWrapper}>
                     <HeatmapCalendar
                         month={currentMonth}
                         transactions={txsForMonth}
                         onDayPress={handleDayPress}
                         selectedDate={selectedDate}
                     />
-                </Animated.View>
+                </View>
 
-                <Animated.View entering={FadeInDown.delay(200).duration(600)} style={styles.summaryRow}>
+                <View style={styles.summaryRow}>
                     <View style={styles.summaryCard}>
                         <View style={[styles.summaryIndicator, { backgroundColor: Colors.danger[400] }]} />
                         <Text style={styles.summaryLabel}>Daily Spent</Text>
@@ -110,9 +110,9 @@ function CalendarContent() {
                         <Text style={styles.summaryLabel}>Monthly Total</Text>
                         <Text style={styles.summaryValue}>{formatCurrency(monthlyTotal)}</Text>
                     </View>
-                </Animated.View>
+                </View>
 
-                <Animated.View entering={FadeInUp.delay(300).duration(600)} style={styles.listSection}>
+                <View style={styles.listSection}>
                     <View style={styles.listHeader}>
                         <View>
                             <Text style={styles.selectedDateText}>{format(selectedDate, 'EEEE, MMM do')}</Text>
@@ -139,7 +139,7 @@ function CalendarContent() {
                             </View>
                         )}
                     </View>
-                </Animated.View>
+                </View>
             </ScrollView>
         </SafeAreaView>
     );

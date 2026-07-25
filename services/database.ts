@@ -751,6 +751,73 @@ const runMigrations = async (db: SQLite.SQLiteDatabase) => {
     await setDbVersion(db, version);
   }
 
+  if (version < 10) {
+    // Version 10: Expense Book overhaul — sections, publish workflow, book metadata
+    
+    // Add new columns to expense_books
+    const alterBookColumns = [
+      `ALTER TABLE expense_books ADD COLUMN status TEXT DEFAULT 'draft'`,
+      `ALTER TABLE expense_books ADD COLUMN published_at TEXT DEFAULT NULL`,
+      `ALTER TABLE expense_books ADD COLUMN total_amount REAL DEFAULT 0`,
+      `ALTER TABLE expense_books ADD COLUMN currency TEXT DEFAULT 'INR'`,
+      `ALTER TABLE expense_books ADD COLUMN cover_emoji TEXT DEFAULT '📒'`,
+      `ALTER TABLE expense_books ADD COLUMN color TEXT DEFAULT '#D66A4E'`,
+      `ALTER TABLE expense_books ADD COLUMN is_collaborative INTEGER DEFAULT 0`,
+      `ALTER TABLE expense_books ADD COLUMN members TEXT DEFAULT NULL`,
+    ];
+    
+    for (const sql of alterBookColumns) {
+      try { await db.execAsync(sql); } catch (_e) { /* column already exists */ }
+    }
+
+    // Add new columns to expense_book_items
+    const alterItemColumns = [
+      `ALTER TABLE expense_book_items ADD COLUMN section_name TEXT DEFAULT NULL`,
+      `ALTER TABLE expense_book_items ADD COLUMN paid_by TEXT DEFAULT NULL`,
+      `ALTER TABLE expense_book_items ADD COLUMN split_among TEXT DEFAULT NULL`,
+      `ALTER TABLE expense_book_items ADD COLUMN transaction_id INTEGER DEFAULT NULL`,
+      `ALTER TABLE expense_book_items ADD COLUMN account_id INTEGER DEFAULT NULL`,
+      `ALTER TABLE expense_book_items ADD COLUMN is_published INTEGER DEFAULT 0`,
+      `ALTER TABLE expense_book_items ADD COLUMN photo_uri TEXT DEFAULT NULL`,
+    ];
+    
+    for (const sql of alterItemColumns) {
+      try { await db.execAsync(sql); } catch (_e) { /* column already exists */ }
+    }
+
+    // Add expense_book_id to transactions
+    try {
+      await db.execAsync(
+        `ALTER TABLE transactions ADD COLUMN expense_book_id INTEGER DEFAULT NULL`
+      );
+    } catch (_e) { /* column already exists */ }
+
+    // Create new sections table
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS expense_book_sections (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id     INTEGER NOT NULL,
+        name        TEXT NOT NULL,
+        color       TEXT DEFAULT NULL,
+        icon        TEXT DEFAULT NULL,
+        order_index INTEGER DEFAULT 0,
+        created_at  TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY (book_id) REFERENCES expense_books(id) ON DELETE CASCADE
+      );
+      CREATE INDEX IF NOT EXISTS idx_eb_sections_book ON expense_book_sections(book_id);
+      CREATE INDEX IF NOT EXISTS idx_eb_items_book ON expense_book_items(book_id);
+      CREATE INDEX IF NOT EXISTS idx_txn_expense_book ON transactions(expense_book_id);
+    `);
+
+    // Set existing books to 'published' status since they already have items
+    await db.execAsync(
+      `UPDATE expense_books SET status = 'published' WHERE status IS NULL OR status = 'draft'`
+    );
+
+    version = 10;
+    await setDbVersion(db, version);
+  }
+
   console.log(`Database migrated successfully to version ${version}`);
 };
 

@@ -203,7 +203,7 @@ export default function AddTransferScreen() {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="light-content" />
+            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
             <LinearGradient
                 colors={[Colors.primary[500], Colors.accent.peach]}
                 start={{ x: 0, y: 0 }}
@@ -230,7 +230,7 @@ export default function AddTransferScreen() {
                 )}
 
                 {/* Accounts Row */}
-                <Animated.View entering={FadeInDown.delay(200).duration(600)} style={styles.transferFlow}>
+                <View style={styles.transferFlow}>
                     <View style={styles.transferRow}>
                         <PressableScale style={[styles.pill, { flex: 1 }, errors.accounts && { borderColor: Colors.danger[300] }]} onPress={cycleFromAccount}>
                             <View style={styles.pillIconContainer}>
@@ -257,7 +257,7 @@ export default function AddTransferScreen() {
                         </PressableScale>
                     </View>
                     {errors.accounts && <Text style={styles.pillErrorText}>{errors.accounts}</Text>}
-                </Animated.View>
+                </View>
             </LinearGradient>
 
             <View style={styles.content}>

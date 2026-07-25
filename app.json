@@ -2,18 +2,23 @@
   "expo": {
     "name": "Gastos",
     "slug": "ExpenseTracker",
-    "version": "3.6.0",
+    "version": "3.7.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "gastos",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
+    "statusBar": {
+      "barStyle": "dark-content",
+      "backgroundColor": "transparent",
+      "translucent": true
+    },
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "package": "com.gastos.expensetracker",
-      "versionCode": 46,
+      "versionCode": 47,
       "adaptiveIcon": {
         "backgroundColor": "#0F172A",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

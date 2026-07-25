@@ -12,6 +12,7 @@ import Animated, {
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { X, Wallet, PieChart, Target, TrendingUp, Calculator, CreditCard, Users, ChevronRight, Calendar, Lock, Clock } from 'lucide-react-native';
 import { Colors, Typography } from '../constants/Theme';
+import { useTheme } from '../context/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSubscription } from '../src/subscription/useSubscription';
 
@@ -37,6 +38,7 @@ interface SidePanelProps {
 }
 
 export const SidePanel: React.FC<SidePanelProps> = ({ visible, onClose, onNavigate }) => {
+    const { sidePanelItems, colors } = useTheme();
     const { isPremium, isTrialActive } = useSubscription();
     const isFreeUser = !isPremium && !isTrialActive;
     const insets = useSafeAreaInsets();
@@ -190,6 +192,11 @@ export const SidePanel: React.FC<SidePanelProps> = ({ visible, onClose, onNaviga
         },
     ];
 
+    const visibleMenuItems = menuItems.filter(item => {
+        const config = sidePanelItems.find(i => i.id === item.id);
+        return config ? config.visible : true;
+    });
+
     return (
         <View style={styles.wrapper}>
             <Animated.View style={[styles.backdrop, animatedBackdropStyle]}>
@@ -197,19 +204,19 @@ export const SidePanel: React.FC<SidePanelProps> = ({ visible, onClose, onNaviga
             </Animated.View>
 
             <GestureDetector gesture={panGesture}>
-                <Animated.View style={[styles.panel, animatedPanelStyle]}>
-                    <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+                <Animated.View style={[styles.panel, { backgroundColor: colors.white }, animatedPanelStyle]}>
+                    <View style={[styles.header, { paddingTop: insets.top + 16, borderColor: colors.gray[100] }]}>
                         <View>
-                            <Text style={styles.headerTitle}>Premium Tools</Text>
-                            <Text style={styles.headerSubtitle}>Quick access to financial features</Text>
+                            <Text style={[styles.headerTitle, { color: colors.gray[900] }]}>Premium Tools</Text>
+                            <Text style={[styles.headerSubtitle, { color: colors.gray[500] }]}>Quick access to financial features</Text>
                         </View>
-                        <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
-                            <X size={24} color={Colors.gray[500]} />
+                        <TouchableOpacity style={[styles.closeBtn, { backgroundColor: colors.gray[50] }]} onPress={onClose}>
+                            <X size={24} color={colors.gray[500]} />
                         </TouchableOpacity>
                     </View>
 
                     <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={styles.menuContainer}>
-                        {menuItems.map((item) => (
+                        {visibleMenuItems.map((item) => (
                             <TouchableOpacity
                                 key={item.id}
                                 style={[styles.menuItem, item.disabled && styles.menuItemDisabled]}
