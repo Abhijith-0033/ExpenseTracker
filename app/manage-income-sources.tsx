@@ -4,12 +4,14 @@ import { useRouter } from 'expo-router';
 import { getIncomeSources, addIncomeSource, updateIncomeSource, deleteIncomeSource, IncomeSource } from '../services/database';
 import { Plus, X, Pencil, Trash2, Briefcase, Tag, TrendingUp, Gift, DollarSign, Home, Globe, User } from 'lucide-react-native';
 import { Colors, Layout, Typography } from '../constants/Theme';
+import { useTheme } from '../context/ThemeContext';
 import { IconSymbol } from '../components/ui/icon-symbol';
 
 const AVAILABLE_ICONS = ['Briefcase', 'Tag', 'TrendingUp', 'Gift', 'DollarSign', 'Home', 'Globe', 'User'];
 
 export default function ManageIncomeSourcesScreen() {
     const router = useRouter();
+    const { colors } = useTheme();
     const [sources, setSources] = useState<IncomeSource[]>([]);
     const [_loading, setLoading] = useState(true);
     const [modalVisible, setModalVisible] = useState(false);
@@ -79,7 +81,7 @@ export default function ManageIncomeSourcesScreen() {
         ]);
     };
 
-    const renderIcon = (iconName: string, size = 20, color = Colors.gray[600]) => {
+    const renderIcon = (iconName: string, size = 20, color = colors.gray[600]) => {
         switch (iconName) {
             case 'Briefcase': return <Briefcase size={size} color={color} />;
             case 'Tag': return <Tag size={size} color={color} />;
@@ -94,32 +96,32 @@ export default function ManageIncomeSourcesScreen() {
     };
 
     const renderItem = ({ item }: { item: IncomeSource }) => (
-        <View style={styles.card}>
+        <View style={[styles.card, { backgroundColor: colors.white }]}>
             <View style={styles.row}>
-                <View style={styles.iconBox}>
-                    {renderIcon(item.icon, 20, Colors.primary[600])}
+                <View style={[styles.iconBox, { backgroundColor: colors.primary[50] }]}>
+                    {renderIcon(item.icon, 20, colors.primary[600])}
                 </View>
-                <Text style={styles.sourceName}>{item.name}</Text>
+                <Text style={[styles.sourceName, { color: colors.gray[800] }]}>{item.name}</Text>
             </View>
             <View style={styles.row}>
                 <TouchableOpacity onPress={() => openEdit(item)} style={styles.actionBtn}>
-                    <Pencil size={18} color={Colors.primary[600]} />
+                    <Pencil size={18} color={colors.primary[600]} />
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => handleDelete(item.id)} style={[styles.actionBtn, { marginLeft: 12 }]}>
-                    <Trash2 size={18} color={Colors.danger[500]} />
+                    <Trash2 size={18} color={colors.danger[500] || Colors.danger[500]} />
                 </TouchableOpacity>
             </View>
         </View>
     );
 
     return (
-        <View style={styles.container}>
-            <View style={styles.header}>
+        <View style={[styles.container, { backgroundColor: colors.gray[50] }]}>
+            <View style={[styles.header, { backgroundColor: colors.white, borderBottomColor: colors.gray[200] }]}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-                    <IconSymbol name="chevron.left" size={24} color={Colors.gray[800]} />
+                    <IconSymbol name="chevron.left" size={24} color={colors.gray[800]} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Income Sources</Text>
-                <TouchableOpacity onPress={openAdd} style={styles.addBtn}>
+                <Text style={[styles.headerTitle, { color: colors.gray[900] }]}>Income Sources</Text>
+                <TouchableOpacity onPress={openAdd} style={[styles.addBtn, { backgroundColor: colors.primary[600] }]}>
                     <Plus size={24} color="#fff" />
                 </TouchableOpacity>
             </View>
@@ -129,41 +131,49 @@ export default function ManageIncomeSourcesScreen() {
                 keyExtractor={item => item.id.toString()}
                 renderItem={renderItem}
                 contentContainerStyle={styles.listContent}
-                ListEmptyComponent={<Text style={styles.emptyText}>No income sources found.</Text>}
+                ListEmptyComponent={<Text style={[styles.emptyText, { color: colors.gray[500] }]}>No income sources found.</Text>}
             />
 
             <Modal visible={modalVisible} animationType="slide" transparent>
                 <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
+                    <View style={[styles.modalContent, { backgroundColor: colors.white }]}>
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>{editingSource ? 'Edit Source' : 'New Income Source'}</Text>
+                            <Text style={[styles.modalTitle, { color: colors.gray[900] }]}>{editingSource ? 'Edit Source' : 'New Income Source'}</Text>
                             <TouchableOpacity onPress={() => setModalVisible(false)}>
-                                <X size={24} color={Colors.gray[600]} />
+                                <X size={24} color={colors.gray[600]} />
                             </TouchableOpacity>
                         </View>
 
-                        <Text style={styles.label}>Source Name</Text>
+                        <Text style={[styles.label, { color: colors.gray[600] }]}>Source Name</Text>
                         <TextInput
                             placeholder="e.g. Salary, Consulting"
+                            placeholderTextColor={colors.gray[400]}
                             value={name}
                             onChangeText={setName}
-                            style={styles.input}
+                            style={[styles.input, { backgroundColor: colors.gray[50], color: colors.gray[900], borderColor: colors.gray[100] }]}
                         />
 
-                        <Text style={styles.label}>Select Icon</Text>
+                        <Text style={[styles.label, { color: colors.gray[600] }]}>Select Icon</Text>
                         <View style={styles.iconGrid}>
-                            {AVAILABLE_ICONS.map(icon => (
-                                <TouchableOpacity
-                                    key={icon}
-                                    style={[styles.iconSelect, selectedIcon === icon && styles.iconSelectActive]}
-                                    onPress={() => setSelectedIcon(icon)}
-                                >
-                                    {renderIcon(icon, 24, selectedIcon === icon ? Colors.primary[600] : Colors.gray[400])}
-                                </TouchableOpacity>
-                            ))}
+                            {AVAILABLE_ICONS.map(icon => {
+                                const isActive = selectedIcon === icon;
+                                return (
+                                    <TouchableOpacity
+                                        key={icon}
+                                        style={[
+                                            styles.iconSelect,
+                                            { backgroundColor: colors.gray[100] },
+                                            isActive && { borderColor: colors.primary[600], backgroundColor: colors.primary[50] }
+                                        ]}
+                                        onPress={() => setSelectedIcon(icon)}
+                                    >
+                                        {renderIcon(icon, 24, isActive ? colors.primary[600] : colors.gray[400])}
+                                    </TouchableOpacity>
+                                );
+                            })}
                         </View>
 
-                        <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
+                        <TouchableOpacity style={[styles.saveBtn, { backgroundColor: colors.primary[600] }]} onPress={handleSave}>
                             <Text style={styles.saveText}>Save Source</Text>
                         </TouchableOpacity>
                     </View>

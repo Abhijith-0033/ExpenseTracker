@@ -3,6 +3,8 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Modal,
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { ArrowLeft, Plus, X } from 'lucide-react-native';
 import { Colors, Layout, Typography } from '../../constants/Theme';
+import { useTheme } from '../../context/ThemeContext';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { getDebts, addDebtPerson, deleteDebtPerson, Debt, getAccounts, Account } from '../../services/database';
 import { getDebtSummary } from '../../services/debts';
 import { DebtOverviewCharts } from '../../components/DebtCharts';
@@ -16,6 +18,7 @@ import { Snackbar } from '../../components/Snackbar';
 export default function DebtsScreen() {
     const router = useRouter();
     const params = useLocalSearchParams();
+    const { colors } = useTheme();
     const initialType = params.type as 'debt' | 'receivable' || 'debt';
 
     const [activeTab, setActiveTab] = useState<'debt' | 'receivable'>(initialType);
@@ -64,202 +67,6 @@ export default function DebtsScreen() {
         setErrors({});
         try {
             await addDebtPerson(newName, activeTab, newNotes, parseFloat(newAmount) || 0, selectedAccountId ?? undefined);
-            setModalVisible(false);
-            setNewName('');
-            setNewAmount('');
-            setNewNotes('');
-            setSelectedAccountId(null);
-            fetchData();
-        } catch (_e) {
-            Alert.alert('Error', 'Failed to add person');
-        }
-    };
-
-    const handleDelete = (id: number) => {
-        setPendingDeleteDebt(id);
-    };
-
-    const commitDelete = async () => {
-        if (!pendingDeleteDebt) return;
-        try {
-            await deleteDebtPerson(pendingDeleteDebt);
-            fetchData();
-        } catch (_e) {
-            Alert.alert("Error", "Failed to delete person");
-        } finally {
-            setPendingDeleteDebt(null);
-        }
-    };
-
-    const validDebts = debts.filter(d => d.id !== pendingDeleteDebt);
-
-    // Prepare Chart Data
-    const pieData = validDebts.map(d => ({
-        value: d.amount,
-        color: activeTab === 'debt' ? Colors.danger[500] : Colors.success[500],
-        text: d.name
-    })).filter(d => d.value > 0);
-
-    const barData = validDebts.slice(0, 5).map(d => ({
-        value: d.amount,
-        label: d.name.substring(0, 5),
-        frontColor: activeTab === 'debt' ? Colors.danger[500] : Colors.success[500],
-    }));
-
-    return (
-        <View style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
-
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-                    <ArrowLeft size={24} color={Colors.gray[900]} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Debts & Credits</Text>
-                <View style={{ width: 40 }} />
-            </View>
-
-            {/* Tabs */}
-            <View style={styles.tabs}>
-                <TouchableOpacity
-                    style={[styles.tab, activeTab === 'debt' && styles.activeTab]}
-                    onPress={() => setActiveTab('debt')}
-                >
-                    <Text style={[styles.tabText, activeTab === 'debt' && styles.activeTabText]}>I Owe (Debt)</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.tab, activeTab === 'receivable' && styles.activeTab]}
-                    onPress={() => setActiveTab('receivable')}
-                >
-                    <Text style={[styles.tabText, activeTab === 'receivable' && styles.activeTabText]}>They Owe Me</Text>
-                </TouchableOpacity>
-            </View>
-
-            <ScrollView contentContainerStyle={styles.scrollContent}>
-                {/* Summary Cards */}
-                <View style={styles.summaryRow}>
-                    <View style={[styles.summaryCard, { backgroundColor: activeTab === 'debt' ? Colors.danger[50] : Colors.success[50] }]}>
-                        <Text style={styles.summaryLabel}>Total {activeTab === 'debt' ? 'Pending' : 'Receivable'}</Text>
-                        <Text style={[styles.summaryValue, { color: activeTab === 'debt' ? Colors.danger[600] : Colors.success[600] }]}>
-                            {formatCurrency(activeTab === 'debt' ? summary.totalDebt : summary.totalReceivable)}
-                        </Text>
-                    </View>
-                </View>
-
-                {/* Charts */}
-                <DebtOverviewCharts pieData={pieData} barData={barData} />
-
-                {/* List */}
-                <Text style={styles.sectionTitle}>People</Text>
-                {loading ? (
-                    <ActivityIndicator size="large" color={Colors.primary[500]} />
-                ) : (
-                    validDebts.length > 0 ? (
-                        validDebts.map(item => (
-                            <SwipeableRow
-                                key={item.id}
-                                onDelete={() => handleDelete(item.id)}
-                                onEdit={() => router.push(`/debts/${item.id}`)}
-                                deleteConfirmTitle="Remove Person"
-                                deleteConfirmMessage={`Are you sure you want to remove ${item.name}?`}
-                            >
-                                <DebtCard
-                                    item={item}
-                                    onPress={() => router.push(`/debts/${item.id}`)}
-                                    onIncrease={() => {/* Handled in detail usually, or add quick action modal */ }}
-                                    onReduce={() => {/* Handled in detail */ }}
-                                    onDelete={() => handleDelete(item.id)}
-                                />
-                            </SwipeableRow>
-                        ))
-                    ) : (
-                        <View style={styles.emptyState}>
-                            <Text style={styles.emptyText}>No records found.</Text>
-                        </View>
-                    )
-                )}
-
-                <View style={{ height: 80 }} />
-            </ScrollView>
-
-            {/* FAB */}
-            <TouchableOpacity style={styles.fab} onPress={() => setModalVisible(true)}>
-                <Plus size={32} color="white" />
-            </TouchableOpacity>
-
-            {/* Add Modal */}
-            <Modal visible={isModalVisible} transparent animationType="slide">
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Add Person</Text>
-                            <TouchableOpacity onPress={() => setModalVisible(false)}>
-                                <X size={24} color={Colors.gray[500]} />
-                            </TouchableOpacity>
-                        </View>
-
-                        <FormField 
-                            label="Name"
-                            value={newName}
-                            onChangeText={(val) => { setNewName(val); setErrors({}); }}
-                            placeholder="John Doe"
-                            error={errors.name}
-                            required
-                        />
-
-                        <FormField 
-                            label="Initial Amount (Optional)"
-                            value={newAmount}
-                            onChangeText={setNewAmount}
-                            placeholder="0"
-                            keyboardType="numeric"
-                        />
-
-                        <FormField 
-                            label="Notes"
-                            value={newNotes}
-                            onChangeText={setNewNotes}
-                            placeholder="Description..."
-                            multiline
-                        />
-
-                        {parseFloat(newAmount) > 0 && (
-                            <View style={{ marginBottom: 20 }}>
-                                <Text style={styles.label}>Link to Account (Optional)</Text>
-                                <AccountSelector 
-                                    accounts={accounts}
-                                    selectedAccountId={selectedAccountId}
-                                    onSelect={setSelectedAccountId}
-                                />
-                                <Text style={styles.helpText}>
-                                    {activeTab === 'debt' 
-                                        ? "This will INCREASE the account balance." 
-                                        : "This will DECREASE the account balance."}
-                                </Text>
-                            </View>
-                        )}
-
-                        <TouchableOpacity style={styles.saveBtn} onPress={handleAdd}>
-                            <Text style={styles.saveBtnText}>Save</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </Modal>
-
-            <Snackbar 
-                visible={!!pendingDeleteDebt}
-                message="Person removed"
-                onUndo={() => setPendingDeleteDebt(null)}
-                onDismiss={commitDelete}
-            />
-        </View>
-    );
-}
-
-const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: Colors.gray[50] },
-    header: {
-        flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 20,

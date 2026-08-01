@@ -2,13 +2,15 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Alert, Modal, Switch } from 'react-native';
 import { useApp } from '../context/AppContext';
-import { saveCategories, checkTransactionsExistForCategory } from '../services/database';
+import { saveCategories } from '../services/database';
 import { Plus, X, Trash2 } from 'lucide-react-native';
 import { Colors, Layout, Typography } from '../constants/Theme';
+import { useTheme } from '../context/ThemeContext';
 import { ConfirmActionSheet, ConfirmActionType } from '../components/ConfirmActionSheet';
 
 export default function ManageCategoriesScreen() {
     const { categories, refreshData } = useApp();
+    const { colors } = useTheme();
     const [modalVisible, setModalVisible] = useState(false);
 
     // Form
@@ -159,11 +161,11 @@ export default function ManageCategoriesScreen() {
     };
 
     return (
-        <View style={styles.container}>
-            <View style={styles.header}>
-                <Text style={styles.title}>Categories</Text>
-                <TouchableOpacity onPress={() => { setParentCat(null); setEditingCatId(null); setEditingSubName(null); setModalVisible(true); }} style={styles.addBtn}>
-                    <Text style={styles.addBtnText}>+ New Category</Text>
+        <View style={[styles.container, { backgroundColor: colors.gray[50] }]}>
+            <View style={[styles.header, { backgroundColor: colors.white, borderBottomColor: colors.gray[100] }]}>
+                <Text style={[styles.title, { color: colors.gray[900] }]}>Categories</Text>
+                <TouchableOpacity onPress={() => { setParentCat(null); setEditingCatId(null); setEditingSubName(null); setModalVisible(true); }} style={[styles.addBtn, { backgroundColor: colors.primary[50] }]}>
+                    <Text style={[styles.addBtnText, { color: colors.primary[600] }]}>+ New Category</Text>
                 </TouchableOpacity>
             </View>
 
@@ -172,12 +174,12 @@ export default function ManageCategoriesScreen() {
                 keyExtractor={(item) => item.id}
                 contentContainerStyle={{ padding: 16 }}
                 renderItem={({ item }) => (
-                    <View style={styles.catCard}>
+                    <View style={[styles.catCard, { backgroundColor: colors.white }]}>
                         <View style={styles.catHeader}>
-                            <Text style={styles.catTitle}>{item.name}</Text>
+                            <Text style={[styles.catTitle, { color: colors.gray[900] }]}>{item.name}</Text>
                             <View style={{ flexDirection: 'row' }}>
                                 <TouchableOpacity onPress={() => { setParentCat(item.name); setEditingCatId(null); setEditingSubName(null); setModalVisible(true); }} style={{ marginRight: 16 }}>
-                                    <Plus size={20} color="#2563eb" />
+                                    <Plus size={20} color={colors.primary[600]} />
                                 </TouchableOpacity>
                                 <TouchableOpacity onPress={() => {
                                     setEditingCatId(item.id);
@@ -187,10 +189,10 @@ export default function ManageCategoriesScreen() {
                                     setParentCat(null);
                                     setModalVisible(true);
                                 }} style={{ marginRight: 16 }}>
-                                    <Text style={{ color: Colors.primary[600], fontFamily: Typography.family.bold, fontSize: Typography.size.sm }}>Edit</Text>
+                                    <Text style={{ color: colors.primary[600], fontFamily: Typography.family.bold, fontSize: Typography.size.sm }}>Edit</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity onPress={() => requestDelete(item.name)}>
-                                    <Trash2 size={20} color="#ef4444" />
+                                    <Trash2 size={20} color={colors.danger[500] || '#ef4444'} />
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -199,7 +201,7 @@ export default function ManageCategoriesScreen() {
                             return (
                                 <View key={idx} style={styles.subCol}>
                                     <View style={styles.subRow}>
-                                        <Text style={styles.subText}>{sub}</Text>
+                                        <Text style={[styles.subText, { color: colors.gray[600] }]}>{sub}</Text>
                                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                             <TouchableOpacity onPress={() => {
                                                 setEditingSubName(sub);
@@ -209,17 +211,17 @@ export default function ManageCategoriesScreen() {
                                                 setDefaultValidity(subSetting?.default_validity?.toString() || '28');
                                                 setModalVisible(true);
                                             }} style={{ marginRight: 12 }}>
-                                                <Text style={{ color: Colors.primary[600], fontFamily: Typography.family.medium, fontSize: Typography.size.xs }}>Edit</Text>
+                                                <Text style={{ color: colors.primary[600], fontFamily: Typography.family.medium, fontSize: Typography.size.xs }}>Edit</Text>
                                             </TouchableOpacity>
                                             <TouchableOpacity onPress={() => requestDelete(item.name, sub)}>
-                                                <X size={16} color="#9ca3af" />
+                                                <X size={16} color={colors.gray[400] || '#9ca3af'} />
                                             </TouchableOpacity>
                                         </View>
                                     </View>
                                     {subSetting && (
                                         <View style={styles.subBadgeRow}>
-                                            <View style={[styles.repetitiveBadge, { paddingVertical: 2 }]}>
-                                                <Text style={[styles.badgeText, { fontSize: 10 }]}>
+                                            <View style={[styles.repetitiveBadge, { backgroundColor: colors.primary[50], paddingVertical: 2 }]}>
+                                                <Text style={[styles.badgeText, { color: colors.primary[600], fontSize: 10 }]}>
                                                     {subSetting.is_recurring ? `Repetitive (${subSetting.default_validity}d)` : 'Not Repetitive'}
                                                 </Text>
                                             </View>
@@ -230,8 +232,8 @@ export default function ManageCategoriesScreen() {
                         })}
                         {item.is_recurring && (
                             <View style={styles.badgeRow}>
-                                <View style={styles.repetitiveBadge}>
-                                    <Text style={styles.badgeText}>Repetitive ({item.default_validity} days)</Text>
+                                <View style={[styles.repetitiveBadge, { backgroundColor: colors.primary[50] }]}>
+                                    <Text style={[styles.badgeText, { color: colors.primary[600] }]}>Repetitive ({item.default_validity} days)</Text>
                                 </View>
                             </View>
                         )}
@@ -241,9 +243,9 @@ export default function ManageCategoriesScreen() {
 
             <Modal visible={modalVisible} animationType="slide" transparent>
                 <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
+                    <View style={[styles.modalContent, { backgroundColor: colors.white }]}>
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>
+                            <Text style={[styles.modalTitle, { color: colors.gray[900] }]}>
                                 {editingCatId ? `Edit ${newCatName}` : editingSubName ? `Edit ${editingSubName}` : parentCat ? `Add Subcategory to ${parentCat}` : 'New Category'}
                             </Text>
                             <TouchableOpacity onPress={() => {
@@ -252,43 +254,44 @@ export default function ManageCategoriesScreen() {
                                 setEditingSubName(null);
                                 setNewCatName('');
                             }}>
-                                <X size={24} color="#333" />
+                                <X size={24} color={colors.gray[600] || '#333'} />
                             </TouchableOpacity>
                         </View>
 
                         <TextInput
                             placeholder="Name"
+                            placeholderTextColor={colors.gray[400]}
                             value={newCatName}
                             onChangeText={setNewCatName}
-                            style={styles.input}
+                            style={[styles.input, { backgroundColor: colors.gray[50], color: colors.gray[900], borderColor: colors.gray[200] }]}
                             autoFocus
                         />
 
                         <View style={styles.switchRow}>
-                            <Text style={styles.switchLabel}>
+                            <Text style={[styles.switchLabel, { color: colors.gray[600] }]}>
                                 {parentCat ? "Override repetitive behavior?" : "Is this a repetitive expense?"}
                             </Text>
                             <Switch
                                 value={isRepetitive}
                                 onValueChange={setIsRepetitive}
-                                trackColor={{ false: '#d1d5db', true: '#93c5fd' }}
-                                thumbColor={isRepetitive ? '#2563eb' : '#f3f4f6'}
+                                trackColor={{ false: colors.gray[300], true: colors.primary[200] }}
+                                thumbColor={isRepetitive ? colors.primary[600] : colors.gray[100]}
                             />
                         </View>
 
                         {isRepetitive && (
                             <View style={styles.validityInputRow}>
-                                <Text style={styles.validityLabel}>Default Validity (Days):</Text>
+                                <Text style={[styles.validityLabel, { color: colors.gray[500] }]}>Default Validity (Days):</Text>
                                 <TextInput
                                     value={defaultValidity}
                                     onChangeText={setDefaultValidity}
                                     keyboardType="numeric"
-                                    style={styles.smallInput}
+                                    style={[styles.smallInput, { backgroundColor: colors.gray[50], color: colors.gray[900], borderColor: colors.gray[200] }]}
                                 />
                             </View>
                         )}
 
-                        <TouchableOpacity style={styles.saveBtn} onPress={requestSave}>
+                        <TouchableOpacity style={[styles.saveBtn, { backgroundColor: colors.primary[600] }]} onPress={requestSave}>
                             <Text style={styles.saveText}>Save</Text>
                         </TouchableOpacity>
                     </View>

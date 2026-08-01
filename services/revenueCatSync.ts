@@ -21,6 +21,14 @@ const SYNC_KEYS = {
  */
 export async function syncUserAttributes(): Promise<void> {
   try {
+    // Guard: ensure Purchases SDK is configured before attempting attribute calls
+    try {
+      await Purchases.getCustomerInfo();
+    } catch (_e) {
+      console.warn('syncUserAttributes: Purchases not configured yet, skipping');
+      return;
+    }
+
     // 1. Get transaction count
     await initDatabase();
     const db = getDatabase();
@@ -57,14 +65,11 @@ export async function syncUserAttributes(): Promise<void> {
       user_segment: userSegment,
       app_version: appVersion,
       install_date: installDate,
+      '$displayName': displayName || 'Gastos User',
     };
 
-    if (displayName) {
-      attributes['$displayName'] = displayName;
-      attributes['has_certificate'] = 'true';
-      if (typeof (Purchases as any).setDisplayName === 'function') {
-        await (Purchases as any).setDisplayName(displayName);
-      }
+    if (displayName && displayName !== 'Anonymous User') {
+      attributes['has_name'] = 'true';
     }
     if (certNumber) {
       attributes['certificate_number'] = certNumber;

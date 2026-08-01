@@ -163,6 +163,8 @@ export default function UserNameScreen() {
     try {
       await saveUserName('Anonymous User');
       await generateAndSaveCertificateNumber();
+      // Sync RevenueCat attributes for skipped/anonymous user
+      syncRevenueCatAttributes();
       // Navigate to main dashboard (do NOT show certificate)
       router.replace('/(tabs)');
     } catch (err) {
@@ -171,7 +173,7 @@ export default function UserNameScreen() {
     } finally {
       setLoading(false);
     }
-  }, [loading, router]);
+  }, [loading, router, syncRevenueCatAttributes]);
 
   const showCharCount = name.length > 0;
 

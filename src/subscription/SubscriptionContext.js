@@ -74,12 +74,26 @@ export const SubscriptionProvider = ({ children }) => {
       const devOverride = await AsyncStorage.getItem('dev_force_premium');
       const forcePremium = devOverride === 'true';
 
+      // RESILIENCE: If RC failed AND no trial cache seeded yet → treat as new trial user
+      let finalTrialActive = (forcePremium || isSubscribed) ? false : isTrialOn;
+      if (!forcePremium && !isSubscribed && !isTrialOn) {
+        try {
+          const { getDatabase } = await import('../../services/database');
+          const db = getDatabase();
+          const cacheRow = await db.getFirstAsync('SELECT id FROM subscription_cache LIMIT 1');
+          if (!cacheRow) {
+            // Truly first install with RC unavailable → grant trial
+            finalTrialActive = true;
+          }
+        } catch (_e) { /* DB not ready or missing table */ }
+      }
+
       setState({
         isPremium: forcePremium || isSubscribed,
         tier: forcePremium ? 'premium' : currentTier,
         plan: forcePremium ? 'dev_bypass' : currentPlan,
-        isTrialActive: (forcePremium || isSubscribed) ? false : isTrialOn,
-        trialHoursRemaining: trialHours,
+        isTrialActive: finalTrialActive,
+        trialHoursRemaining: finalTrialActive && trialHours === 0 ? 48 : trialHours,
         loading: false,
       });
     } catch (e) {

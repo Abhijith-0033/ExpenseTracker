@@ -2,7 +2,8 @@ import React, { useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { Trash2, Edit2, Copy, Repeat } from 'lucide-react-native';
-import {  Typography } from '../constants/Theme';
+import { Typography } from '../constants/Theme';
+import { useTheme } from '../context/ThemeContext';
 
 interface SwipeableRowProps {
   children: React.ReactNode;
@@ -20,79 +21,91 @@ export const SwipeableRow: React.FC<SwipeableRowProps> = ({
   onEdit,
   onDuplicate,
   onRepeat,
-  deleteConfirmTitle = "Delete Item",
-  deleteConfirmMessage = "Are you sure you want to delete this?"
 }) => {
   const swipeableRef = useRef<Swipeable>(null);
+  const { colors } = useTheme();
 
   const renderRightActions = (
-    progress: Animated.AnimatedInterpolation<number>,
-    dragX: Animated.AnimatedInterpolation<number>
+    _progress: Animated.AnimatedInterpolation<number>,
+    _dragX: Animated.AnimatedInterpolation<number>
   ) => {
-    const _trans = dragX.interpolate({
-      inputRange: [-144, 0],
-      outputRange: [0, 144],
-    });
+    const actionsCount = (onEdit ? 1 : 0) + (onDelete ? 1 : 0);
+    if (actionsCount === 0) return null;
+    const width = actionsCount * 72;
 
     return (
-      <View style={{ width: 144, flexDirection: 'row' }}>
-        <Animated.View style={{ flex: 1, transform: [{ translateX: 0 }] }}>
-          <TouchableOpacity 
-            style={[styles.action, { backgroundColor: '#2D6EF5' }]}
-            onPress={() => { 
-              swipeableRef.current?.close(); 
-              onEdit?.(); 
-            }}
-          >
-            <Edit2 size={20} color="white" />
-            <Text style={styles.actionLabel}>Edit</Text>
-          </TouchableOpacity>
-        </Animated.View>
-        <Animated.View style={{ flex: 1, transform: [{ translateX: 0 }] }}>
-          <TouchableOpacity 
-            style={[styles.action, { backgroundColor: '#F04438' }]}
-            onPress={() => {
-              swipeableRef.current?.close();
-              onDelete?.();
-            }}
-          >
-            <Trash2 size={20} color="white" />
-            <Text style={styles.actionLabel}>Delete</Text>
-          </TouchableOpacity>
-        </Animated.View>
+      <View style={{ width, flexDirection: 'row' }}>
+        {onEdit && (
+          <View style={{ flex: 1 }}>
+            <TouchableOpacity 
+              style={[styles.action, { backgroundColor: colors.primary[600] }]}
+              onPress={() => { 
+                swipeableRef.current?.close(); 
+                onEdit?.(); 
+              }}
+            >
+              <Edit2 size={20} color="white" />
+              <Text style={styles.actionLabel}>Edit</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        {onDelete && (
+          <View style={{ flex: 1 }}>
+            <TouchableOpacity 
+              style={[styles.action, { backgroundColor: colors.danger[500] || '#F04438' }]}
+              onPress={() => {
+                swipeableRef.current?.close();
+                onDelete?.();
+              }}
+            >
+              <Trash2 size={20} color="white" />
+              <Text style={styles.actionLabel}>Delete</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     );
   };
 
   const renderLeftActions = (
-    progress: Animated.AnimatedInterpolation<number>,
-    dragX: Animated.AnimatedInterpolation<number>
+    _progress: Animated.AnimatedInterpolation<number>,
+    _dragX: Animated.AnimatedInterpolation<number>
   ) => {
+    const hasLeft = onDuplicate || onRepeat;
+    if (!hasLeft) return null;
+
     return (
-      <View style={{ width: 152, flexDirection: 'row' }}>
-         <TouchableOpacity 
-          style={[styles.action, { backgroundColor: '#12B76A', width: 72 }]}
-          onPress={() => { 
-            swipeableRef.current?.close(); 
-            onDuplicate?.(); 
-          }}
-        >
-          <Copy size={20} color="white" />
-          <Text style={styles.actionLabel}>Copy</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.action, { backgroundColor: '#6941C6', width: 80 }]}
-          onPress={() => { 
-            swipeableRef.current?.close(); 
-            onRepeat?.(); 
-          }}
-        >
-          <Repeat size={20} color="white" />
-          <Text style={styles.actionLabel}>Repeat</Text>
-        </TouchableOpacity>
+      <View style={{ flexDirection: 'row' }}>
+        {onDuplicate && (
+          <TouchableOpacity 
+            style={[styles.action, { backgroundColor: '#12B76A', width: 72 }]}
+            onPress={() => { 
+              swipeableRef.current?.close(); 
+              onDuplicate?.(); 
+            }}
+          >
+            <Copy size={20} color="white" />
+            <Text style={styles.actionLabel}>Copy</Text>
+          </TouchableOpacity>
+        )}
+        {onRepeat && (
+          <TouchableOpacity 
+            style={[styles.action, { backgroundColor: '#6941C6', width: 80 }]}
+            onPress={() => { 
+              swipeableRef.current?.close(); 
+              onRepeat?.(); 
+            }}
+          >
+            <Repeat size={20} color="white" />
+            <Text style={styles.actionLabel}>Repeat</Text>
+          </TouchableOpacity>
+        )}
       </View>
     );
   };
+
+  const hasLeft = Boolean(onDuplicate || onRepeat);
+  const hasRight = Boolean(onEdit || onDelete);
 
   return (
     <Swipeable
@@ -100,8 +113,8 @@ export const SwipeableRow: React.FC<SwipeableRowProps> = ({
       friction={2}
       leftThreshold={30}
       rightThreshold={40}
-      renderLeftActions={renderLeftActions}
-      renderRightActions={renderRightActions}
+      renderLeftActions={hasLeft ? renderLeftActions : undefined}
+      renderRightActions={hasRight ? renderRightActions : undefined}
       overshootFriction={8}
     >
       {children}

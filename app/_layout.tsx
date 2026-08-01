@@ -127,14 +127,7 @@ export default function RootLayout() {
         // Run AutoPay for EMI payments
         await runAutoPay();
 
-        // Sync user attributes to RevenueCat (non-blocking)
-        try {
-          const { syncUserAttributes } = await import('../services/revenueCatSync');
-          await syncUserAttributes();
-        } catch (e) {
-          console.warn('Launch RevenueCat sync failed (non-critical):', e);
-        }
-        
+
         // Start Telegram polling (silently fails if not linked)
         startPolling();
         // Register background task (silently fails if package not installed)
