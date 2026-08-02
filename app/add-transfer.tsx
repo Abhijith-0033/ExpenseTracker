@@ -19,6 +19,7 @@ import { PressableScale } from '../components/ui/PressableScale';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SuccessAnimation } from '../components/SuccessAnimation';
+import { TransactionForm } from '../components/transaction/TransactionForm';
 
 const { width } = Dimensions.get('window');
 
@@ -202,116 +203,31 @@ export default function AddTransferScreen() {
     }
 
     return (
-        <View style={styles.container}>
-            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-            <LinearGradient
-                colors={[Colors.primary[500], Colors.accent.peach]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={[styles.header, { paddingTop: insets.top + 10 }]}
-            >
-                <View style={styles.headerTop}>
-                    <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
-                        <X size={24} color="white" />
-                    </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Move Funds</Text>
-                    <View style={{ width: 40 }} />
-                </View>
-
-                {/* Main Display */}
-                <View style={styles.amountContainer}>
-                    <Text style={[styles.currencySymbol, errors.amount && { color: Colors.danger[200] }]}>₹</Text>
-                    <Text style={[styles.amountDisplay, errors.amount && { color: Colors.danger[100] }]} numberOfLines={1} adjustsFontSizeToFit>{display}</Text>
-                </View>
-                {errors.amount && (
-                    <Animated.Text entering={FadeIn.duration(300)} style={styles.inlineErrorTextHeader}>
-                        {errors.amount}
-                    </Animated.Text>
-                )}
-
-                {/* Accounts Row */}
-                <View style={styles.transferFlow}>
-                    <View style={styles.transferRow}>
-                        <PressableScale style={[styles.pill, { flex: 1 }, errors.accounts && { borderColor: Colors.danger[300] }]} onPress={cycleFromAccount}>
-                            <View style={styles.pillIconContainer}>
-                                <WalletIcon size={20} color={Colors.primary[600]} />
-                            </View>
-                            <View style={styles.pillContent}>
-                                <Text style={styles.pillLabel}>From</Text>
-                                <Text style={styles.pillValue} numberOfLines={1}>{fromAccount?.name}</Text>
-                            </View>
-                        </PressableScale>
-
-                        <View style={styles.arrowContainer}>
-                            <ArrowRight size={20} color={Colors.gray[400]} />
-                        </View>
-
-                        <PressableScale style={[styles.pill, { flex: 1 }, errors.accounts && { borderColor: Colors.danger[300] }]} onPress={cycleToAccount}>
-                            <View style={styles.pillIconContainer}>
-                                <WalletIcon size={20} color={Colors.primary[600]} />
-                            </View>
-                            <View style={styles.pillContent}>
-                                <Text style={styles.pillLabel}>To</Text>
-                                <Text style={styles.pillValue} numberOfLines={1}>{toAccount?.name}</Text>
-                            </View>
-                        </PressableScale>
-                    </View>
-                    {errors.accounts && <Text style={styles.pillErrorText}>{errors.accounts}</Text>}
-                </View>
-            </LinearGradient>
-
-            <View style={styles.content}>
-                <View style={styles.inputSection}>
-                    <View style={styles.inputRow}>
-                        <CalendarIcon size={20} color={Colors.gray[400]} />
-                        <TouchableOpacity onPress={() => setShowDatePicker(true)} style={styles.datePickerBtn}>
-                            <Text style={styles.dateText}>{format(date, 'EEEE, MMM dd yyyy')}</Text>
-                        </TouchableOpacity>
-                    </View>
-
-                    <View style={styles.inputRow}>
-                        <ArrowDownUp size={20} color={Colors.gray[400]} />
-                        <TextInput
-                            style={styles.noteInput}
-                            placeholder="What's this transfer for?"
-                            placeholderTextColor={Colors.gray[400]}
-                            value={description}
-                            onChangeText={setDescription}
-                        />
-                    </View>
-                </View>
-
-                <View style={styles.keypadSection}>
-                    <Keypad
-                        onPress={handleKeyPress}
-                        onDelete={handleDelete}
-                        onClear={handleClear}
-                        onSubmit={handleSave}
-                        disabled={isSubmitting}
-                    />
-                </View>
-            </View>
-
-            {showDatePicker && (
-                <DateTimePicker
-                    value={date}
-                    mode="date"
-                    onChange={(event, selectedDate) => {
-                        setShowDatePicker(false);
-                        if (selectedDate) setDate(selectedDate);
-                    }}
-                />
-            )}
-
-            <SuccessAnimation 
-                visible={showSuccess} 
-                onAnimationFinish={() => {
-                    setShowSuccess(false);
-                    router.back();
-                }} 
-                message="Transfer Successful!"
-            />
-        </View>
+        <TransactionForm
+            initialType="transfer"
+            allowTypeSwitch={true}
+            accounts={accounts}
+            display={display}
+            setDisplay={setDisplay}
+            description={description}
+            setDescription={setDescription}
+            fromAccount={fromAccount}
+            setFromAccount={setFromAccount}
+            toAccount={toAccount}
+            setToAccount={setToAccount}
+            date={date}
+            setDate={setDate}
+            errors={errors}
+            onSave={handleSave}
+            onClose={() => router.back()}
+            isSubmitting={isSubmitting}
+            showSuccess={showSuccess}
+            onSuccessFinish={() => {
+                setShowSuccess(false);
+                router.back();
+            }}
+            successMessage="Transfer Successful!"
+        />
     );
 }
 

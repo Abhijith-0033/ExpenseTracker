@@ -195,7 +195,20 @@ export default function RootLayout() {
 
     if (fontsLoaded) {
       prepare();
+      // Setup foreground scheduled expense check on app launch
+      import('../src/scheduled/ScheduledExpenseEngine').then(m => {
+        m.setupForegroundScheduledCheck?.().catch(() => {});
+      }).catch(() => {});
     }
+
+    // AppState listener to re-run scheduled check whenever app becomes active
+    const appStateSub = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        import('../src/scheduled/ScheduledExpenseEngine').then(m => {
+          m.checkAndProcessScheduled?.().catch(() => {});
+        }).catch(() => {});
+      }
+    });
 
     // Handle notification click
     const subscription = Notifications.addNotificationResponseReceivedListener(async response => {
@@ -328,7 +341,10 @@ export default function RootLayout() {
       }
     });
 
-    return () => subscription.remove();
+    return () => {
+      subscription.remove();
+      appStateSub.remove();
+    };
   }, [fontsLoaded, router]);
 
   if (!lockChecked || !fontsLoaded) {

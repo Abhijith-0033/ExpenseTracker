@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Alert, Modal } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useApp } from '../context/AppContext';
-import { addAccount, updateAccount, Account, checkTransactionsExistForAccount, deleteAccount } from '../services/database';
+import { addAccount, updateAccount, Account, checkTransactionsExistForAccount, deleteAccount, getDatabase, initDatabase } from '../services/database';
 import { ConfirmActionSheet, ConfirmActionType } from '../components/ConfirmActionSheet';
 import { SwipeableRow } from '../components/SwipeableRow';
 import { Plus, X, Lock } from 'lucide-react-native';
@@ -60,13 +60,25 @@ export default function ManageAccountsScreen() {
 
     const handleDelete = async (account: Account) => {
         try {
+            await initDatabase();
+            const db = getDatabase();
             const hasTransactions = await checkTransactionsExistForAccount(account.id);
-            if (hasTransactions) {
+            
+            const schedResult = await db.getFirstAsync<{count: number}>(
+                'SELECT COUNT(*) as count FROM scheduled_expenses WHERE account_id = ? AND is_active = 1',
+                [account.id]
+            );
+            const hasScheduled = (schedResult?.count || 0) > 0;
+
+            if (hasTransactions || hasScheduled) {
+                const parts = [];
+                if (hasTransactions) parts.push('transactions');
+                if (hasScheduled) parts.push('scheduled expenses');
                 setConfirmSheet({
-                    title: 'Cannot Delete Account',
-                    description: 'There are transactions associated with this account. Please reassign or delete them first.',
-                    confirmLabel: 'OK',
-                    actionType: 'warning',
+                    title: '🔒 Account In Use',
+                    description: `This account is linked to existing ${parts.join(' and ')}. Please reassign or remove them before deleting this account.`,
+                    confirmLabel: 'Got It',
+                    actionType: 'info',
                     onConfirm: () => setConfirmSheet(null)
                 });
                 return;
@@ -84,7 +96,7 @@ export default function ManageAccountsScreen() {
                 }
             });
         } catch (_e) {
-            Alert.alert("Error", "Failed to check account transactions");
+            Alert.alert("Error", "Failed to check account dependencies");
         }
     };
 

@@ -3,12 +3,12 @@ import {
   View, Text, StyleSheet, TouchableOpacity, Modal,
   Animated, Dimensions, TouchableWithoutFeedback
 } from 'react-native';
-import { Trash2, Edit2, CheckCircle2, AlertTriangle } from 'lucide-react-native';
+import { Trash2, Edit2, CheckCircle2, AlertTriangle, Info } from 'lucide-react-native';
 import { Colors, Typography, Layout } from '../constants/Theme';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-export type ConfirmActionType = 'delete' | 'edit' | 'approve' | 'warning' | 'pay';
+export type ConfirmActionType = 'delete' | 'edit' | 'approve' | 'warning' | 'pay' | 'info';
 
 interface ConfirmActionSheetProps {
   visible: boolean;
@@ -27,6 +27,7 @@ const ICONS: Record<ConfirmActionType, React.ReactNode> = {
   approve: <CheckCircle2 size={28} color={Colors.success[600]} />,
   warning: <AlertTriangle size={28} color={Colors.warning[600]} />,
   pay:     <CheckCircle2 size={28} color={Colors.success[600]} />,
+  info:    <Info size={28} color={Colors.primary[600]} />,
 };
 
 const ICON_BG: Record<ConfirmActionType, string> = {
@@ -35,6 +36,7 @@ const ICON_BG: Record<ConfirmActionType, string> = {
   approve: Colors.success[50],
   warning: '#FEF9C3',
   pay:     Colors.success[50],
+  info:    Colors.primary[50],
 };
 
 export const ConfirmActionSheet: React.FC<ConfirmActionSheetProps> = ({
@@ -92,7 +94,7 @@ export const ConfirmActionSheet: React.FC<ConfirmActionSheetProps> = ({
         {/* Description */}
         <Text style={styles.description}>{description}</Text>
 
-        {/* NOTE: This cannot be undone — shown for delete/warning */}
+        {/* NOTE: This cannot be undone — shown ONLY for delete/warning */}
         {(actionType === 'delete' || actionType === 'warning') && (
           <View style={styles.irreversibleRow}>
             <AlertTriangle size={12} color={Colors.danger[500]} />
@@ -100,11 +102,13 @@ export const ConfirmActionSheet: React.FC<ConfirmActionSheetProps> = ({
           </View>
         )}
 
-        {/* Buttons — always visible above keyboard */}
+        {/* Buttons */}
         <View style={styles.btnRow}>
-          <TouchableOpacity style={styles.cancelBtn} onPress={onCancel} activeOpacity={0.8}>
-            <Text style={styles.cancelBtnText}>Cancel</Text>
-          </TouchableOpacity>
+          {actionType !== 'info' && (
+            <TouchableOpacity style={styles.cancelBtn} onPress={onCancel} activeOpacity={0.8}>
+              <Text style={styles.cancelBtnText}>Cancel</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
             style={[styles.confirmBtn, { backgroundColor: btnColor }]}
             onPress={onConfirm}

@@ -433,3 +433,12 @@ export async function cancelNotificationsForExpense(schedId) {
     console.warn('cancelNotificationsForExpense failed:', e);
   }
 }
+
+export async function setupForegroundScheduledCheck() {
+  try {
+    await checkAndProcessScheduled();
+  } catch (e) {
+    console.warn('setupForegroundScheduledCheck failed:', e);
+  }
+}
+

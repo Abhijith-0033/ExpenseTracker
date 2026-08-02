@@ -316,7 +316,7 @@ export const scheduleDailyReminder = async (): Promise<void> => {
   const masterEnabled = await AsyncStorage.getItem(SETTINGS_KEYS.NOTIF_MASTER_ENABLED);
   const reminderEnabled = await AsyncStorage.getItem(SETTINGS_KEYS.NOTIF_DAILY_REMINDER);
   
-  if (masterEnabled !== 'true' || reminderEnabled !== 'true') {
+  if (masterEnabled === 'false' || reminderEnabled === 'false') {
     await Notifications.cancelScheduledNotificationAsync(NOTIFICATION_IDS.DAILY_EXPENSE_REMINDER);
     return;
   }
@@ -356,7 +356,7 @@ export const scheduleDailyReport = async (): Promise<void> => {
   const masterEnabled = await AsyncStorage.getItem(SETTINGS_KEYS.NOTIF_MASTER_ENABLED);
   const reportEnabled = await AsyncStorage.getItem(SETTINGS_KEYS.NOTIF_DAILY_REPORT);
   
-  if (masterEnabled !== 'true' || reportEnabled !== 'true') {
+  if (masterEnabled === 'false' || reportEnabled === 'false') {
     await Notifications.cancelScheduledNotificationAsync(NOTIFICATION_IDS.DAILY_EXPENSE_REPORT);
     return;
   }

@@ -19,6 +19,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SuccessAnimation } from '../components/SuccessAnimation';
 import { checkDuplicate } from '../services/duplicateCheck';
 import { DuplicateWarningSheet } from '../components/DuplicateWarningSheet';
+import { TransactionForm } from '../components/transaction/TransactionForm';
 
 export default function AddIncomeScreen() {
     const router = useRouter();
@@ -134,7 +135,7 @@ export default function AddIncomeScreen() {
         setDisplay(evaluateExpression(display).toString());
     };
 
-    const [_isSubmitting, setIsSubmitting] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const isSubmittingRef = React.useRef(false);
 
     const handleSave = async () => {
@@ -230,165 +231,47 @@ export default function AddIncomeScreen() {
     }
 
     return (
-        <View style={[commonStyles.screenContainer, { paddingTop: insets.top, paddingBottom: insets.bottom + 16 }]}>
-            <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
-
-            <LinearGradient
-                colors={['rgba(34, 197, 94, 0.08)', 'rgba(255, 255, 255, 0)']}
-                style={StyleSheet.absoluteFill}
-            />
-
-            {/* Header */}
-            <View style={styles.header}>
-                <PressableScale onPress={() => router.back()} style={styles.closeBtn}>
-                    <X size={24} color={Colors.gray[800]} />
-                </PressableScale>
-                <View style={styles.headerTitleContainer}>
-                    <Text style={styles.headerSubtitle}>Adding Money</Text>
-                    <Text style={styles.headerTitle}>New Income</Text>
-                </View>
-                <View style={{ width: 44 }} />
-            </View>
-
-            <ScrollView
-                style={styles.mainScroll}
-                contentContainerStyle={styles.scrollContent}
-                keyboardShouldPersistTaps="handled"
-                showsVerticalScrollIndicator={false}
-            >
-                {/* Main Display */}
-                <View style={styles.displayContainer}>
-                    <View style={styles.amountWrapper}>
-                        <Text style={[styles.currencySymbol, errors.amount && { color: Colors.danger[400] }]}>₹</Text>
-                        <Text style={[styles.amountDisplay, errors.amount && { color: Colors.danger[600] }]} numberOfLines={1} adjustsFontSizeToFit>{display}</Text>
-                    </View>
-                    {errors.amount && (
-                        <Animated.Text entering={FadeIn.duration(300)} style={styles.inlineErrorText}>
-                            {errors.amount}
-                        </Animated.Text>
-                    )}
-                    <View style={styles.incomeBadge}>
-                        <TrendingUp size={14} color={Colors.success[700]} />
-                        <Text style={styles.incomeBadgeText}>Income Entry</Text>
-                    </View>
-                </View>
-
-                {/* Row 1: Date & Account */}
-                <View style={styles.selectorsRow}>
-                    <PressableScale style={[styles.pill, { flex: 1 }]} onPress={() => setShowDatePicker(true)}>
-                        <View style={styles.pillIconContainer}>
-                            <CalendarIcon size={20} color={Colors.success[600]} />
-                        </View>
-                        <View style={styles.pillContent}>
-                            <Text style={styles.pillLabel}>Date</Text>
-                            <Text style={styles.pillValue}>{format(date, 'MMM dd, yyyy')}</Text>
-                        </View>
-                    </PressableScale>
-
-                    <View style={{ flex: 1 }}>
-                        <PressableScale style={[styles.pill, errors.account && { borderColor: Colors.danger[300] }]} onPress={cycleAccount}>
-                            <View style={[styles.pillIconContainer, errors.account && { backgroundColor: Colors.danger[50] }]}>
-                                <WalletIcon size={20} color={errors.account ? Colors.danger[600] : Colors.success[600]} />
-                            </View>
-                            <View style={styles.pillContent}>
-                                <Text style={[styles.pillLabel, errors.account && { color: Colors.danger[400] }]}>Account</Text>
-                                <Text style={[styles.pillValue, errors.account && { color: Colors.danger[600] }]} numberOfLines={1}>
-                                    {selectedAccount ? selectedAccount.name : 'Select'}
-                                </Text>
-                            </View>
-                        </PressableScale>
-                        {errors.account && <Text style={styles.pillErrorText}>{errors.account}</Text>}
-                    </View>
-                </View>
-
-                {/* Source Selection */}
-                <View>
-                    <PressableScale style={[styles.pill, styles.widePill]} onPress={cycleSource}>
-                        <View style={styles.pillIconContainer}>
-                            {/* Simple dynamic icon render */}
-                            {selectedSourceIcon === 'Briefcase' && <Briefcase size={24} color={Colors.success[600]} />}
-                            {selectedSourceIcon === 'Tag' && <TagIcon size={24} color={Colors.success[600]} />}
-                            {selectedSourceIcon === 'TrendingUp' && <TrendingUp size={24} color={Colors.success[600]} />}
-                            {selectedSourceIcon === 'Gift' && <Gift size={24} color={Colors.success[600]} />}
-                            {selectedSourceIcon === 'DollarSign' && <DollarSign size={24} color={Colors.success[600]} />}
-                            {selectedSourceIcon === 'Home' && <Home size={24} color={Colors.success[600]} />}
-                            {selectedSourceIcon === 'Globe' && <Globe size={24} color={Colors.success[600]} />}
-                            {selectedSourceIcon === 'User' && <User size={24} color={Colors.success[600]} />}
-                            {!['Briefcase', 'Tag', 'TrendingUp', 'Gift', 'DollarSign', 'Home', 'Globe', 'User'].includes(selectedSourceIcon) && <DollarSign size={24} color={Colors.success[600]} />}
-                        </View>
-                        <View style={styles.pillContent}>
-                            <Text style={styles.pillLabel}>Income Source</Text>
-                            <Text style={styles.pillValue}>{subcategory}</Text>
-                        </View>
-                        <View style={styles.cycleIcon}>
-                            <ChevronDown size={14} color={Colors.gray[400]} />
-                        </View>
-                    </PressableScale>
-                </View>
-
-                {/* Note Input */}
-                <View style={styles.noteWrapper}>
-                    <TextInput
-                        placeholder="Add a remark for this entry..."
-                        placeholderTextColor={Colors.gray[400]}
-                        value={description}
-                        onChangeText={setDescription}
-                        style={commonStyles.input}
-                    />
-                </View>
-            </ScrollView>
-
-            <View>
-                <Keypad
-                    onPress={handleKeyPress}
-                    onDelete={handleDelete}
-                    onClear={handleClear}
-                    onSubmit={handleSave}
-                    onEvaluate={handleEvaluate}
-                    submitColor={Colors.success[600]}
-                    submitLabel="Save Income"
-                />
-            </View>
-
-            {/* Date Picker Modal */}
-            {showDatePicker && (
-                <DateTimePicker
-                    value={date}
-                    mode="date"
-                    display="default"
-                    onChange={(event, selectedDate) => {
-                        setShowDatePicker(false);
-                        if (selectedDate) setDate(selectedDate);
-                    }}
-                />
-            )}
-
-            <SuccessAnimation 
-                visible={showSuccess} 
-                onAnimationFinish={() => {
-                    setShowSuccess(false);
-                    router.back();
-                }} 
-                message="Income Saved!"
-            />
-
-            <DuplicateWarningSheet 
-                visible={showDuplicateWarning}
-                existingTransaction={duplicateTransaction}
-                onCancel={() => {
-                    setShowDuplicateWarning(false);
-                    setDuplicateTransaction(null);
+        <TransactionForm
+            initialType="income"
+            allowTypeSwitch={true}
+            accounts={accounts}
+            incomeSources={incomeSources}
+            display={display}
+            setDisplay={setDisplay}
+            description={description}
+            setDescription={setDescription}
+            selectedAccount={selectedAccount}
+            setSelectedAccount={setSelectedAccount}
+            category={category}
+            subcategory={subcategory}
+            setSubcategory={setSubcategory}
+            date={date}
+            setDate={setDate}
+            errors={errors}
+            onSave={handleSave}
+            onClose={() => router.back()}
+            isSubmitting={isSubmitting}
+            showSuccess={showSuccess}
+            onSuccessFinish={() => {
+                setShowSuccess(false);
+                router.back();
+            }}
+            successMessage="Income Saved!"
+            showDuplicateWarning={showDuplicateWarning}
+            duplicateTransaction={duplicateTransaction}
+            onDuplicateCancel={() => {
+                setShowDuplicateWarning(false);
+                setDuplicateTransaction(null);
+                pendingSaveDataRef.current = null;
+            }}
+            onDuplicateSaveAnyway={() => {
+                setShowDuplicateWarning(false);
+                if (pendingSaveDataRef.current !== null) {
+                    executeSave(pendingSaveDataRef.current);
                     pendingSaveDataRef.current = null;
-                }}
-                onSaveAnyway={() => {
-                    setShowDuplicateWarning(false);
-                    if (pendingSaveDataRef.current !== null) {
-                        executeSave(pendingSaveDataRef.current);
-                        pendingSaveDataRef.current = null;
-                    }
-                }}
-            />
-        </View>
+                }
+            }}
+        />
     );
 }
 

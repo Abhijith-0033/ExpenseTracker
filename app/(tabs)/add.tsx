@@ -25,6 +25,7 @@ import Animated, { FadeIn, FadeInDown, FadeInUp } from 'react-native-reanimated'
 import { checkDuplicate, getSmartSuggestions, getLastUsedForCategory, SmartSuggestion } from '../../services/duplicateCheck';
 import { DuplicateWarningSheet } from '../../components/DuplicateWarningSheet';
 import { useSubscription } from '../../src/subscription/useSubscription';
+import { TransactionForm } from '../../components/transaction/TransactionForm';
 
 
 
@@ -519,299 +520,63 @@ function AddTransactionContent() {
     }
 
     return (
-        <View style={[styles.container, { paddingTop: insets.top }]}>
-            <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
-
-            {/* Subtle top gradient */}
-            <LinearGradient
-                colors={['rgba(15, 23, 42, 0.05)', 'rgba(255, 255, 255, 0)']}
-                style={StyleSheet.absoluteFill}
-            />
-
-            {/* Header */}
-            <View style={styles.header}>
-                <PressableScale onPress={() => router.back()} style={styles.closeBtn}>
-                    <X size={24} color={Colors.gray[800]} />
-                </PressableScale>
-                <View style={styles.headerTitleContainer}>
-                    <Text style={styles.headerSubtitle}>Money Out</Text>
-                    <Text style={styles.headerTitle}>New Transaction</Text>
-                </View>
-                <TouchableOpacity 
-                    onPress={() => setShowSMSModal(true)}
-                    style={styles.smsBtn}
-                >
-                    <Sparkles size={20} color={Colors.primary[600]} />
-                </TouchableOpacity>
-            </View>
-
-            {/* Main Display */}
-            <View style={styles.displayContainer}>
-                <View style={styles.amountWrapper}>
-                    <Text style={[styles.currencySymbol, errors.amount && { color: Colors.danger[400] }]}>₹</Text>
-                    <Text style={[styles.amountDisplay, errors.amount && { color: Colors.danger[600] }]} numberOfLines={1} adjustsFontSizeToFit>{display}</Text>
-                </View>
-                {errors.amount && (
-                    <Animated.Text entering={FadeIn.duration(300)} style={styles.inlineErrorText}>
-                        {errors.amount}
-                    </Animated.Text>
-                )}
-            </View>
-
-            <ScrollView
-                style={styles.formContainer}
-                keyboardShouldPersistTaps="handled"
-                showsVerticalScrollIndicator={false}
-            >
-                {/* Suggestions Section */}
-                {suggestions.length > 0 && (
-                    <Animated.View entering={FadeInDown.duration(400)} style={styles.suggestionsContainer}>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.suggestionsScroll}>
-                            {suggestions.map((sugg, idx) => (
-                                <TouchableOpacity
-                                    key={idx}
-                                    style={styles.suggestionChip}
-                                    onPress={() => {
-                                        setCategory(sugg.category);
-                                        setSubcategory(sugg.subcategory);
-                                        const acc = accounts.find(a => a.id === sugg.accountId);
-                                        if (acc) setSelectedAccount(acc);
-                                    }}
-                                >
-                                    <Text style={styles.suggestionChipText}>
-                                        ✨ {sugg.category} • {sugg.subcategory || 'General'} • {sugg.accountName}
-                                    </Text>
-                                </TouchableOpacity>
-                            ))}
-                        </ScrollView>
-                    </Animated.View>
-                )}
-
-                {/* Row 1: Date & Account */}
-                <View style={styles.selectorsRow}>
-                    <PressableScale style={[styles.pill, { flex: 1 }]} onPress={() => setShowDatePicker(true)}>
-                        <View style={styles.pillIconContainer}>
-                            <CalendarIcon size={20} color={Colors.primary[600]} />
-                        </View>
-                        <View style={styles.pillContent}>
-                            <Text style={styles.pillLabel}>Date</Text>
-                            <Text style={styles.pillValue}>{format(date, 'MMM dd, yyyy')}</Text>
-                        </View>
-                    </PressableScale>
-
-                    <View style={{ flex: 1 }}>
-                        <PressableScale style={[styles.pill, errors.account && { borderColor: Colors.danger[300] }]} onPress={cycleAccount}>
-                            <View style={[styles.pillIconContainer, errors.account && { backgroundColor: Colors.danger[50] }]}>
-                                <WalletIcon size={20} color={errors.account ? Colors.danger[600] : Colors.primary[600]} />
-                            </View>
-                            <View style={styles.pillContent}>
-                                <Text style={[styles.pillLabel, errors.account && { color: Colors.danger[400] }]}>Account</Text>
-                                <Text style={[styles.pillValue, errors.account && { color: Colors.danger[600] }]} numberOfLines={1}>
-                                    {selectedAccount ? selectedAccount.name : 'Select'}
-                                </Text>
-                            </View>
-                        </PressableScale>
-                        {errors.account && <Text style={styles.pillErrorText}>{errors.account}</Text>}
-                        {isFreeUser && accounts.length > 1 && (
-                            <Text style={{ fontSize: 9, color: Colors.gray[400], marginTop: 4, marginLeft: 4 }}>
-                                🔒 Multi-account requires Premium
-                            </Text>
-                        )}
-                    </View>
-                </View>
-
-                {/* Category Selector */}
-                <View style={{ marginBottom: 16 }}>
-                    <PressableScale 
-                        style={[styles.pill, styles.widePill, { marginBottom: 0 }, errors.category && { borderColor: Colors.danger[300] }]} 
-                        onPress={() => setShowCategoryPicker(true)}
-                    >
-                        <View style={[styles.pillIconContainer, errors.category && { backgroundColor: Colors.danger[50] }]}>
-                            <TagIcon size={20} color={errors.category ? Colors.danger[600] : (category ? Colors.primary[600] : Colors.gray[400])} />
-                        </View>
-                        <View style={styles.pillContent}>
-                            <Text style={[styles.pillLabel, errors.category && { color: Colors.danger[400] }]}>Category</Text>
-                            <Text style={[styles.pillValue, !category && { color: Colors.gray[400] }, errors.category && { color: Colors.danger[600] }]}>
-                                {category ? (subcategory ? `${category}  •  ${subcategory}` : category) : 'Select Category'}
-                            </Text>
-                        </View>
-                        <View style={styles.cycleIcon}>
-                            <ChevronDown size={14} color={errors.category ? Colors.danger[400] : Colors.gray[400]} />
-                        </View>
-                    </PressableScale>
-                    {errors.category && <Text style={styles.pillErrorText}>{errors.category}</Text>}
-                    {lastUsedHint && !errors.category && (
-                        <Text style={styles.hintText}>{lastUsedHint}</Text>
-                    )}
-                </View>
-
-                {/* Note Input */}
-                <View style={styles.noteWrapper}>
-                    <TextInput
-                        placeholder="What was this for? (optional)"
-                        placeholderTextColor={Colors.gray[400]}
-                        value={description}
-                        onChangeText={handleDescriptionChange}
-                        style={styles.input}
-                    />
-                </View>
-
-                {/* Repetitive Status & Validity Options */}
-                {isRecharge && (
-                    <Animated.View entering={FadeInDown.duration(400)} style={styles.rechargeContainer}>
-                        <View style={styles.repetitiveHeader}>
-                            <View style={styles.clockIconContainer}>
-                                <Clock size={16} color={Colors.primary[700]} />
-                            </View>
-                            <Text style={styles.repetitiveHeaderText}>Recurring Expense</Text>
-                            <CheckCircle2 size={16} color={Colors.primary[500]} style={{ marginLeft: 'auto' }} />
-                        </View>
-
-                        <View style={styles.validityOptions}>
-                            <Text style={styles.validityLabel}>Set Validity (Days):</Text>
-                            <View style={styles.validityButtons}>
-                                {[28, 56, 84].map(v => (
-                                    <PressableScale
-                                        key={v}
-                                        style={[styles.vButton, validity === v && styles.vButtonActive]}
-                                        onPress={() => {
-                                            setValidity(v);
-                                            setCustomValidity('');
-                                        }}
-                                    >
-                                        <Text style={[styles.vButtonText, validity === v && styles.vButtonTextActive]}>{v}</Text>
-                                    </PressableScale>
-                                ))}
-                                <PressableScale
-                                    style={[styles.vButton, validity === 0 && styles.vButtonActive]}
-                                    onPress={() => setValidity(0)}
-                                >
-                                    <Text style={[styles.vButtonText, validity === 0 && styles.vButtonTextActive]}>Custom</Text>
-                                </PressableScale>
-                            </View>
-                            {validity === 0 && (
-                                <TextInput
-                                    style={styles.customInput}
-                                    placeholder="Enter days"
-                                    keyboardType="numeric"
-                                    value={customValidity}
-                                    onChangeText={setCustomValidity}
-                                />
-                            )}
-                        </View>
-                    </Animated.View>
-                )}
-            </ScrollView>
-
-
-            <View>
-                <Keypad
-                    onPress={handleKeyPress}
-                    onDelete={handleDelete}
-                    onClear={handleClear}
-                    onSubmit={handleSave}
-                    onEvaluate={handleEvaluate}
-                    disabled={isSubmitting}
-                />
-            </View>
-
-            {/* Date Picker Modal */}
-            {showDatePicker && (
-                <DateTimePicker
-                    value={date}
-                    mode="date"
-                    display="default"
-                    onChange={(event, selectedDate) => {
-                        setShowDatePicker(false);
-                        if (selectedDate) setDate(selectedDate);
-                    }}
-                />
-            )}
-
-            {/* Category Modal */}
-            <CategoryPicker
-                visible={showCategoryPicker}
-                onClose={() => setShowCategoryPicker(false)}
-                onSelect={(cat, sub) => {
-                    setCategory(cat);
-                    setSubcategory(sub);
-
-                    // Check if category is repetitive
-                    const catData = categories.find((c: CategoryNode) => c.name === cat);
-
-                    // Check subcategory override first
-                    const subSetting = catData?.subcategory_settings?.[sub];
-
-                    if (subSetting) {
-                        setIsRecharge(subSetting.is_recurring);
-                        if (subSetting.is_recurring) {
-                            setValidity(subSetting.default_validity || 28);
-                        }
-                    } else if (catData?.is_recurring) {
-                        setIsRecharge(true);
-                        setValidity(catData.default_validity || 28);
-                    } else {
-                        setIsRecharge(false);
-                    }
-                }}
-            />
-
-            <SuccessAnimation 
-                visible={showSuccess} 
-                onAnimationFinish={() => {
-                    setShowSuccess(false);
-                    router.back();
-                }} 
-                message="Expense Saved!"
-            />
-
-            {/* SMS Detection Modal */}
-            <Modal visible={showSMSModal} transparent animationType="slide">
-                <View style={styles.modalOverlay}>
-                    <View style={styles.smsModalContent}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Quick Fill from SMS</Text>
-                            <TouchableOpacity onPress={() => setShowSMSModal(false)}>
-                                <X size={24} color={Colors.gray[500]} />
-                            </TouchableOpacity>
-                        </View>
-                        <Text style={styles.smsHelp}>Paste your bank SMS here to auto-detect amount and description.</Text>
-                        <TextInput
-                            multiline
-                            style={styles.smsInput}
-                            placeholder="Example: Your a/c no. XX1234 is debited for Rs. 500.00 at AMAZON on 23-04-20..."
-                            value={smsText}
-                            onChangeText={setSmsText}
-                        />
-                        <TouchableOpacity 
-                            style={[styles.parseBtn, !smsText && styles.parseBtnDisabled]} 
-                            onPress={handleSMSParse}
-                            disabled={!smsText}
-                        >
-                            <Sparkles size={20} color="white" />
-                            <Text style={styles.parseBtnText}>Detect Details</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </Modal>
-
-            <DuplicateWarningSheet 
-                visible={showDuplicateWarning}
-                existingTransaction={duplicateTransaction}
-                onCancel={() => {
-                    setShowDuplicateWarning(false);
-                    setDuplicateTransaction(null);
+        <TransactionForm
+            initialType="expense"
+            allowTypeSwitch={true}
+            accounts={accounts}
+            categories={categories}
+            display={display}
+            setDisplay={setDisplay}
+            description={description}
+            setDescription={setDescription}
+            selectedAccount={selectedAccount}
+            setSelectedAccount={setSelectedAccount}
+            category={category}
+            setCategory={setCategory}
+            subcategory={subcategory}
+            setSubcategory={setSubcategory}
+            date={date}
+            setDate={setDate}
+            errors={errors}
+            onSave={handleSave}
+            onClose={() => router.back()}
+            isSubmitting={isSubmitting}
+            showSuccess={showSuccess}
+            onSuccessFinish={() => {
+                setShowSuccess(false);
+                router.back();
+            }}
+            successMessage="Expense Saved!"
+            showDuplicateWarning={showDuplicateWarning}
+            duplicateTransaction={duplicateTransaction}
+            onDuplicateCancel={() => {
+                setShowDuplicateWarning(false);
+                setDuplicateTransaction(null);
+                pendingSaveDataRef.current = null;
+            }}
+            onDuplicateSaveAnyway={() => {
+                setShowDuplicateWarning(false);
+                if (pendingSaveDataRef.current !== null) {
+                    executeSave(pendingSaveDataRef.current);
                     pendingSaveDataRef.current = null;
-                }}
-                onSaveAnyway={() => {
-                    setShowDuplicateWarning(false);
-                    if (pendingSaveDataRef.current !== null) {
-                        executeSave(pendingSaveDataRef.current);
-                        pendingSaveDataRef.current = null;
-                    }
-                }}
-            />
-        </View>
+                }
+            }}
+            onCategorySelected={(cat, sub) => {
+                setCategory(cat);
+                setSubcategory(sub);
+                const catData = categories.find((c) => c.name === cat);
+                const subSetting = catData?.subcategory_settings?.[sub];
+                if (subSetting) {
+                    setIsRecharge(subSetting.is_recurring);
+                    if (subSetting.is_recurring) setValidity(subSetting.default_validity || 28);
+                } else if (catData?.is_recurring) {
+                    setIsRecharge(true);
+                    setValidity(catData.default_validity || 28);
+                } else {
+                    setIsRecharge(false);
+                }
+            }}
+        />
     );
 }
 
