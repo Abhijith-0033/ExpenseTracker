@@ -59,6 +59,16 @@ function initTables() {
       category    TEXT NOT NULL,
       synced_at   TEXT DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS subscriptions (
+      id                       INTEGER PRIMARY KEY AUTOINCREMENT,
+      app_user_id              TEXT UNIQUE NOT NULL,
+      plan                     TEXT NOT NULL,
+      status                   TEXT NOT NULL,
+      razorpay_subscription_id TEXT DEFAULT NULL,
+      current_period_end       TEXT DEFAULT NULL,
+      updated_at               TEXT DEFAULT (datetime('now'))
+    );
   `);
 
   // ── Safe migration: add subcategory + account columns if missing ──────────
@@ -70,6 +80,42 @@ function initTables() {
   if (!ptCols.includes('account')) {
     db.exec("ALTER TABLE pending_transactions ADD COLUMN account TEXT DEFAULT NULL;");
   }
+}
+
+// --- Subscription functions ---
+function upsertSubscription(appUserId, subData) {
+  const existing = getSubscription(appUserId);
+  const now = new Date().toISOString();
+  if (existing) {
+    getDb().prepare(`
+      UPDATE subscriptions
+      SET plan = ?, status = ?, razorpay_subscription_id = ?, current_period_end = ?, updated_at = ?
+      WHERE app_user_id = ?
+    `).run(
+      subData.plan,
+      subData.status,
+      subData.razorpay_subscription_id || null,
+      subData.current_period_end || null,
+      now,
+      appUserId
+    );
+  } else {
+    getDb().prepare(`
+      INSERT INTO subscriptions (app_user_id, plan, status, razorpay_subscription_id, current_period_end, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(
+      appUserId,
+      subData.plan,
+      subData.status,
+      subData.razorpay_subscription_id || null,
+      subData.current_period_end || null,
+      now
+    );
+  }
+}
+
+function getSubscription(appUserId) {
+  return getDb().prepare('SELECT * FROM subscriptions WHERE app_user_id = ?').get(appUserId);
 }
 
 // --- User functions ---
@@ -187,4 +233,6 @@ module.exports = {
   updateCommandResult,
   syncCategories,
   getUserCategories,
+  upsertSubscription,
+  getSubscription,
 };
