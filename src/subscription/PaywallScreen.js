@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, ActivityIndicator, Alert, StatusBar, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import { Crown, Check, X, Shield, Sparkles, ArrowRight, Star, Lock } from 'lucide-react-native';
 import { Colors, Typography, Layout } from '../../constants/Theme';
 import { useSubscription } from './useSubscription';
@@ -32,7 +33,7 @@ const TESTIMONIALS = [
 
 export default function PaywallScreen({ showClose = true, context = 'default' }) {
   const router = useRouter();
-  const { purchaseMonthly, purchaseYearly, restorePurchases, isTrialActive, trialHoursRemaining, toggleDevPremium, plan } = useSubscription();
+  const { purchaseMonthly, purchaseYearly, restorePurchases, isTrialActive, trialHoursRemaining, toggleDevPremium, plan, userId, refreshSubscription } = useSubscription();
   const [loading, setLoading] = useState(false);
   const [activeTestimonial, setActiveTestimonial] = useState(0);
 
@@ -74,23 +75,27 @@ export default function PaywallScreen({ showClose = true, context = 'default' })
   }, []);
 
   const handlePurchase = async (type) => {
+    if (!userId) {
+      Alert.alert('Error', 'User ID not ready. Please wait a moment and try again.');
+      return;
+    }
+    
     setLoading(true);
     try {
-      if (type === 'monthly') {
-        await purchaseMonthly();
-      } else {
-        await purchaseYearly();
-      }
-      Alert.alert('Success', 'Thank you for upgrading to Gastos Premium!');
+      const paymentUrl = `https://gastos-payment.netlify.app?userId=${userId}&plan=${type}`;
+      const result = await WebBrowser.openBrowserAsync(paymentUrl);
+      
+      // When the browser closes, refresh the subscription status
+      await refreshSubscription();
+      
+      // Check if they are premium now
+      // Since we can't easily wait for the context to update synchronously here without a complex hook, 
+      // the AppNavigator or the screen itself will pick up the context change and rerender.
       if (showClose) {
         router.back();
       }
     } catch (e) {
-      if (e.message && e.message.includes('User cancelled')) {
-        // Silent cancel
-      } else {
-        Alert.alert('Purchase Failed', e.message || 'Something went wrong during purchase.');
-      }
+      Alert.alert('Payment Error', 'Could not open the payment page.');
     } finally {
       setLoading(false);
     }
