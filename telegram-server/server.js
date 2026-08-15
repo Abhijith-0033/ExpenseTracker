@@ -8,12 +8,29 @@ const db = require('./database');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const APP_SECRET_KEY = process.env.APP_SECRET_KEY || 'default_secret_change_me';
+const APP_SECRET_KEY = process.env.APP_SECRET_KEY;
+if (!APP_SECRET_KEY) {
+  console.error('FATAL: APP_SECRET_KEY environment variable is not set!');
+  process.exit(1);
+}
 
-// ── MIDDLEWARE ────────────────────────────────────────────────────────────────
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+  : '*';
 
-app.use(cors({ origin: '*' }));
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins === '*' || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error('CORS not allowed'), false);
+  }
+}));
 app.use(express.json({ limit: '1mb' }));
+
+function isValidUserId(userId) {
+  return typeof userId === 'string' && userId.trim().length > 0 && userId.length <= 100 && /^[a-zA-Z0-9_\-\.\@]+$/.test(userId);
+}
 
 // Simple in-memory rate limiter (30 req/min per app_user_id)
 const rateLimitMap = new Map();
@@ -151,9 +168,14 @@ app.post('/api/sync-categories', requireSecret, (req, res) => {
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
 
+if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+  console.error('FATAL: RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET must be set as environment variables!');
+  process.exit(1);
+}
+
 const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID || 'rzp_live_TQ4zLijK14x3ZC',
-  key_secret: process.env.RAZORPAY_KEY_SECRET || '4DdgWWToS7w2eHhclpui3KlL',
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
 
 const PLAN_IDS = {
@@ -162,10 +184,10 @@ const PLAN_IDS = {
 };
 
 // POST /api/create-subscription — Creates Razorpay subscription for monthly/yearly
-app.post('/api/create-subscription', requireSecret, async (req, res) => {
+app.post('/api/create-subscription', async (req, res) => {
   const { userId, plan } = req.body;
 
-  if (!userId || !plan || !PLAN_IDS[plan]) {
+  if (!isValidUserId(userId) || !plan || !PLAN_IDS[plan]) {
     return res.status(400).json({ error: 'Invalid userId or plan' });
   }
 
@@ -192,11 +214,11 @@ app.post('/api/create-subscription', requireSecret, async (req, res) => {
 });
 
 // POST /api/create-order — Creates Razorpay One-Time Order for Lifetime plan (₹999)
-app.post('/api/create-order', requireSecret, async (req, res) => {
+app.post('/api/create-order', async (req, res) => {
   const { userId, amount, plan } = req.body;
 
-  if (!userId || !amount) {
-    return res.status(400).json({ error: 'userId and amount are required' });
+  if (!isValidUserId(userId) || !amount) {
+    return res.status(400).json({ error: 'Invalid userId or amount' });
   }
 
   if (parseInt(amount) !== 99900) {
@@ -226,18 +248,25 @@ app.post('/api/create-order', requireSecret, async (req, res) => {
 
 // POST /api/razorpay-webhook — Handles Razorpay webhook notifications
 app.post('/api/razorpay-webhook', async (req, res) => {
-  const secret = process.env.RAZORPAY_WEBHOOK_SECRET || 'gastosWebhook2026SecretKey';
+  const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
+  if (!secret) {
+    console.error('[Webhook] RAZORPAY_WEBHOOK_SECRET is not set!');
+    return res.status(500).json({ error: 'Server misconfiguration' });
+  }
+
   const signature = req.headers['x-razorpay-signature'];
+  if (!signature) {
+    console.warn('[Webhook] Missing signature header — rejected');
+    return res.status(400).json({ error: 'Missing signature' });
+  }
 
-  if (signature) {
-    const shasum = crypto.createHmac('sha256', secret);
-    shasum.update(JSON.stringify(req.body));
-    const digest = shasum.digest('hex');
+  const shasum = crypto.createHmac('sha256', secret);
+  shasum.update(JSON.stringify(req.body));
+  const digest = shasum.digest('hex');
 
-    if (digest !== signature) {
-      console.warn('[Webhook] Invalid signature');
-      return res.status(400).json({ error: 'Invalid signature' });
-    }
+  if (!crypto.timingSafeEqual(Buffer.from(digest, 'hex'), Buffer.from(signature, 'hex'))) {
+    console.warn('[Webhook] Invalid signature — rejected');
+    return res.status(400).json({ error: 'Invalid signature' });
   }
 
   const { event, payload } = req.body;
