@@ -43,20 +43,25 @@ function DashboardContent() {
   const { accounts, refreshData, dataVersion } = useApp();
   const { colors, typography, radius, isDark, themeConfig, dashboardWidgets } = useTheme();
   const [refreshing, setRefreshing] = useState(false);
-  const { isPremium: _isPremium, isTrialActive, trialHoursRemaining } = useSubscription();
+  const { isPremium, isTrialActive, trialHoursRemaining, trialDaysRemaining } = useSubscription();
   const [showBanner, setShowBanner] = useState(false);
 
   useEffect(() => {
-    if (isTrialActive) {
+    if (isPremium) {
+      setShowBanner(false);
+    } else if (isTrialActive) {
       shouldShowTrialBanner().then(setShowBanner);
     } else {
-      setShowBanner(false);
+      // Trial expired & not premium -> Always show non-dismissible expired banner
+      setShowBanner(true);
     }
-  }, [isTrialActive]);
+  }, [isPremium, isTrialActive]);
 
   const handleDismissBanner = async () => {
-    await dismissTrialBannerForOneHour();
-    setShowBanner(false);
+    if (isTrialActive) {
+      await dismissTrialBannerForOneHour();
+      setShowBanner(false);
+    }
   };
 
   // Dashboard Summaries State
@@ -428,30 +433,38 @@ function DashboardContent() {
             </View>
           </View>
 
-          {/* Trial Expiry Banner */}
-          {showBanner && (
-            <View style={styles.trialBanner}>
+          {/* Trial / Expiry Banner */}
+          {showBanner && !isPremium && (
+            <View style={[styles.trialBanner, !isTrialActive && { backgroundColor: Colors.danger[600] }]}>
               <TouchableOpacity 
                 activeOpacity={0.9} 
-                style={styles.trialBannerContent}
-                onPress={() => router.push('/paywall')}
+                style={[styles.trialBannerContent, !isTrialActive && { backgroundColor: Colors.danger[600] }]}
+                onPress={() => router.push(isTrialActive ? '/paywall' : '/trial-end')}
               >
                 <View style={styles.trialBannerLeft}>
                   <View style={styles.trialBannerIconContainer}>
                     <Lock size={16} color="#FFF" />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.trialBannerTitle}>Premium Trial Active</Text>
-                    <Text style={styles.trialBannerSub}>Only {Math.max(1, Math.round(trialHoursRemaining))} hours remaining. Tap to secure access forever.</Text>
+                    <Text style={styles.trialBannerTitle}>
+                      {isTrialActive ? `Free Trial: ${trialDaysRemaining > 1 ? `${trialDaysRemaining} days` : `${trialHoursRemaining} hours`} left` : 'Free Trial Expired'}
+                    </Text>
+                    <Text style={styles.trialBannerSub}>
+                      {isTrialActive 
+                        ? 'Tap to secure Gastos Premium & unlock all feature modules.' 
+                        : 'Tap here to upgrade and resume full access to your finances.'}
+                    </Text>
                   </View>
                 </View>
-                <TouchableOpacity 
-                  style={styles.trialDismissBtn} 
-                  onPress={handleDismissBanner}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                  <X size={16} color="rgba(255,255,255,0.7)" />
-                </TouchableOpacity>
+                {isTrialActive && (
+                  <TouchableOpacity 
+                    style={styles.trialDismissBtn} 
+                    onPress={handleDismissBanner}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <X size={16} color="rgba(255,255,255,0.7)" />
+                  </TouchableOpacity>
+                )}
               </TouchableOpacity>
             </View>
           )}

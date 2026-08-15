@@ -10,8 +10,21 @@ import { getFundStatus, SinkingFund } from '../../services/sinkingfunds/SinkingF
 import { Snackbar } from '../../components/Snackbar';
 import { format } from 'date-fns';
 import { ConfirmActionSheet, ConfirmActionType } from '../../components/ConfirmActionSheet';
+import { SubscriptionGate } from '../../src/subscription/SubscriptionGate';
 
 export default function SinkingFundsScreen() {
+  return (
+    <SubscriptionGate
+      feature="sinking_funds"
+      title="Sinking Funds is Premium"
+      description="Save monthly for predictable big expenses like insurance premiums, festivals, and holidays."
+    >
+      <SinkingFundsContent />
+    </SubscriptionGate>
+  );
+}
+
+function SinkingFundsContent() {
   const router = useRouter();
   const [funds, setFunds] = useState<(SinkingFund & { totalSaved: number })[]>([]);
   const [loading, setLoading] = useState(true);

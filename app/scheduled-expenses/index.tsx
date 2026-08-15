@@ -14,10 +14,21 @@ import { formatCurrency } from '../../utils/currency';
 import { getDatabase , getAllScheduledExpenses, getScheduledExpenseStats, updateScheduledExpense, ScheduledExpenseJoined } from '../../services/database';
 import { scheduleNotificationsForExpense, cancelNotificationsForExpense } from '../../src/scheduled/ScheduledExpenseEngine';
 import { ConfirmActionSheet } from '../../components/ConfirmActionSheet';
-
-const DAYS_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+import { SubscriptionGate } from '../../src/subscription/SubscriptionGate';
 
 export default function ScheduledExpensesIndex() {
+  return (
+    <SubscriptionGate
+      feature="scheduled_expenses"
+      title="Scheduled Expenses is Premium"
+      description="Automate daily, weekly, or monthly expense creation and push approvals with Gastos Premium."
+    >
+      <ScheduledExpensesContent />
+    </SubscriptionGate>
+  );
+}
+
+function ScheduledExpensesContent() {
   const router = useRouter();
     
   const [schedules, setSchedules] = useState<ScheduledExpenseJoined[]>([]);

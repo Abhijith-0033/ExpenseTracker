@@ -16,8 +16,21 @@ import { formatAmount } from '../utils/formatAmount';
 import { FormField } from '../components/FormField';
 import { Snackbar } from '../components/Snackbar';
 import { ConfirmActionSheet, ConfirmActionType } from '../components/ConfirmActionSheet';
+import { SubscriptionGate } from '../src/subscription/SubscriptionGate';
 
 export default function SubscriptionsScreen() {
+  return (
+    <SubscriptionGate
+      feature="subscriptions_tracker"
+      title="Subscription Tracker is Premium"
+      description="Keep track of recurring software, OTT, and utility subscriptions with renewal reminders."
+    >
+      <SubscriptionsContent />
+    </SubscriptionGate>
+  );
+}
+
+function SubscriptionsContent() {
     const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
     const [monthlyBurn, setMonthlyBurn] = useState(0);
     const [activeTab, setActiveTab] = useState<'active' | 'cancelled'>('active');

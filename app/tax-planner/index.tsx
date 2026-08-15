@@ -15,8 +15,21 @@ import {
 import {
   compareRegimes, suggestRemainingInvestment, TaxProfile, TaxDeduction
 } from '../../services/taxplanner/TaxEngine';
+import { SubscriptionGate } from '../../src/subscription/SubscriptionGate';
 
 export default function TaxPlannerScreen() {
+  return (
+    <SubscriptionGate
+      feature="tax_planner"
+      title="Tax Planner is Premium"
+      description="Estimate annual tax liability, compare old vs new regime side-by-side, and track deductions."
+    >
+      <TaxPlannerContent />
+    </SubscriptionGate>
+  );
+}
+
+function TaxPlannerContent() {
   const router = useRouter();
   const currentFY = getCurrentFY();
 

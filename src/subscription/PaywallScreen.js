@@ -33,7 +33,7 @@ const TESTIMONIALS = [
 
 export default function PaywallScreen({ showClose = true, context = 'default' }) {
   const router = useRouter();
-  const { purchaseMonthly, purchaseYearly, restorePurchases, isTrialActive, trialHoursRemaining, toggleDevPremium, plan, userId, refreshSubscription } = useSubscription();
+  const { purchaseMonthly, purchaseYearly, purchaseLifetime, restorePurchases, isTrialActive, trialHoursRemaining, plan, userId, refreshSubscription } = useSubscription();
   const [loading, setLoading] = useState(false);
   const [activeTestimonial, setActiveTestimonial] = useState(0);
 
@@ -187,6 +187,29 @@ export default function PaywallScreen({ showClose = true, context = 'default' })
 
         {/* Pricing Cards */}
         <View style={styles.pricingContainer}>
+          {/* Lifetime Card */}
+          <TouchableOpacity 
+            style={[styles.pricingCard, styles.monthlyCard]} 
+            activeOpacity={0.9}
+            onPress={() => handlePurchase('lifetime')}
+          >
+            <View style={[styles.bestValueBadge, { backgroundColor: '#E0F2FE' }]}>
+              <Text style={[styles.bestValueText, { color: '#0369A1' }]}>FOREVER</Text>
+            </View>
+            <Text style={[styles.planTitle, { color: Colors.white }]}>Lifetime Access</Text>
+            <View style={styles.priceRow}>
+              <Text style={[styles.currencySymbol, { color: Colors.gray[300] }]}>₹</Text>
+              <Text style={[styles.priceValue, { color: Colors.white }]}>999</Text>
+              <Text style={[styles.priceDuration, { color: Colors.gray[400] }]}>/ lifetime</Text>
+            </View>
+            <Text style={[styles.priceMeta, { color: Colors.gray[400] }]}>Pay once. Premium forever.</Text>
+            
+            <View style={[styles.buyButton, styles.monthlyBuyButton]}>
+              <Text style={[styles.buyButtonText, { color: Colors.white }]}>Get Lifetime Access</Text>
+              <ArrowRight size={16} color={Colors.white} />
+            </View>
+          </TouchableOpacity>
+
           {/* Yearly Card (Recommended) */}
           <TouchableOpacity 
             style={[styles.pricingCard, styles.yearlyCard]} 
@@ -199,13 +222,13 @@ export default function PaywallScreen({ showClose = true, context = 'default' })
             <Text style={styles.planTitle}>Yearly Access</Text>
             <View style={styles.priceRow}>
               <Text style={styles.currencySymbol}>₹</Text>
-              <Text style={styles.priceValue}>799</Text>
+              <Text style={styles.priceValue}>333</Text>
               <Text style={styles.priceDuration}>/ year</Text>
             </View>
             
             {/* Yearly strike-through pricing comparison */}
             <Text style={styles.priceMeta}>
-              ₹66.58/month · <Text style={{ textDecorationLine: 'line-through', opacity: 0.7 }}>₹1,188/year if monthly</Text> (Save 33%)
+              ₹27.75/month · <Text style={{ textDecorationLine: 'line-through', opacity: 0.7 }}>₹348/year if monthly</Text> (Save 4%)
             </Text>
             
             <View style={[styles.buyButton, styles.yearlyBuyButton]}>
@@ -223,7 +246,7 @@ export default function PaywallScreen({ showClose = true, context = 'default' })
             <Text style={[styles.planTitle, { color: Colors.white }]}>Monthly Pass</Text>
             <View style={styles.priceRow}>
               <Text style={[styles.currencySymbol, { color: Colors.gray[300] }]}>₹</Text>
-              <Text style={[styles.priceValue, { color: Colors.white }]}>99</Text>
+              <Text style={[styles.priceValue, { color: Colors.white }]}>29</Text>
               <Text style={[styles.priceDuration, { color: Colors.gray[400] }]}>/ month</Text>
             </View>
             <Text style={[styles.priceMeta, { color: Colors.gray[400] }]}>Billed monthly. Cancel anytime.</Text>
@@ -368,22 +391,6 @@ export default function PaywallScreen({ showClose = true, context = 'default' })
 
         {/* Restore purchases & privacy */}
         <View style={styles.footerContainer}>
-          {__DEV__ && (
-            <TouchableOpacity 
-              style={styles.devBypassBtn} 
-              onPress={async () => {
-                await toggleDevPremium();
-                Alert.alert('Dev Mode', 'Subscription state toggled!');
-                if (showClose) {
-                  router.back();
-                }
-              }}
-            >
-              <Sparkles size={14} color={Colors.warning[500]} style={{ marginRight: 6 }} />
-              <Text style={styles.devBypassText}>DEBUG: Toggle Premium Bypass</Text>
-            </TouchableOpacity>
-          )}
-
           <TouchableOpacity style={styles.restoreBtn} onPress={handleRestore}>
             <Shield size={14} color={Colors.gray[400]} style={{ marginRight: 6 }} />
             <Text style={styles.restoreBtnText}>Restore Purchases</Text>

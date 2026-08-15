@@ -27,8 +27,21 @@ const ProgressRing = ({ progress, size = 60, strokeWidth = 6, color = Colors.pri
         </Svg>
     );
 };
+import { SubscriptionGate } from '../src/subscription/SubscriptionGate';
 
 export default function SavingsGoalsScreen() {
+  return (
+    <SubscriptionGate
+      feature="savings_goals"
+      title="Savings Goals is Premium"
+      description="Track progress towards target savings goals with weekly progress calculations and rings."
+    >
+      <SavingsGoalsContent />
+    </SubscriptionGate>
+  );
+}
+
+function SavingsGoalsContent() {
     const [goals, setGoals] = useState<SavingsGoal[]>([]);
     const [completedGoals, setCompletedGoals] = useState<SavingsGoal[]>([]);
     const [showAddModal, setShowAddModal] = useState(false);

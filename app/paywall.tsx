@@ -1,12 +1,6 @@
-import React, { useEffect } from 'react';
-import { useRouter } from 'expo-router';
+import React from 'react';
+import PaywallScreen from '../src/subscription/PaywallScreen';
 
 export default function PaywallRoute() {
-  const router = useRouter();
-
-  useEffect(() => {
-    router.replace('/');
-  }, [router]);
-
-  return null;
+  return <PaywallScreen showClose={true} />;
 }

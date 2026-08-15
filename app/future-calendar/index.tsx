@@ -15,8 +15,21 @@ const TYPE_COLORS: Record<FutureEvent['type'], string> = {
   emi: '#7C3AED', subscription: '#F59E0B', recurring: '#0BA5EC',
   debt: '#EF4444', chit: '#10B981', sinking_fund: '#14B8A6', income: '#12B76A',
 };
+import { SubscriptionGate } from '../../src/subscription/SubscriptionGate';
 
 export default function FutureCalendarScreen() {
+  return (
+    <SubscriptionGate
+      feature="future_calendar"
+      title="Future Calendar is Premium"
+      description="Forecast your upcoming 90 days of bills, subscriptions, EMIs, and recurring expenses."
+    >
+      <FutureCalendarContent />
+    </SubscriptionGate>
+  );
+}
+
+function FutureCalendarContent() {
   const router = useRouter();
   const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
   const [currentMonth, setCurrentMonth] = useState(new Date());

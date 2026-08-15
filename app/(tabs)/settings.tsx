@@ -9,20 +9,37 @@ import { useTheme } from '../../context/ThemeContext';
 import { Colors, Typography, Layout } from '../../constants/Theme';
 import { checkReminderStatus, scheduleDailyReminder } from '../../services/notifications';
 import { exportData, exportCSV, restoreData } from '../../services/backup';
+import { Crown, Sparkles } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useSubscription } from '../../src/subscription/useSubscription';
+
 function SettingsContent() {
     const router = useRouter();
     const { soundEnabled, setSoundEnabled } = useApp();
+    const { isPremium, isTrialActive, trialDaysRemaining, trialHoursRemaining, restorePurchases } = useSubscription();
     const [reminderEnabled, setReminderEnabled] = useState(true);
 
     const handleBackupJSON = () => {
+        if (!isPremium && !isTrialActive) {
+            router.push('/paywall');
+            return;
+        }
         exportData();
     };
 
     const handleExportCSV = () => {
+        if (!isPremium && !isTrialActive) {
+            router.push('/paywall');
+            return;
+        }
         exportCSV();
     };
 
     const handleRestore = () => {
+        if (!isPremium && !isTrialActive) {
+            router.push('/paywall');
+            return;
+        }
         restoreData();
     };
 
@@ -49,6 +66,52 @@ function SettingsContent() {
         <ScrollView style={styles.container}>
             <Text style={styles.headerTitle}>Settings</Text>
 
+            {/* Premium Status Header Card */}
+            <View style={styles.premiumCardContainer}>
+                {isPremium ? (
+                    <View style={[styles.premiumCard, styles.premiumCardActive]}>
+                        <View style={styles.premiumHeader}>
+                            <Crown size={24} color="#EAB308" style={{ marginRight: 8 }} />
+                            <Text style={[styles.premiumTitle, { color: Colors.white }]}>Gastos Premium Active</Text>
+                        </View>
+                        <Text style={[styles.premiumDesc, { color: 'rgba(255,255,255,0.8)' }]}>
+                            You have unlimited access to all features, reports, and modules.
+                        </Text>
+                        <View style={styles.premiumActionRow}>
+                            <TouchableOpacity style={styles.restoreBtn} onPress={() => router.push('/paywall')}>
+                                <Text style={styles.restoreBtnText}>View Plan Details</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                ) : (
+                    <LinearGradient
+                        colors={[Colors.primary[600], Colors.primary[800]]}
+                        style={styles.premiumCard}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                    >
+                        <View style={styles.premiumHeader}>
+                            <Crown size={24} color="#FACC15" style={{ marginRight: 8 }} />
+                            <Text style={[styles.premiumTitle, { color: Colors.white }]}>
+                                {isTrialActive ? `Free Trial: ${trialDaysRemaining > 1 ? `${trialDaysRemaining} days` : `${trialHoursRemaining} hours`} left` : 'Unlock Gastos Premium'}
+                            </Text>
+                        </View>
+                        <Text style={[styles.premiumDesc, { color: 'rgba(255,255,255,0.85)' }]}>
+                            {isTrialActive 
+                                ? 'Upgrade today to lock in full access to EMI, Debt, Sinking Funds & reports.' 
+                                : 'Your trial has ended. Upgrade to regain full access to advanced features.'}
+                        </Text>
+                        <View style={styles.premiumActionRow}>
+                            <TouchableOpacity style={styles.upgradeBtn} onPress={() => router.push('/paywall')}>
+                                <Text style={styles.upgradeBtnText}>Get Premium</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.restoreBtnLink} onPress={restorePurchases}>
+                                <Text style={[styles.restoreBtnLinkText, { color: Colors.white }]}>Restore</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </LinearGradient>
+                )}
+            </View>
 
             <View style={styles.section}>
                 <Text style={styles.sectionTitle}>General</Text>

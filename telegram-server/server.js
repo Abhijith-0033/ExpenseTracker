@@ -152,13 +152,13 @@ const Razorpay = require('razorpay');
 const crypto = require('crypto');
 
 const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_TPz58kY38e4DDc',
-  key_secret: process.env.RAZORPAY_KEY_SECRET || '6693V7PqLIRdvcxP2DhppQaM',
+  key_id: process.env.RAZORPAY_KEY_ID || 'rzp_live_TQ4zLijK14x3ZC',
+  key_secret: process.env.RAZORPAY_KEY_SECRET || '4DdgWWToS7w2eHhclpui3KlL',
 });
 
 const PLAN_IDS = {
-  monthly: process.env.RAZORPAY_MONTHLY_PLAN_ID || 'plan_TPywoFrCTxtzZN',
-  yearly: process.env.RAZORPAY_YEARLY_PLAN_ID || 'plan_TPz0CFJt6Nu9ay',
+  monthly: process.env.RAZORPAY_MONTHLY_PLAN_ID || 'plan_TQ52ylgvxoCH5I',
+  yearly: process.env.RAZORPAY_YEARLY_PLAN_ID || 'plan_TQ52z2AY8v0Qk3',
 };
 
 // POST /api/create-subscription — Creates Razorpay subscription for monthly/yearly
@@ -207,7 +207,7 @@ app.post('/api/create-order', requireSecret, async (req, res) => {
     const order = await razorpay.orders.create({
       amount: 99900,
       currency: 'INR',
-      receipt: `gastos_lifetime_${userId}_${Date.now()}`,
+      receipt: `rcpt_${userId.substring(0, 15)}_${Date.now()}`.substring(0, 40),
       notes: { userId, plan: 'lifetime' },
     });
 

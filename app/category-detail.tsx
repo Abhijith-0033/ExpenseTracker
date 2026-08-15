@@ -14,9 +14,21 @@ import { TransactionList } from '../components/TransactionList';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-type Period = 'Last 6M' | 'This Year' | 'All Time';
+import { SubscriptionGate } from '../src/subscription/SubscriptionGate';
 
 export default function CategoryDetailScreen() {
+  return (
+    <SubscriptionGate
+      feature="category_detail"
+      title="Category Insights is Premium"
+      description="View subcategory breakdowns, essential vs non-essential classification, and spending trends."
+    >
+      <CategoryDetailContent />
+    </SubscriptionGate>
+  );
+}
+
+function CategoryDetailContent() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const params = useLocalSearchParams();

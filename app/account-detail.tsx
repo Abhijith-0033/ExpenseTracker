@@ -14,9 +14,21 @@ import { TransactionList } from '../components/TransactionList';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-type Period = 'This Month' | 'Last 3M' | 'This Year' | 'All Time';
+import { SubscriptionGate } from '../src/subscription/SubscriptionGate';
 
 export default function AccountDetailScreen() {
+  return (
+    <SubscriptionGate
+      feature="account_detail"
+      title="Account Insights is Premium"
+      description="View cash flow graphs, historical balance trends, and account analytics with Gastos Premium."
+    >
+      <AccountDetailContent />
+    </SubscriptionGate>
+  );
+}
+
+function AccountDetailContent() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const params = useLocalSearchParams();

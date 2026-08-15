@@ -38,8 +38,21 @@ const getSourceIcon = (source: string) => {
         default: return <DollarSign size={20} color={Colors.white} />;
     }
 };
+import { SubscriptionGate } from '../src/subscription/SubscriptionGate';
 
 export default function IncomeBreakdownScreen() {
+  return (
+    <SubscriptionGate
+      feature="income_breakdown"
+      title="Income Breakdown is Premium"
+      description="View detailed breakdowns of your salary, freelance, investments, and monthly income trends."
+    >
+      <IncomeBreakdownContent />
+    </SubscriptionGate>
+  );
+}
+
+function IncomeBreakdownContent() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
 

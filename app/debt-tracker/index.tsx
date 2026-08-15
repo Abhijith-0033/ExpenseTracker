@@ -9,10 +9,21 @@ import { formatCurrency } from '../../utils/currency';
 import { Snackbar } from '../../components/Snackbar';
 import { Swipeable } from 'react-native-gesture-handler';
 import { ConfirmActionSheet } from '../../components/ConfirmActionSheet';
-
-type FilterType = 'all' | 'borrowed' | 'lent' | 'completed';
+import { SubscriptionGate } from '../../src/subscription/SubscriptionGate';
 
 export default function DebtTrackerScreen() {
+  return (
+    <SubscriptionGate
+      feature="debt_tracker"
+      title="Debt Tracker is Premium"
+      description="Track money you owe or are owed with full interest calculation and repayment history."
+    >
+      <DebtTrackerContent />
+    </SubscriptionGate>
+  );
+}
+
+function DebtTrackerContent() {
   const router = useRouter();
   const [debts, setDebts] = useState<DebtRecord[]>([]);
   const [filteredDebts, setFilteredDebts] = useState<DebtRecord[]>([]);

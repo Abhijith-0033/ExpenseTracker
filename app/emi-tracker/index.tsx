@@ -8,8 +8,21 @@ import { getEMIRecords, getEMIPayments, deleteEMIRecord, EMIRecord } from '../..
 import { SwipeableRow } from '../../components/SwipeableRow';
 import { initDatabase } from '../../services/database';
 import { ConfirmActionSheet } from '../../components/ConfirmActionSheet';
+import { SubscriptionGate } from '../../src/subscription/SubscriptionGate';
 
 export default function EMITrackerScreen() {
+  return (
+    <SubscriptionGate
+      feature="emi_tracker"
+      title="EMI Tracker is Premium"
+      description="Track loan EMIs, schedule auto-pay, and view payoff progress with Gastos Premium."
+    >
+      <EMITrackerContent />
+    </SubscriptionGate>
+  );
+}
+
+function EMITrackerContent() {
   const router = useRouter();
   const [emiRecords, setEMIRecords] = useState<EMIRecord[]>([]);
   const [paymentStats, setPaymentStats] = useState<{ pending: number; overdue: number; paid: number }>({

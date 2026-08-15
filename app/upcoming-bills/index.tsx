@@ -20,8 +20,21 @@ import { useApp } from '../../context/AppContext';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { SwipeableRow } from '../../components/SwipeableRow';
 import { ConfirmActionSheet } from '../../components/ConfirmActionSheet';
+import { SubscriptionGate } from '../../src/subscription/SubscriptionGate';
 
 export default function UpcomingBillsIndex() {
+  return (
+    <SubscriptionGate
+      feature="upcoming_bills"
+      title="Upcoming Bills is Premium"
+      description="Track pending & overdue bills, get automatic pay reminders, and snooze bills."
+    >
+      <UpcomingBillsContent />
+    </SubscriptionGate>
+  );
+}
+
+function UpcomingBillsContent() {
   const router = useRouter();
   const { accounts, refreshData } = useApp();
 

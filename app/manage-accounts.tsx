@@ -11,10 +11,13 @@ import { formatCurrency } from '../utils/currency';
 import { Colors, Layout, Typography } from '../constants/Theme';
 import { useTheme } from '../context/ThemeContext';
 import { useRouter } from 'expo-router';
+import { useSubscription } from '../src/subscription/useSubscription';
+
 export default function ManageAccountsScreen() {
     const router = useRouter();
     const { accounts, refreshData } = useApp();
     const { colors } = useTheme();
+    const { isPremium, isTrialActive } = useSubscription();
 
     const [modalVisible, setModalVisible] = useState(false);
     const [editingAccount, setEditingAccount] = useState<Account | null>(null);
@@ -33,6 +36,10 @@ export default function ManageAccountsScreen() {
     const [type, setType] = useState('General');
 
     const openAdd = () => {
+        if (!isPremium && !isTrialActive && accounts.length >= 1) {
+            router.push('/paywall');
+            return;
+        }
         setEditingAccount(null);
         setName('');
         setBalance('');

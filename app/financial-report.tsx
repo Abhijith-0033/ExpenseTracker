@@ -9,8 +9,21 @@ import { Button } from '../components/ui/Button';
 import { MonthlyReport, generateMonthlyReportData, exportReportAsPDF } from '../services/financialReport';
 import { formatCurrency } from '../utils/currency';
 import { format, subMonths, addMonths } from 'date-fns';
-import { BarChart, PieChart } from 'react-native-gifted-charts';
+import { SubscriptionGate } from '../src/subscription/SubscriptionGate';
+
 export default function FinancialReportScreen() {
+  return (
+    <SubscriptionGate
+      feature="financial_report"
+      title="Financial Report is Premium"
+      description="Generate monthly PDF financial reports, income vs expense breakdowns, and health scores."
+    >
+      <FinancialReportContent />
+    </SubscriptionGate>
+  );
+}
+
+function FinancialReportContent() {
     const [selectedMonth, setSelectedMonth] = useState(new Date());
     const [report, setReport] = useState<MonthlyReport | null>(null);
     const [loading, setLoading] = useState(true);

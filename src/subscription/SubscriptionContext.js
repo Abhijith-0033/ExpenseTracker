@@ -1,34 +1,52 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { AppState } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import * as Crypto from 'expo-crypto';
+import { getSubscriptionStatus, purchaseMonthly as buyMonthly, purchaseYearly as buyYearly, purchaseLifetime as buyLifetime, restorePurchases as restoreStatus } from './SubscriptionManager';
+import { initTrial, getTrialStatus } from './trialManager';
 
 const USER_ID_KEY = 'gastos_user_id';
-const SERVER_URL = 'https://gastos-server-wfl5.onrender.com';
+
+export const FREE_FEATURES = [
+  'add_expense',
+  'add_income',
+  'add_transfer',
+  'view_transactions_30d',
+  'basic_dashboard',
+  'manage_categories',
+  'single_account',
+  'app_lock',
+  'expense_books',
+  'bill_splitter',
+  'category_budgets',
+  'monthly_trend_chart',
+  'current_month_calendar',
+];
 
 const SubscriptionContext = createContext({
   userId: null,
   isPremium: false,
-  isTrialActive: false,
-  trialHoursRemaining: 0,
+  isTrialActive: true,
+  trialHoursRemaining: 168,
+  trialDaysRemaining: 7,
   tier: 'free',
   plan: 'free',
   loading: true,
   purchaseMonthly: async () => {},
   purchaseYearly: async () => {},
+  purchaseLifetime: async () => {},
   restorePurchases: async () => {},
   checkAccess: (_feature) => false,
   refreshSubscription: async () => {},
-  toggleDevPremium: async () => {},
 });
-
-export const FREE_FEATURES = [];
 
 export const SubscriptionProvider = ({ children }) => {
   const [state, setState] = useState({
     userId: null,
     isPremium: false,
-    isTrialActive: false,
-    trialHoursRemaining: 0,
+    isTrialActive: true,
+    trialHoursRemaining: 168,
+    trialDaysRemaining: 7,
     tier: 'free',
     plan: 'free',
     loading: true,
@@ -49,73 +67,105 @@ export const SubscriptionProvider = ({ children }) => {
   };
 
   const refreshSubscription = useCallback(async () => {
-    setState(prev => ({ ...prev, loading: true }));
     try {
       const uid = await loadOrCreateUserId();
-      
-      const response = await fetch(`${SERVER_URL}/api/subscription-status/${uid}`);
-      if (!response.ok) throw new Error('Failed to fetch status');
-      
-      const data = await response.json();
-      
+      const [serverStatus, trialStatus] = await Promise.all([
+        getSubscriptionStatus(uid),
+        getTrialStatus(),
+      ]);
+
+      const isPremium = serverStatus.isPremium;
+      const isTrialActive = !isPremium && trialStatus.isActive;
+
       setState({
         userId: uid,
-        isPremium: data.isPremium,
-        plan: data.plan,
-        tier: data.isPremium ? 'premium' : 'free',
-        isTrialActive: false,
-        trialHoursRemaining: 0,
+        isPremium,
+        isTrialActive,
+        trialHoursRemaining: trialStatus.hoursRemaining,
+        trialDaysRemaining: trialStatus.daysRemaining,
+        plan: serverStatus.plan || (isTrialActive ? 'trial' : 'free'),
+        tier: isPremium ? 'premium' : (isTrialActive ? 'trial' : 'free'),
         loading: false,
       });
     } catch (error) {
-      console.warn('Failed to refresh subscription from server:', error);
-      // Fallback to free if we can't reach the server
+      console.warn('Failed to refresh subscription status:', error);
       const uid = await loadOrCreateUserId();
+      const trialStatus = await getTrialStatus();
       setState(prev => ({
         ...prev,
         userId: uid,
         isPremium: false,
-        plan: 'free',
-        tier: 'free',
+        isTrialActive: trialStatus.isActive,
+        trialHoursRemaining: trialStatus.hoursRemaining,
+        trialDaysRemaining: trialStatus.daysRemaining,
+        plan: trialStatus.isActive ? 'trial' : 'free',
+        tier: trialStatus.isActive ? 'trial' : 'free',
         loading: false,
       }));
     }
   }, []);
 
   useEffect(() => {
-    // Ensure scheduled expense engine is active
-    const initEngine = async () => {
-      try {
-        const { registerScheduledExpenseTask } = await import('../scheduled/ScheduledExpenseEngine');
-        await registerScheduledExpenseTask();
-      } catch (e) {
-        console.warn('ScheduledExpenseEngine init failed (non-critical):', e);
-      }
+    // 1. Initial setup
+    const init = async () => {
+      await initTrial();
+      await refreshSubscription();
     };
-    initEngine();
-    
-    // Check real status
-    refreshSubscription();
+    init();
+
+    // 2. Refresh on app foreground
+    const sub = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        refreshSubscription();
+      }
+    });
+
+    return () => sub.remove();
   }, [refreshSubscription]);
 
-  const checkAccess = (_feature) => state.isPremium;
-  const purchaseMonthly = async () => {};
-  const purchaseYearly = async () => {};
-  const restorePurchases = async () => {
+  const checkAccess = useCallback((feature) => {
+    if (state.isPremium || state.isTrialActive) return true;
+    if (!feature) return false;
+    return FREE_FEATURES.includes(feature);
+  }, [state.isPremium, state.isTrialActive]);
+
+  const purchaseMonthly = async () => {
+    if (!state.userId) return;
+    const res = await buyMonthly(state.userId);
     await refreshSubscription();
-    return { isPremium: state.isPremium };
+    return res;
   };
-  const toggleDevPremium = async () => {};
+
+  const purchaseYearly = async () => {
+    if (!state.userId) return;
+    const res = await buyYearly(state.userId);
+    await refreshSubscription();
+    return res;
+  };
+
+  const purchaseLifetime = async () => {
+    if (!state.userId) return;
+    const res = await buyLifetime(state.userId);
+    await refreshSubscription();
+    return res;
+  };
+
+  const restorePurchases = async () => {
+    if (!state.userId) return { isPremium: false };
+    const res = await restoreStatus(state.userId);
+    await refreshSubscription();
+    return res;
+  };
 
   return (
     <SubscriptionContext.Provider value={{
       ...state,
       purchaseMonthly,
       purchaseYearly,
+      purchaseLifetime,
       restorePurchases,
       checkAccess,
       refreshSubscription,
-      toggleDevPremium,
     }}>
       {children}
     </SubscriptionContext.Provider>

@@ -10,10 +10,21 @@ import { Snackbar } from '../../components/Snackbar';
 import { Swipeable } from 'react-native-gesture-handler';
 import { format } from 'date-fns';
 import { ConfirmActionSheet } from '../../components/ConfirmActionSheet';
-
-type FilterType = 'all' | 'active' | 'completed' | 'cancelled';
+import { SubscriptionGate } from '../../src/subscription/SubscriptionGate';
 
 export default function ChitFundsScreen() {
+  return (
+    <SubscriptionGate
+      feature="chit_funds"
+      title="Chit Funds is Premium"
+      description="Track monthly contributions, dividend payouts, and ROI for your chit fund investments."
+    >
+      <ChitFundsContent />
+    </SubscriptionGate>
+  );
+}
+
+function ChitFundsContent() {
   const router = useRouter();
   const [chitFunds, setChitFunds] = useState<ChitFund[]>([]);
   const [filteredChitFunds, setFilteredChitFunds] = useState<ChitFund[]>([]);
