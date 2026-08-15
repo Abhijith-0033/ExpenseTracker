@@ -11,13 +11,9 @@ import { Snackbar } from '../../components/Snackbar';
 import { AccountSelector } from '../../components/AccountSelector';
 import { LineChart, BarChart } from 'react-native-gifted-charts';
 import { format } from 'date-fns';
-import { useSubscription } from '../../src/subscription/useSubscription';
-import PaywallScreen from '../../src/subscription/PaywallScreen';
 import { ConfirmActionSheet } from '../../components/ConfirmActionSheet';
 
 export default function ChitFundDetailScreen() {
-  const { isPremium, isTrialActive } = useSubscription();
-
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const chitFundId = parseInt(id);
@@ -89,10 +85,6 @@ export default function ChitFundDetailScreen() {
       fetchData();
     }
   }, [chitFundId, fetchData]);
-
-  if (!isPremium && !isTrialActive) {
-    return <PaywallScreen showClose={true} />;
-  }
 
   const handleEditRecord = (record: ChitMonthlyRecord) => {
     setEditingRecord(record);

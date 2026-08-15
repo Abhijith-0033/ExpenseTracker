@@ -9,15 +9,11 @@ import { formatCurrency } from '../../utils/currency';
 import { Snackbar } from '../../components/Snackbar';
 import { Swipeable } from 'react-native-gesture-handler';
 import { format } from 'date-fns';
-
-import { useSubscription } from '../../src/subscription/useSubscription';
-import PaywallScreen from '../../src/subscription/PaywallScreen';
 import { ConfirmActionSheet } from '../../components/ConfirmActionSheet';
 
 type FilterType = 'all' | 'active' | 'completed' | 'cancelled';
 
 export default function ChitFundsScreen() {
-  const { isPremium, isTrialActive } = useSubscription();
   const router = useRouter();
   const [chitFunds, setChitFunds] = useState<ChitFund[]>([]);
   const [filteredChitFunds, setFilteredChitFunds] = useState<ChitFund[]>([]);
@@ -109,10 +105,6 @@ export default function ChitFundsScreen() {
     
     setFilteredChitFunds(filtered);
   }, [activeFilter, chitFunds]);
-
-  if (!isPremium && !isTrialActive) {
-    return <PaywallScreen showClose={true} />;
-  }
 
   const handleDelete = (chitFund: ChitFund) => {
     setConfirmSheet({

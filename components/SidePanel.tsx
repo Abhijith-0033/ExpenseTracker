@@ -10,11 +10,10 @@ import Animated, {
     Extrapolate
 } from 'react-native-reanimated';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
-import { X, Wallet, PieChart, Target, TrendingUp, Calculator, CreditCard, Users, ChevronRight, Calendar, Lock, Clock } from 'lucide-react-native';
+import { X, Wallet, PieChart, Target, TrendingUp, Calculator, CreditCard, Users, ChevronRight, Calendar, Clock, BarChart2 } from 'lucide-react-native';
 import { Colors, Typography } from '../constants/Theme';
 import { useTheme } from '../context/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useSubscription } from '../src/subscription/useSubscription';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PANEL_WIDTH = SCREEN_WIDTH * 0.82;
@@ -39,8 +38,6 @@ interface SidePanelProps {
 
 export const SidePanel: React.FC<SidePanelProps> = ({ visible, onClose, onNavigate }) => {
     const { sidePanelItems, colors } = useTheme();
-    const { isPremium, isTrialActive } = useSubscription();
-    const isFreeUser = !isPremium && !isTrialActive;
     const insets = useSafeAreaInsets();
     const translateX = useSharedValue(SCREEN_WIDTH);
     const [render, setRender] = React.useState(false);
@@ -117,6 +114,15 @@ export const SidePanel: React.FC<SidePanelProps> = ({ visible, onClose, onNaviga
             icon: Wallet,
             bgColor: Colors.primary[100],
             iconColor: Colors.primary[600],
+            isPremiumOnly: true,
+        },
+        {
+            id: 'reports',
+            title: 'Financial Reports',
+            subtitle: 'Daily, weekly & monthly analytics',
+            icon: BarChart2,
+            bgColor: 'rgba(59, 130, 246, 0.12)',
+            iconColor: '#3B82F6',
             isPremiumOnly: true,
         },
         {
@@ -207,7 +213,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({ visible, onClose, onNaviga
                 <Animated.View style={[styles.panel, { backgroundColor: colors.white }, animatedPanelStyle]}>
                     <View style={[styles.header, { paddingTop: insets.top + 16, borderColor: colors.gray[100] }]}>
                         <View>
-                            <Text style={[styles.headerTitle, { color: colors.gray[900] }]}>Premium Tools</Text>
+                            <Text style={[styles.headerTitle, { color: colors.gray[900] }]}>Tools & Features</Text>
                             <Text style={[styles.headerSubtitle, { color: colors.gray[500] }]}>Quick access to financial features</Text>
                         </View>
                         <TouchableOpacity style={[styles.closeBtn, { backgroundColor: colors.gray[50] }]} onPress={onClose}>
@@ -239,19 +245,13 @@ export const SidePanel: React.FC<SidePanelProps> = ({ visible, onClose, onNaviga
                                         <Text style={styles.menuBadgeText}>{item.badgeCount}</Text>
                                     </View>
                                 )}
-                                {item.isPremiumOnly && isFreeUser ? (
-                                    <View style={styles.lockIconWrapper}>
-                                        <Lock size={14} color={Colors.primary[500]} />
-                                    </View>
-                                ) : (
-                                    !item.disabled && <ChevronRight size={20} color={Colors.gray[300]} />
-                                )}
+                                {!item.disabled && <ChevronRight size={20} color={Colors.gray[300]} />}
                             </TouchableOpacity>
                         ))}
                     </ScrollView>
 
                     <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-                        <Text style={styles.versionText}>Gastos v3.5.0 (Build 45)</Text>
+                        <Text style={styles.versionText}>Gastos v3.9.0 (Build 49)</Text>
                     </View>
                 </Animated.View>
             </GestureDetector>

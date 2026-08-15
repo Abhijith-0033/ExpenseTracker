@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
 import { LineChart, BarChart, PieChart } from 'react-native-gifted-charts';
 import { Colors, Layout, Typography } from '../constants/Theme';
@@ -12,7 +12,7 @@ const screenWidth = Dimensions.get('window').width;
 export const IncomeExpenseLineChart: React.FC<{ data: MonthlyComparison[], width?: number }> = ({ data, width = screenWidth - 60 }) => {
     if (!data || data.length === 0) return <Text style={styles.noData}>No comparison data available</Text>;
 
-    const incomeData = data.map(item => ({
+    const incomeData = useMemo(() => data.map(item => ({
         value: item.income,
         label: format(new Date(item.month + '-01'), 'MMM'),
         dataPointText: item.income > 0 ? formatCurrency(Math.round(item.income)) : '',
@@ -21,9 +21,9 @@ export const IncomeExpenseLineChart: React.FC<{ data: MonthlyComparison[], width
         textShiftY: -10,
         textFontSize: 11,
         fontFamily: Typography.family.bold
-    }));
+    })), [data]);
 
-    const expenseData = data.map(item => ({
+    const expenseData = useMemo(() => data.map(item => ({
         value: item.expense,
         dataPointText: item.expense > 0 ? formatCurrency(Math.round(item.expense)) : '',
         dataPointColor: Colors.danger[500],
@@ -31,13 +31,12 @@ export const IncomeExpenseLineChart: React.FC<{ data: MonthlyComparison[], width
         textShiftY: 5,
         textFontSize: 11,
         fontFamily: Typography.family.bold
-    }));
+    })), [data]);
 
     return (
         <View style={styles.chartContainer}>
             <View style={styles.legendContainer}>
                 <View style={[styles.legendItem, { marginRight: 20 }]}>
-                    <View style={[styles.dot, { backgroundColor: Colors.success[500] }]} />
                     <Text style={styles.legendText}>Income</Text>
                 </View>
                 <View style={styles.legendItem}>

@@ -7,12 +7,7 @@ import { formatCurrency } from '../../utils/currency';
 import { addSinkingFund } from '../../services/sinkingfunds/sinkingFundService';
 import { calculateMonthlyContribution } from '../../services/sinkingfunds/SinkingFundEngine';
 import { Snackbar } from '../../components/Snackbar';
-import { useSubscription } from '../../src/subscription/useSubscription';
-import PaywallScreen from '../../src/subscription/PaywallScreen';
-
 export default function AddSinkingFundScreen() {
-  const { isPremium, isTrialActive } = useSubscription();
-
   const router = useRouter();
   const today = new Date().toISOString().split('T')[0];
   const [name, setName] = useState('');
@@ -28,10 +23,6 @@ export default function AddSinkingFundScreen() {
     if (!ta || !targetDate || !startDate) return 0;
     return calculateMonthlyContribution(ta, startDate, targetDate);
   }, [targetAmount, targetDate, startDate]);
-
-  if (!isPremium && !isTrialActive) {
-    return <PaywallScreen showClose={true} />;
-  }
 
   const handleSave = async () => {
     const ta = parseFloat(targetAmount);

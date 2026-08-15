@@ -7,9 +7,6 @@ import { formatCurrency } from '../../utils/currency';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, getDay } from 'date-fns';
 import { getFutureEvents, groupEventsByDate, groupEventsByWeek, FutureEvent } from '../../services/futurecalendar/FutureCalendarEngine';
 
-import { useSubscription } from '../../src/subscription/useSubscription';
-import PaywallScreen from '../../src/subscription/PaywallScreen';
-
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const cellSize = (SCREEN_WIDTH - 40) / 7;
 
@@ -20,7 +17,6 @@ const TYPE_COLORS: Record<FutureEvent['type'], string> = {
 };
 
 export default function FutureCalendarScreen() {
-  const { isPremium, isTrialActive } = useSubscription();
   const router = useRouter();
   const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -75,10 +71,6 @@ export default function FutureCalendarScreen() {
       .forEach(e => { byType[e.type] = (byType[e.type] || 0) + e.amount; });
     return byType;
   }, [events, currentMonth]);
-
-  if (!isPremium && !isTrialActive) {
-    return <PaywallScreen showClose={true} />;
-  }
 
   const typeLabel: Record<FutureEvent['type'], string> = {
     emi: '🏦 EMIs', subscription: '🔁 Subs', recurring: '📅 Recurring',

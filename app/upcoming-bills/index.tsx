@@ -16,16 +16,13 @@ import {
   getAllUpcomingBills, markBillPaid, 
   deleteUpcomingBill, snoozeUpcomingBill, UpcomingBill 
 } from '../../services/upcomingBills';
-import { useSubscription } from '../../src/subscription/useSubscription';
 import { useApp } from '../../context/AppContext';
-import PaywallScreen from '../../src/subscription/PaywallScreen';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { SwipeableRow } from '../../components/SwipeableRow';
 import { ConfirmActionSheet } from '../../components/ConfirmActionSheet';
 
 export default function UpcomingBillsIndex() {
   const router = useRouter();
-  const { isPremium, isTrialActive } = useSubscription();
   const { accounts, refreshData } = useApp();
 
   const [bills, setBills] = useState<(UpcomingBill & { account_name?: string })[]>([]);
@@ -76,16 +73,9 @@ export default function UpcomingBillsIndex() {
 
   useFocusEffect(
     useCallback(() => {
-      if (isPremium || isTrialActive) {
-        loadData();
-      }
-    }, [loadData, isPremium, isTrialActive])
+      loadData();
+    }, [loadData])
   );
-
-  // Hook rules require early returns below hooks
-  if (!isPremium && !isTrialActive) {
-    return <PaywallScreen showClose={true} />;
-  }
 
   const handleRefresh = () => {
     setRefreshing(true);

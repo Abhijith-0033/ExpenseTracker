@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, Pressable, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { X, Sparkles } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 
@@ -74,12 +75,14 @@ export interface TransactionFormProps {
   // Income source
   selectedSourceIcon?: string;
   setSelectedSourceIcon?: (val: string) => void;
+  incomeSubcategory?: string;
+  setIncomeSubcategory?: (val: string | undefined) => void;
 }
 
 const TYPE_COLORS: Record<TransactionType, string> = {
-  expense: Colors.expense || '#E03131',
-  income: Colors.income || '#2F9E44',
-  transfer: Colors.transfer || '#1C7ED6',
+  expense: Colors.danger[600] || '#E03131',
+  income: Colors.success[600] || '#2F9E44',
+  transfer: Colors.primary[600] || '#1C7ED6',
 };
 
 const SCREEN_TINT: Record<TransactionType, string> = {
@@ -123,6 +126,8 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
   duplicateTransaction,
   onDuplicateCancel,
   onDuplicateSaveAnyway,
+  incomeSubcategory,
+  setIncomeSubcategory,
 }) => {
   const router = useRouter();
   const activeType = initialType;
@@ -338,6 +343,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
             subcategory={subcategory}
             description={description}
             incomeSource={subcategory}
+            incomeSubcategory={incomeSubcategory}
             errors={errors}
             onDatePress={() => setShowDatePicker(true)}
             onAccountPress={() => setShowAccountPicker(true)}
@@ -456,8 +462,10 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
             onClose={() => setShowIncomeSourceSheet(false)}
             sources={incomeSources}
             selectedSource={subcategory}
-            onSelect={(srcName) => {
+            selectedSubcategory={incomeSubcategory}
+            onSelect={(srcName, subName) => {
               setSubcategory(srcName);
+              if (setIncomeSubcategory) setIncomeSubcategory(subName);
               setShowIncomeSourceSheet(false);
             }}
             typeColor={typeColor}

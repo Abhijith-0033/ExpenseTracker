@@ -9,12 +9,7 @@ import { CashFlowDay, generateCashFlowForecast } from '../services/cashFlow';
 import { formatCurrency } from '../utils/currency';
 import { format, parseISO } from 'date-fns';
 import { LineChart } from 'react-native-gifted-charts';
-import { useSubscription } from '../src/subscription/useSubscription';
-import PaywallScreen from '../src/subscription/PaywallScreen';
-
 export default function CashFlowScreen() {
-    const { isPremium, isTrialActive } = useSubscription();
-
     const [forecast, setForecast] = useState<CashFlowDay[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedDay, setSelectedDay] = useState<CashFlowDay | null>(null);
@@ -22,10 +17,6 @@ export default function CashFlowScreen() {
     useEffect(() => {
         loadData();
     }, []);
-
-    if (!isPremium && !isTrialActive) {
-        return <PaywallScreen showClose={true} />;
-    }
 
     const loadData = async () => {
         setLoading(true);

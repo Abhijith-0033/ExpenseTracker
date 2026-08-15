@@ -8,12 +8,7 @@ import { FormField } from '../../components/FormField';
 import { getEMIRecord, updateEMIRecord, createEMIRecord, calculateEMI, EMIRecord } from '../../services/emitracker/EMIEngine';
 import { getAccounts } from '../../services/database';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { useSubscription } from '../../src/subscription/useSubscription';
-import PaywallScreen from '../../src/subscription/PaywallScreen';
-
 export default function AddEMIScreen() {
-  const { isPremium, isTrialActive } = useSubscription();
-
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string }>();
   const isEdit = !!params.id;
@@ -105,10 +100,6 @@ export default function AddEMIScreen() {
     const tenureMonths = parseInt(formData.tenure_months) || 0;
     calculateLiveEMI(principal, interestRate, tenureMonths);
   }, [formData.principal, formData.interest_rate, formData.tenure_months, calculateLiveEMI]);
-
-  if (!isPremium && !isTrialActive) {
-    return <PaywallScreen showClose={true} />;
-  }
 
   const handleSave = async () => {
     // Validation

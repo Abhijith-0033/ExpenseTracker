@@ -1,205 +1,51 @@
-import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
-import { AppState } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as SubscriptionManager from './SubscriptionManager';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 
 const SubscriptionContext = createContext({
-  isPremium: false,
+  isPremium: true,
   isTrialActive: false,
   trialHoursRemaining: 0,
-  tier: 'free',
-  plan: null,
-  loading: true,
-  purchaseMonthly: async () => {},
-  purchaseYearly: async () => {},
-  restorePurchases: async () => {},
-  checkAccess: (feature) => false,
+  tier: 'premium',
+  plan: 'personal',
+  loading: false,
+  purchaseMonthly: async () => ({ tier: 'premium', isPremium: true }),
+  purchaseYearly: async () => ({ tier: 'premium', isPremium: true }),
+  restorePurchases: async () => ({ tier: 'premium', isPremium: true }),
+  checkAccess: (_feature) => true,
   refreshSubscription: async () => {},
   toggleDevPremium: async () => {},
 });
 
-export const FREE_FEATURES = [
-  'add_expense',
-  'add_income',
-  'view_transactions_30d',
-  'basic_dashboard',
-  'manage_categories',
-  'single_account',
-  'basic_notifications',
-];
+export const FREE_FEATURES = [];
 
 export const SubscriptionProvider = ({ children }) => {
-  const [state, setState] = useState({
-    isPremium: false,
+  const [state] = useState({
+    isPremium: true,
     isTrialActive: false,
     trialHoursRemaining: 0,
-    tier: 'free',
-    plan: null,
-    loading: true,
+    tier: 'premium',
+    plan: 'personal',
+    loading: false,
   });
-  
-  const appStateRef = useRef('active');
-
-  const refreshSubscription = async () => {
-    let isSubscribed = false;
-    let currentTier = 'free';
-    let currentPlan = null;
-    let isTrialOn = false;
-    let trialHours = 0;
-
-    try {
-      const subStatus = await SubscriptionManager.getSubscriptionStatus().catch(err => {
-        console.warn('getSubscriptionStatus failed:', err);
-        return { isPremium: false, tier: 'free', plan: null };
-      });
-      isSubscribed = subStatus.isPremium;
-      currentTier = subStatus.tier;
-      currentPlan = subStatus.plan;
-    } catch (e) {
-      console.warn(e);
-    }
-
-    try {
-      const trialStatus = await SubscriptionManager.getTrialStatus().catch(err => {
-        console.warn('getTrialStatus failed:', err);
-        return { isActive: false, hoursRemaining: 0 };
-      });
-      isTrialOn = trialStatus.isActive;
-      trialHours = trialStatus.hoursRemaining;
-    } catch (e) {
-      console.warn(e);
-    }
-
-    try {
-      const devOverride = await AsyncStorage.getItem('dev_force_premium');
-      const forcePremium = devOverride === 'true';
-
-      // RESILIENCE: If RC failed AND no trial cache seeded yet → treat as new trial user
-      let finalTrialActive = (forcePremium || isSubscribed) ? false : isTrialOn;
-      if (!forcePremium && !isSubscribed && !isTrialOn) {
-        try {
-          const { getDatabase } = await import('../../services/database');
-          const db = getDatabase();
-          const cacheRow = await db.getFirstAsync('SELECT id FROM subscription_cache LIMIT 1');
-          if (!cacheRow) {
-            // Truly first install with RC unavailable → grant trial
-            finalTrialActive = true;
-          }
-        } catch (_e) { /* DB not ready or missing table */ }
-      }
-
-      setState({
-        isPremium: forcePremium || isSubscribed,
-        tier: forcePremium ? 'premium' : currentTier,
-        plan: forcePremium ? 'dev_bypass' : currentPlan,
-        isTrialActive: finalTrialActive,
-        trialHoursRemaining: finalTrialActive && trialHours === 0 ? 48 : trialHours,
-        loading: false,
-      });
-    } catch (e) {
-      console.warn('Storage read or setState failed in refreshSubscription:', e);
-      setState(prev => ({ ...prev, loading: false }));
-    }
-  };
 
   useEffect(() => {
-    // Initialize RevenueCat & get initial status
-    SubscriptionManager.initialize().catch(console.warn);
-    refreshSubscription();
+    // Ensure scheduled expense engine is active
+    const initEngine = async () => {
+      try {
+        const { registerScheduledExpenseTask } = await import('../scheduled/ScheduledExpenseEngine');
+        await registerScheduledExpenseTask();
+      } catch (e) {
+        console.warn('ScheduledExpenseEngine init failed (non-critical):', e);
+      }
+    };
+    initEngine();
   }, []);
 
-  // Refresh on foreground
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', (nextState) => {
-      if (nextState === 'active' && appStateRef.current !== 'active') {
-        refreshSubscription();
-      }
-      appStateRef.current = nextState;
-    });
-    return () => sub.remove();
-  }, []);
-
-  const checkAccess = (feature) => {
-    if (state.isPremium || state.isTrialActive) return true;
-    return FREE_FEATURES.includes(feature);
-  };
-
-  const purchaseMonthly = async () => {
-    const result = await SubscriptionManager.purchaseMonthly();
-    await refreshSubscription();
-    await handleUpgrade();
-    return result;
-  };
-
-  const purchaseYearly = async () => {
-    const result = await SubscriptionManager.purchaseYearly();
-    await refreshSubscription();
-    await handleUpgrade();
-    return result;
-  };
-
-  const restorePurchases = async () => {
-    const result = await SubscriptionManager.restorePurchases();
-    await refreshSubscription();
-    if (result.isPremium) {
-      await handleUpgrade();
-    } else {
-      await handleDowngrade();
-    }
-    return result;
-  };
-
-  const handleUpgrade = async () => {
-    try {
-      const { registerScheduledExpenseTask, scheduleNotificationsForExpense } = 
-        await import('../scheduled/ScheduledExpenseEngine');
-      await registerScheduledExpenseTask();
-      // Reschedule all active schedules
-      const { getDatabase } = await import('../../services/database');
-      const db = getDatabase();
-      const schedules = await db.getAllAsync(
-        "SELECT * FROM scheduled_expenses WHERE status = 'active' AND is_active = 1"
-      );
-      for (const se of schedules) {
-        await scheduleNotificationsForExpense(se);
-      }
-    } catch (e) {
-      console.warn('handleUpgrade failed:', e);
-    }
-  };
-
-  const handleDowngrade = async () => {
-    try {
-      const { unregisterScheduledExpenseTask, cancelNotificationsForExpense } = 
-        await import('../scheduled/ScheduledExpenseEngine');
-      await unregisterScheduledExpenseTask();
-      // Cancel all scheduled notifications
-      const { getDatabase } = await import('../../services/database');
-      const db = getDatabase();
-      const schedules = await db.getAllAsync("SELECT id FROM scheduled_expenses");
-      for (const se of schedules) {
-        await cancelNotificationsForExpense(se.id);
-      }
-    } catch (e) {
-      console.warn('handleDowngrade failed:', e);
-    }
-  };
-
-  const toggleDevPremium = async () => {
-    try {
-      const current = await AsyncStorage.getItem('dev_force_premium');
-      const newVal = current === 'true' ? 'false' : 'true';
-      await AsyncStorage.setItem('dev_force_premium', newVal);
-      if (newVal === 'true') {
-        await handleUpgrade();
-      } else {
-        await handleDowngrade();
-      }
-      await refreshSubscription();
-    } catch (e) {
-      console.warn('toggleDevPremium failed:', e);
-    }
-  };
+  const checkAccess = (_feature) => true;
+  const purchaseMonthly = async () => ({ tier: 'premium', isPremium: true });
+  const purchaseYearly = async () => ({ tier: 'premium', isPremium: true });
+  const restorePurchases = async () => ({ tier: 'premium', isPremium: true });
+  const refreshSubscription = async () => {};
+  const toggleDevPremium = async () => {};
 
   return (
     <SubscriptionContext.Provider value={{

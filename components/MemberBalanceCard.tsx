@@ -6,9 +6,11 @@ import { Colors, Layout, Typography } from '../constants/Theme';
 interface MemberBalanceCardProps {
     name: string;
     amount: number; // +ve = receives, -ve = owes
+    totalSpent?: number;
+    totalShare?: number;
 }
 
-export const MemberBalanceCard = ({ name, amount }: MemberBalanceCardProps) => {
+export const MemberBalanceCard = ({ name, amount, totalSpent = 0 }: MemberBalanceCardProps) => {
     const isPositive = amount > 0;
     const isZero = Math.abs(amount) < 0.01;
 
@@ -39,6 +41,9 @@ export const MemberBalanceCard = ({ name, amount }: MemberBalanceCardProps) => {
             <Text style={[styles.amount, { color }]}>
                 ₹{Math.abs(amount).toLocaleString('en-IN')}
             </Text>
+            {totalSpent > 0 && (
+                <Text style={styles.spentSub}>Spent ₹{totalSpent.toLocaleString('en-IN')}</Text>
+            )}
         </View>
     );
 };
@@ -71,6 +76,12 @@ const styles = StyleSheet.create({
     amount: {
         fontSize: 20,
         fontFamily: Typography.family.bold,
+    },
+    spentSub: {
+        fontSize: 10,
+        fontFamily: Typography.family.medium,
+        color: Colors.gray[500],
+        marginTop: 4,
     },
 });
 

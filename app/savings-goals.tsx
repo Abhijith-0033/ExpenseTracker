@@ -13,8 +13,6 @@ import { format } from 'date-fns';
 import { ConfirmActionSheet, ConfirmActionType } from '../components/ConfirmActionSheet';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { BarChart } from 'react-native-gifted-charts';
-import { useSubscription } from '../src/subscription/useSubscription';
-import PaywallScreen from '../src/subscription/PaywallScreen';
 
 const ProgressRing = ({ progress, size = 60, strokeWidth = 6, color = Colors.primary[500] }: { progress: number, size?: number, strokeWidth?: number, color?: string }) => {
     const radius = (size - strokeWidth) / 2;
@@ -31,8 +29,6 @@ const ProgressRing = ({ progress, size = 60, strokeWidth = 6, color = Colors.pri
 };
 
 export default function SavingsGoalsScreen() {
-    const { isPremium, isTrialActive } = useSubscription();
-
     const [goals, setGoals] = useState<SavingsGoal[]>([]);
     const [completedGoals, setCompletedGoals] = useState<SavingsGoal[]>([]);
     const [showAddModal, setShowAddModal] = useState(false);
@@ -64,10 +60,6 @@ export default function SavingsGoalsScreen() {
     useEffect(() => {
         loadData();
     }, []);
-
-    if (!isPremium && !isTrialActive) {
-        return <PaywallScreen showClose={true} />;
-    }
 
     const loadData = async () => {
         const [active, completed] = await Promise.all([

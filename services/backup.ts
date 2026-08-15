@@ -61,6 +61,7 @@ interface BackupData {
         dailyReportCache: any[];
         categories: any[];
         categorySubcategories: any[];
+        incomeSourceSubcategories?: any[];
     };
 }
 
@@ -90,6 +91,12 @@ const IncomeSourceSchema = z.object({
     id: z.number(),
     name: z.string(),
     icon: z.string().nullish().transform(val => val ?? 'Briefcase'),
+});
+
+const IncomeSourceSubcategorySchema = z.object({
+    id: z.number(),
+    income_source_id: z.number(),
+    name: z.string(),
 });
 
 const CategoryBudgetSchema = z.object({
@@ -256,7 +263,8 @@ const DebtRepaymentSchema = z.object({
     payment_date: z.string(),
     payment_type: z.string(),
     note: z.string().nullable().optional(),
-    account_id: z.number(),
+    // DB column: account_id INTEGER DEFAULT NULL — must allow null
+    account_id: z.number().nullable().optional(),
     created_at: z.string().nullable().optional(),
 });
 
@@ -348,7 +356,10 @@ const NotificationScheduleSchema = z.object({
     notification_id: z.string(),
     trigger_type: z.string(),
     scheduled_for: z.string(),
-    created_at: z.string().nullable().optional(),
+    // DB column: created_at INTEGER NOT NULL — stored as Unix timestamp number, not a string
+    created_at: z.union([z.number(), z.string()]).nullish().transform(val =>
+        typeof val === 'number' ? val : (Date.parse(val ?? '') || Date.now())
+    ),
 });
 
 const DailyReportCacheSchema = z.object({
@@ -382,11 +393,11 @@ const CategorySubcategorySchema = z.object({
 
 const BackupDataSchema = z.object({
     metadata: z.object({
-        timestamp: z.number(),
-        date: z.string(),
-        schemaVersion: z.number(),
-        appVersion: z.string(),
-        platform: z.string(),
+        timestamp: z.union([z.number(), z.string()]).transform(v => typeof v === 'number' ? v : Date.parse(v) || Date.now()),
+        date: z.string().optional().default(new Date().toISOString()),
+        schemaVersion: z.number().optional().default(1),
+        appVersion: z.string().optional().default('unknown'),
+        platform: z.string().optional().default('android'),
     }),
     data: z.object({
         accounts: z.array(AccountSchema),
@@ -414,8 +425,9 @@ const BackupDataSchema = z.object({
         emiPayments: z.array(EmiPaymentSchema).optional().default([]),
         notificationSchedules: z.array(NotificationScheduleSchema).optional().default([]),
         dailyReportCache: z.array(DailyReportCacheSchema).optional().default([]),
-        categories: z.array(CategorySchema).optional().default([]),
-        categorySubcategories: z.array(CategorySubcategorySchema).optional().default([]),
+        categories: z.array(z.any()).optional().default([]),
+        categorySubcategories: z.array(z.any()).optional().default([]),
+        incomeSourceSubcategories: z.array(IncomeSourceSubcategorySchema).optional().default([]),
     }),
 });
 
@@ -459,7 +471,8 @@ export const exportData = async () => {
             notificationSchedules,
             dailyReportCache,
             categories,
-            categorySubcategories
+            categorySubcategories,
+            incomeSourceSubcategories
         ] = await Promise.all([
             db.getAllAsync<Transaction>('SELECT * FROM transactions'),
             db.getAllAsync<Account>('SELECT * FROM accounts'), // Includes meta categories
@@ -488,6 +501,7 @@ export const exportData = async () => {
             db.getAllAsync<any>('SELECT * FROM daily_report_cache'),
             db.getAllAsync<any>('SELECT * FROM categories'),
             db.getAllAsync<any>('SELECT * FROM category_subcategories'),
+            db.getAllAsync<any>('SELECT * FROM income_source_subcategories'),
         ]);
 
         // 2. Construct Backup Object
@@ -526,7 +540,8 @@ export const exportData = async () => {
                 notificationSchedules,
                 dailyReportCache,
                 categories,
-                categorySubcategories
+                categorySubcategories,
+                incomeSourceSubcategories
             }
         };
 
@@ -600,27 +615,76 @@ export const restoreData = async () => {
     try {
         // 1. Pick File
         const result = await DocumentPicker.getDocumentAsync({
-            type: ['application/json', '*/*'], // Allow generic types in case mime detection fails
-            copyToCacheDirectory: true
+            type: ['application/json', 'text/plain', '*/*'],
+            copyToCacheDirectory: true,
+            multiple: false,
         });
 
         if (result.canceled) return;
 
-        const fileUri = result.assets[0].uri;
+        const fileAsset = result.assets?.[0];
+        if (!fileAsset) {
+            Alert.alert('Restore Failed', 'No file was selected.');
+            return;
+        }
 
-        // 2. Read and Parse
-        const fileContent = await readAsStringAsync(fileUri);
-        const parsedJson = JSON.parse(fileContent);
+        const fileUri = fileAsset.uri;
 
-        // 3. Validate Zod Schema
+        // 2. Read File
+        let fileContent: string;
+        try {
+            fileContent = await readAsStringAsync(fileUri, { encoding: 'utf8' });
+        } catch (readError) {
+            console.error('Failed to read backup file:', readError);
+            Alert.alert('Restore Failed', 'Could not read the selected file. Make sure it is a valid backup JSON file.');
+            return;
+        }
+
+        // 3. Strip BOM if present and parse JSON
+        let parsedJson: any;
+        try {
+            const cleanContent = fileContent.replace(/^\uFEFF/, '').trim();
+            parsedJson = JSON.parse(cleanContent);
+        } catch (parseError) {
+            console.error('Failed to parse backup JSON:', parseError);
+            Alert.alert('Restore Failed', 'The file is not valid JSON. Please select a backup file exported from this app.');
+            return;
+        }
+
+        // 4. Validate structure (check for required top-level keys before Zod)
+        if (!parsedJson || typeof parsedJson !== 'object') {
+            Alert.alert('Restore Failed', 'The backup file appears to be empty or invalid.');
+            return;
+        }
+        if (!parsedJson.data || !parsedJson.data.accounts || !parsedJson.data.transactions) {
+            Alert.alert(
+                'Restore Failed',
+                'This file does not appear to be a valid Gastos backup. Missing required data sections (accounts or transactions).'
+            );
+            return;
+        }
+
+        // 5. Validate with Zod Schema
         const validation = BackupDataSchema.safeParse(parsedJson);
         if (!validation.success) {
-            console.error('Backup validation failed:', validation.error.format());
-            throw new Error("Invalid backup file format. Schema validation failed.");
+            const zodErrors = validation.error?.issues ?? validation.error?.errors ?? [];
+            const errorDetails = zodErrors
+                .slice(0, 3)
+                .map((e: any) => `• ${(e.path ?? []).join('.')}: ${e.message ?? 'Invalid value'}`)
+                .join('\n');
+            console.error('Backup validation failed:', JSON.stringify(zodErrors.slice(0, 5)));
+            Alert.alert(
+                'Restore Failed',
+                zodErrors.length > 0
+                    ? `The backup file has validation errors:\n\n${errorDetails}\n\nTry exporting a fresh backup and restoring that.`
+                    : 'The backup file format is invalid. Please select a backup exported from this app.'
+            );
+            return;
         }
+
         const backup = validation.data;
 
-        if (backup.metadata.schemaVersion > CURRENT_SCHEMA_VERSION) {
+        if ((backup.metadata.schemaVersion ?? 1) > CURRENT_SCHEMA_VERSION) {
             Alert.alert(
                 "Incompatible Version",
                 `This backup is from a newer version of the app (Schema v${backup.metadata.schemaVersion}). Please update the app to restore it.`
@@ -628,10 +692,16 @@ export const restoreData = async () => {
             return;
         }
 
-        // 4. Confirm Alert
+        // 6. Confirm Alert
+        const txCount = backup.data.transactions.length;
+        const accCount = backup.data.accounts.length;
+        const backupDate = backup.metadata.date
+            ? new Date(backup.metadata.date).toLocaleDateString()
+            : 'Unknown date';
+
         Alert.alert(
             "Confirm Restore",
-            "⚠️ This will PERMANENTLY REPLACE all your current data. This action cannot be undone. Are you sure?",
+            `⚠️ This will PERMANENTLY REPLACE all your current data.\n\nBackup contains:\n• ${txCount} transactions\n• ${accCount} accounts\n• Backed up on: ${backupDate}\n\nThis action cannot be undone. Continue?`,
             [
                 { text: "Cancel", style: "cancel" },
                 {
@@ -642,9 +712,12 @@ export const restoreData = async () => {
             ]
         );
 
-    } catch (error) {
-        console.error('Restore failed:', error);
-        Alert.alert('Restore Failed', 'Invalid header or corrupt file.');
+    } catch (error: any) {
+        console.error('Restore failed unexpectedly:', error);
+        Alert.alert(
+            'Restore Failed',
+            `An unexpected error occurred: ${error?.message || 'Unknown error'}. Please try again.`
+        );
     }
 };
 
@@ -663,6 +736,7 @@ const performRestore = async (data: BackupData['data']) => {
             await db.runAsync('DELETE FROM expense_books');
             await db.runAsync('DELETE FROM debt_history');
             await db.runAsync('DELETE FROM debts');
+            await db.runAsync('DELETE FROM income_source_subcategories');
             await db.runAsync('DELETE FROM income_sources');
             await db.runAsync('DELETE FROM category_budgets');
             await db.runAsync('DELETE FROM recharge_meta');
@@ -719,6 +793,16 @@ const performRestore = async (data: BackupData['data']) => {
                     'INSERT INTO income_sources (id, name, icon) VALUES (?, ?, ?)',
                     [inc.id, inc.name, inc.icon]
                 );
+            }
+
+            // Income Source Subcategories
+            if (data.incomeSourceSubcategories) {
+                for (const sub of data.incomeSourceSubcategories) {
+                    await db.runAsync(
+                        'INSERT INTO income_source_subcategories (id, income_source_id, name) VALUES (?, ?, ?)',
+                        [sub.id, sub.income_source_id, sub.name]
+                    );
+                }
             }
 
             // Category Budgets

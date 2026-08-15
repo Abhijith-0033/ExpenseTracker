@@ -1,39 +1,28 @@
-
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, RefreshControl, ActivityIndicator, Alert } from 'react-native';
+import { ScrollView, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { ArrowLeft, Plus } from 'lucide-react-native';
 import { Colors, Typography } from '../../constants/Theme';
-import { getGroups, getGroupMembers, getGroupExpenses, BillGroup } from '../../services/billSplitter';
+import { getGroups, getGroupMembers, getGroupExpenses, deleteGroup, BillGroup } from '../../services/billSplitter';
 import { BillGroupCard } from '../../components/BillGroupCard';
-
-import { useSubscription } from '../../src/subscription/useSubscription';
-import PaywallScreen from '../../src/subscription/PaywallScreen';
+import { SwipeableRow } from '../../components/SwipeableRow';
+import { ConfirmActionSheet } from '../../components/ConfirmActionSheet';
 
 export default function BillSplitterScreen() {
-    const { isPremium, isTrialActive } = useSubscription();
     const router = useRouter();
     const [groups, setGroups] = useState<BillGroup[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [confirmSheet, setConfirmSheet] = useState<{
+        title: string;
+        description: string;
+        onConfirm: () => void;
+    } | null>(null);
 
     const fetchData = async () => {
         try {
-            // Need to fetch stats too. For now, mock or update service to return stats?
-            // The service returns BillGroup. Let's assume for list view we might need to fetch stats separately
-            // OR update getGroups to do a JOIN.
-            // For MVP efficiency, let's just fetch basic groups and maybe details later?
-            // Actually, the card needs stats. Let's use getGroups as is but we'll need to 
-            // query member count and expense total for each.
-            // Since SQLite is local, N+1 query isn't terrible for small lists, but a JOIN is better.
-            // For now, let's just fetch groups and then for each group fetch stats in parallel.
-
             const data = await getGroups();
-
-            // To properly show stats, we'd need to extend the service to return these counts.
-            // But since I can't easily change database.ts/billSplitter.ts concurrently here without complexity,
-            // I'll make a quick "enriched" fetch here or just show basic info first.
-            // Let's assume I'll update billSplitter.ts to return enriched data or do it here.
 
             const enriched = await Promise.all(data.map(async (g) => {
                 const members = await getGroupMembers(g.id);
@@ -63,11 +52,24 @@ export default function BillSplitterScreen() {
         }, [])
     );
 
-    if (!isPremium && !isTrialActive) {
-        return <PaywallScreen showClose={true} />;
-    }
+    const handleDeleteGroup = (group: BillGroup) => {
+        setConfirmSheet({
+            title: 'Delete Group?',
+            description: `Are you sure you want to delete "${group.name}"? All members and expenses will be permanently removed.`,
+            onConfirm: async () => {
+                setConfirmSheet(null);
+                try {
+                    await deleteGroup(group.id);
+                    fetchData();
+                } catch (_e) {
+                    Alert.alert('Error', 'Failed to delete group.');
+                }
+            }
+        });
+    };
 
     return (
+        <GestureHandlerRootView style={{ flex: 1 }}>
         <View style={styles.container}>
             {/* Header */}
             <View style={styles.header}>
@@ -85,7 +87,7 @@ export default function BillSplitterScreen() {
                 {/* Intro / Banner */}
                 <View style={styles.banner}>
                     <Text style={styles.bannerTitle}>Group Expenses</Text>
-                    <Text style={styles.bannerText}>Track shared potential expenses for trips, roommates, or events.</Text>
+                    <Text style={styles.bannerText}>Track shared expenses for trips, roommates, or events with friends.</Text>
                 </View>
 
                 {/* List */}
@@ -93,13 +95,20 @@ export default function BillSplitterScreen() {
                     <ActivityIndicator size="large" color={Colors.primary[500]} style={{ marginTop: 40 }} />
                 ) : (
                     groups.length > 0 ? (
-                        groups.map((group: any) => (
-                            <BillGroupCard
-                                key={group.id}
-                                group={group}
-                                onPress={() => router.push(`/bill-splitter/group-details?id=${group.id}`)}
-                            />
-                        ))
+                        <View style={{ gap: 12 }}>
+                            {groups.map((group: any) => (
+                                <SwipeableRow
+                                    key={group.id}
+                                    onDelete={() => handleDeleteGroup(group)}
+                                    onEdit={() => router.push(`/bill-splitter/manage-group?id=${group.id}`)}
+                                >
+                                    <BillGroupCard
+                                        group={group}
+                                        onPress={() => router.push(`/bill-splitter/group-details?id=${group.id}`)}
+                                    />
+                                </SwipeableRow>
+                            ))}
+                        </View>
                     ) : (
                         <View style={styles.emptyState}>
                             <Text style={styles.emptyIcon}>✈️</Text>
@@ -119,7 +128,20 @@ export default function BillSplitterScreen() {
             >
                 <Plus size={32} color="white" />
             </TouchableOpacity>
+
+            {confirmSheet && (
+                <ConfirmActionSheet
+                    visible={!!confirmSheet}
+                    title={confirmSheet.title}
+                    description={confirmSheet.description}
+                    confirmLabel="Delete Group"
+                    actionType="delete"
+                    onConfirm={confirmSheet.onConfirm}
+                    onCancel={() => setConfirmSheet(null)}
+                />
+            )}
         </View>
+        </GestureHandlerRootView>
     );
 }
 

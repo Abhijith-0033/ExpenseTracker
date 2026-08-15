@@ -11,11 +11,7 @@ import { Snackbar } from '../../components/Snackbar';
 import { format } from 'date-fns';
 import { ConfirmActionSheet, ConfirmActionType } from '../../components/ConfirmActionSheet';
 
-import { useSubscription } from '../../src/subscription/useSubscription';
-import PaywallScreen from '../../src/subscription/PaywallScreen';
-
 export default function SinkingFundsScreen() {
-  const { isPremium, isTrialActive } = useSubscription();
   const router = useRouter();
   const [funds, setFunds] = useState<(SinkingFund & { totalSaved: number })[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,10 +38,6 @@ export default function SinkingFundsScreen() {
   }, []);
 
   useFocusEffect(useCallback(() => { loadFunds(); }, [loadFunds]));
-
-  if (!isPremium && !isTrialActive) {
-    return <PaywallScreen showClose={true} />;
-  }
 
   const handleDelete = (fund: SinkingFund) => {
     setConfirmSheet({

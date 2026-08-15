@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput,
-  Alert, StatusBar, Dimensions, DeviceEventEmitter, ActivityIndicator, InteractionManager
+  StatusBar, Dimensions, DeviceEventEmitter, ActivityIndicator, InteractionManager
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useApp } from '../context/AppContext';
@@ -19,7 +19,9 @@ import { PressableScale } from '../components/ui/PressableScale';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SuccessAnimation } from '../components/SuccessAnimation';
+import { safeBack } from '../utils/navigation';
 import { TransactionForm } from '../components/transaction/TransactionForm';
+import { ConfirmActionSheet } from '../components/ConfirmActionSheet';
 
 const { width } = Dimensions.get('window');
 
@@ -38,7 +40,13 @@ export default function AddTransferScreen() {
     const isSubmittingRef = React.useRef(false);
     const [showSuccess, setShowSuccess] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
-    
+
+    // Warning sheet state (replaces Alert.alert)
+    const [warningSheet, setWarningSheet] = useState<{
+        title: string;
+        description: string;
+    } | null>(null);
+
     const [initializing, setInitializing] = useState(true);
     React.useEffect(() => {
         const task = InteractionManager.runAfterInteractions(() => {
@@ -151,17 +159,23 @@ export default function AddTransferScreen() {
 
         if (finalAmount <= 0) {
             newErrors.amount = 'Please enter a valid amount';
+            setErrors(newErrors);
+            setWarningSheet({ title: 'Invalid Amount', description: 'Please enter a valid transfer amount greater than ₹0.' });
+            return;
         }
         if (!fromAccount || !toAccount) {
             newErrors.accounts = 'Select both accounts';
-        } else if (fromAccount.id === toAccount.id) {
-            newErrors.accounts = 'Source and destination must differ';
-        }
-
-        if (Object.keys(newErrors).length > 0) {
             setErrors(newErrors);
+            setWarningSheet({ title: 'Missing Accounts', description: 'Please select both a source and a destination account before transferring.' });
             return;
         }
+        if (fromAccount.id === toAccount.id) {
+            newErrors.accounts = 'Source and destination must differ';
+            setErrors(newErrors);
+            setWarningSheet({ title: 'Same Account', description: 'Source and destination accounts must be different. Use the ⇄ button to swap them.' });
+            return;
+        }
+
         setErrors({});
 
         if (isSubmittingRef.current) return;
@@ -182,11 +196,14 @@ export default function AddTransferScreen() {
             setShowSuccess(true);
         } catch (e: any) {
             if (e?.message === 'INSUFFICIENT_BALANCE') {
-                Alert.alert('Insufficient Balance', `${fromAccount.name} doesn't have enough balance.`);
+                setWarningSheet({
+                    title: 'Insufficient Balance',
+                    description: `"${fromAccount.name}" doesn't have enough balance to complete this transfer.`,
+                });
             } else if (e?.message === 'SAME_ACCOUNT') {
-                Alert.alert('Invalid', 'Cannot transfer to the same account');
+                setWarningSheet({ title: 'Same Account', description: 'Cannot transfer to the same account.' });
             } else {
-                Alert.alert('Error', e?.message || 'Transfer failed.');
+                setWarningSheet({ title: 'Transfer Failed', description: e?.message || 'An unexpected error occurred. Please try again.' });
             }
         } finally {
             setIsSubmitting(false);
@@ -203,31 +220,44 @@ export default function AddTransferScreen() {
     }
 
     return (
-        <TransactionForm
-            initialType="transfer"
-            allowTypeSwitch={true}
-            accounts={accounts}
-            display={display}
-            setDisplay={setDisplay}
-            description={description}
-            setDescription={setDescription}
-            fromAccount={fromAccount}
-            setFromAccount={setFromAccount}
-            toAccount={toAccount}
-            setToAccount={setToAccount}
-            date={date}
-            setDate={setDate}
-            errors={errors}
-            onSave={handleSave}
-            onClose={() => router.back()}
-            isSubmitting={isSubmitting}
-            showSuccess={showSuccess}
-            onSuccessFinish={() => {
-                setShowSuccess(false);
-                router.back();
-            }}
-            successMessage="Transfer Successful!"
-        />
+        <>
+            <TransactionForm
+                initialType="transfer"
+                allowTypeSwitch={true}
+                accounts={accounts}
+                display={display}
+                setDisplay={setDisplay}
+                description={description}
+                setDescription={setDescription}
+                fromAccount={fromAccount}
+                setFromAccount={setFromAccount}
+                toAccount={toAccount}
+                setToAccount={setToAccount}
+                date={date}
+                setDate={setDate}
+                errors={errors}
+                onSave={handleSave}
+                onClose={() => safeBack(router)}
+                isSubmitting={isSubmitting}
+                showSuccess={showSuccess}
+                onSuccessFinish={() => {
+                    setShowSuccess(false);
+                    safeBack(router);
+                }}
+                successMessage="Transfer Successful!"
+            />
+            {warningSheet && (
+                <ConfirmActionSheet
+                    visible={!!warningSheet}
+                    title={warningSheet.title}
+                    description={warningSheet.description}
+                    confirmLabel="OK"
+                    actionType="warning"
+                    onConfirm={() => setWarningSheet(null)}
+                    onCancel={() => setWarningSheet(null)}
+                />
+            )}
+        </>
     );
 }
 

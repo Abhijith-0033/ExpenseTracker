@@ -9,15 +9,11 @@ import { getAccounts, Account } from '../../services/database';
 import { AccountSelector } from '../../components/AccountSelector';
 import { PieChart as GiftedPieChart, BarChart as GiftedBarChart } from 'react-native-gifted-charts';
 import { format, parseISO } from 'date-fns';
-import PaywallScreen from '../../src/subscription/PaywallScreen';
-import { useSubscription } from '../../src/subscription/useSubscription';
 import { ConfirmActionSheet } from '../../components/ConfirmActionSheet';
 
 const _screenWidth = Dimensions.get('window').width;
 
 export default function EMIDetailScreen() {
-  const { isPremium, isTrialActive } = useSubscription();
-
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string }>();
   const emiId = params.id ? parseInt(params.id) : 0;
@@ -62,10 +58,6 @@ export default function EMIDetailScreen() {
   useEffect(() => {
     loadData();
   }, [loadData]);
-
-  if (!isPremium && !isTrialActive) {
-    return <PaywallScreen showClose={true} />;
-  }
 
   const paidCount = payments.filter((p) => p.payment_status === 'paid').length;
   const pendingCount = payments.filter((p) => p.payment_status === 'pending').length;
@@ -219,7 +211,7 @@ export default function EMIDetailScreen() {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>EMI Details</Text>
         <TouchableOpacity
-          onPress={() => router.push(`/emi-tracker/edit?id=${emiId}` as any)}
+          onPress={() => router.push(`/emi-tracker/add?id=${emiId}` as any)}
           style={styles.editButton}
         >
           <Edit2 size={20} color={Colors.primary[600]} />

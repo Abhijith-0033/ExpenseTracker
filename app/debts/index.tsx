@@ -10,6 +10,7 @@ import { getDebtSummary } from '../../services/debts';
 import { DebtCard } from '../../components/DebtCard';
 import { formatCurrency } from '../../utils/currency';
 import { AccountSelector } from '../../components/AccountSelector';
+import { safeBack } from '../../utils/navigation';
 
 export default function DebtsScreen() {
     const router = useRouter();
@@ -91,7 +92,7 @@ export default function DebtsScreen() {
                 
                 {/* Header */}
                 <View style={styles.header}>
-                    <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+                    <TouchableOpacity onPress={() => safeBack(router)} style={styles.backBtn}>
                         <ArrowLeft size={24} color={Colors.gray[900]} />
                     </TouchableOpacity>
                     <Text style={styles.headerTitle}>Debt Tracker</Text>
@@ -209,7 +210,7 @@ export default function DebtsScreen() {
                             <AccountSelector
                                 accounts={accounts}
                                 selectedAccountId={selectedAccountId}
-                                onSelectAccount={(acc) => setSelectedAccountId(acc ? acc.id : null)}
+                                onSelect={(accId) => setSelectedAccountId(accId)}
                             />
 
                             <Text style={[styles.label, { marginTop: 16 }]}>Notes (Optional)</Text>

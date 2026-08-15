@@ -212,6 +212,15 @@ async function sendApprovalNotification(se, todayISO) {
   
   const logId = result.lastInsertRowId;
   
+  // Parse scheduled time to set exact trigger
+  const [hour, minute] = (se.scheduled_time || '09:00').split(':').map(Number);
+  const now = new Date();
+  const triggerDate = new Date(now);
+  triggerDate.setHours(hour, minute, 0, 0);
+  const triggerConfig = triggerDate > now
+    ? { type: Notifications.SchedulableTriggerInputTypes.DATE, date: triggerDate }
+    : null;
+  
   // Schedule approval notification with action buttons
   await Notifications.scheduleNotificationAsync({
     identifier: notifId,
@@ -227,7 +236,7 @@ async function sendApprovalNotification(se, todayISO) {
       categoryIdentifier: 'SCHED_APPROVAL_ACTIONS',
       channelId: 'scheduled-expenses',
     },
-    trigger: null,
+    trigger: triggerConfig,
   });
 }
 
@@ -392,7 +401,13 @@ export async function scheduleNotificationsForExpense(se) {
   // Cancel existing first to prevent duplicates
   await cancelNotificationsForExpense(se.id);
 
-  const daysArray = JSON.parse(se.days_of_week);
+  let daysArray;
+  try {
+    daysArray = typeof se.days_of_week === 'string' ? JSON.parse(se.days_of_week) : se.days_of_week;
+  } catch {
+    daysArray = [];
+  }
+  if (!Array.isArray(daysArray)) return;
   const [hour, minute] = se.scheduled_time.split(':').map(Number);
   
   for (const day of daysArray) {

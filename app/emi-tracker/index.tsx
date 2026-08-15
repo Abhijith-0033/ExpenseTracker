@@ -7,14 +7,9 @@ import { formatCurrency } from '../../utils/currency';
 import { getEMIRecords, getEMIPayments, deleteEMIRecord, EMIRecord } from '../../services/emitracker/EMIEngine';
 import { SwipeableRow } from '../../components/SwipeableRow';
 import { initDatabase } from '../../services/database';
-
-
-import { useSubscription } from '../../src/subscription/useSubscription';
-import PaywallScreen from '../../src/subscription/PaywallScreen';
 import { ConfirmActionSheet } from '../../components/ConfirmActionSheet';
 
 export default function EMITrackerScreen() {
-  const { isPremium, isTrialActive } = useSubscription();
   const router = useRouter();
   const [emiRecords, setEMIRecords] = useState<EMIRecord[]>([]);
   const [paymentStats, setPaymentStats] = useState<{ pending: number; overdue: number; paid: number }>({
@@ -78,10 +73,6 @@ export default function EMITrackerScreen() {
     }, [loadData])
   );
 
-  if (!isPremium && !isTrialActive) {
-    return <PaywallScreen showClose={true} />;
-  }
-
   const onRefresh = () => {
     setRefreshing(true);
     loadData();
@@ -107,7 +98,7 @@ export default function EMITrackerScreen() {
   };
 
   const handleEdit = (id: number) => {
-    router.push(`/emi-tracker/edit?id=${id}` as any);
+    router.push(`/emi-tracker/add?id=${id}` as any);
   };
 
   const getStatusColor = (status: string) => {

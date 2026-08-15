@@ -1,15 +1,21 @@
 
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator, Alert, Modal, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, RefreshControl, ActivityIndicator, Alert, Modal, TextInput, Share } from 'react-native';
+import { ScrollView, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
-import { ArrowLeft, Settings, Plus, Receipt, Share2, HandCoins, X } from 'lucide-react-native';
+import { ArrowLeft, Settings, Plus, Receipt, Share2, HandCoins, X, FileText, MessageSquare } from 'lucide-react-native';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system/legacy';
 import { Colors, Layout } from '../../constants/Theme';
 import {
-    getGroupById, getGroupMembers, getGroupExpenses, calculateBalances, calculateSettlements, addExpense,
+    getGroupById, getGroupMembers, getGroupExpenses, calculateBalances, calculateSettlements, addExpense, deleteExpense, generateBillGroupShareSummary, generateBillGroupPdfHtml,
     BillGroup, BillGroupMember, BillExpenseDetails, Balance, SettlementTransaction
 } from '../../services/billSplitter';
 import { SettlementSummary } from '../../components/SettlementSummary';
 import { MemberBalanceCard } from '../../components/MemberBalanceCard';
+import { SwipeableRow } from '../../components/SwipeableRow';
+import { ConfirmActionSheet } from '../../components/ConfirmActionSheet';
 import { format } from 'date-fns';
 
 export default function GroupDetailsScreen() {
@@ -31,6 +37,14 @@ export default function GroupDetailsScreen() {
     const [moneyToId, setMoneyToId] = useState<number | null>(null);
     const [moneyAmount, setMoneyAmount] = useState('');
     const [savingMoney, setSavingMoney] = useState(false);
+    const [showExportOptions, setShowExportOptions] = useState(false);
+    const [exportingPdf, setExportingPdf] = useState(false);
+
+    const [confirmSheet, setConfirmSheet] = useState<{
+        title: string;
+        description: string;
+        onConfirm: () => void;
+    } | null>(null);
 
     const fetchData = React.useCallback(async () => {
         try {
@@ -100,7 +114,82 @@ export default function GroupDetailsScreen() {
         } catch (_e) {
             Alert.alert('Error', 'Failed to save money given.');
         } finally {
-            setSavingMoney(false);
+            savingMoney && setSavingMoney(false);
+        }
+    };
+
+    const handleDeleteExpense = (exp: BillExpenseDetails) => {
+        setConfirmSheet({
+            title: 'Delete Expense?',
+            description: `Are you sure you want to delete "${exp.title}"? Balances will be recalculated.`,
+            onConfirm: async () => {
+                setConfirmSheet(null);
+                try {
+                    await deleteExpense(exp.id);
+                    fetchData();
+                } catch (_e) {
+                    Alert.alert('Error', 'Failed to delete expense.');
+                }
+            }
+        });
+    };
+
+    const handleMarkSettled = async (settlement: SettlementTransaction) => {
+        try {
+            await addExpense({
+                groupId,
+                title: `Settlement: ${settlement.from_name} → ${settlement.to_name}`,
+                amount: settlement.amount,
+                paidByMemberId: settlement.from_id,
+                date: Date.now(),
+                notes: 'Marked as settled',
+                splits: [{ memberId: settlement.to_id, amount: settlement.amount }]
+            });
+            fetchData();
+        } catch (_e) {
+            Alert.alert('Error', 'Failed to record settlement.');
+        }
+    };
+
+    const handleExportGroupSummary = async () => {
+        try {
+            const text = await generateBillGroupShareSummary(groupId);
+            if (text) {
+                await Share.share({
+                    title: `${group?.name || 'Group'} Bill Split Summary`,
+                    message: text,
+                });
+            }
+        } catch (e) {
+            console.error('Failed to share bill split:', e);
+        }
+    };
+
+    const handleExportPdf = async () => {
+        setShowExportOptions(false);
+        setExportingPdf(true);
+        try {
+            const html = await generateBillGroupPdfHtml(groupId);
+            if (!html) {
+                Alert.alert('Error', 'Failed to generate PDF content.');
+                return;
+            }
+            const { uri } = await Print.printToFileAsync({ html });
+
+            if (await Sharing.isAvailableAsync()) {
+                await Sharing.shareAsync(uri, {
+                    mimeType: 'application/pdf',
+                    dialogTitle: `Share ${group?.name || 'Group'} Bill Report`,
+                    UTI: 'com.adobe.pdf',
+                });
+            } else {
+                Alert.alert('PDF Exported', `PDF file created successfully.`);
+            }
+        } catch (e) {
+            console.error('PDF Export Error:', e);
+            Alert.alert('Export Error', 'Failed to generate or share PDF.');
+        } finally {
+            setExportingPdf(false);
         }
     };
 
@@ -113,6 +202,7 @@ export default function GroupDetailsScreen() {
     }
 
     return (
+        <GestureHandlerRootView style={{ flex: 1 }}>
         <View style={styles.container}>
             {/* Header */}
             <View style={styles.header}>
@@ -123,16 +213,21 @@ export default function GroupDetailsScreen() {
                     <Text style={styles.headerTitle} numberOfLines={1}>{group.name}</Text>
                     {group.description ? <Text style={styles.headerSubtitle} numberOfLines={1}>{group.description}</Text> : null}
                 </View>
-                <TouchableOpacity onPress={() => router.push(`/bill-splitter/manage-group?id=${groupId}`)}>
-                    <Settings size={24} color={Colors.gray[900]} />
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <TouchableOpacity onPress={() => setShowExportOptions(true)} hitSlop={10}>
+                        <Share2 size={22} color={Colors.primary[600]} />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => router.push(`/bill-splitter/manage-group?id=${groupId}`)} hitSlop={10}>
+                        <Settings size={22} color={Colors.gray[900]} />
+                    </TouchableOpacity>
+                </View>
             </View>
 
             {/* Balances Horizontal Scroll */}
             <View style={styles.balancesContainer}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.balancesList}>
                     {balances.map(b => (
-                        <MemberBalanceCard key={b.member_id} name={b.member_name} amount={b.amount} />
+                        <MemberBalanceCard key={b.member_id} name={b.member_name} amount={b.amount} totalSpent={b.total_spent} totalShare={b.total_share} />
                     ))}
                 </ScrollView>
             </View>
@@ -166,28 +261,33 @@ export default function GroupDetailsScreen() {
                                 expenses.map(expense => {
                                     const isMoneyGiven = expense.title.startsWith('Money given');
                                     return (
-                                        <TouchableOpacity
+                                        <SwipeableRow
                                             key={expense.id}
-                                            style={[styles.expenseItem, isMoneyGiven && styles.moneyGivenItem]}
-                                            onPress={() => router.push(`/bill-splitter/add-group-expense?groupId=${groupId}&id=${expense.id}`)}
+                                            onDelete={() => handleDeleteExpense(expense)}
+                                            onEdit={() => router.push(`/bill-splitter/add-group-expense?groupId=${groupId}&id=${expense.id}`)}
                                         >
-                                            <View style={[styles.expenseDate, isMoneyGiven && { backgroundColor: Colors.primary[50] }]}>
-                                                <Text style={styles.dateMonth}>{format(new Date(expense.date), 'MMM')}</Text>
-                                                <Text style={styles.dateDay}>{format(new Date(expense.date), 'dd')}</Text>
-                                            </View>
-                                            <View style={styles.expenseDetails}>
-                                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                                    {isMoneyGiven && <HandCoins size={14} color={Colors.primary[600]} style={{ marginRight: 6 }} />}
-                                                    <Text style={styles.expenseTitle}>{expense.title}</Text>
+                                            <TouchableOpacity
+                                                style={[styles.expenseItem, isMoneyGiven && styles.moneyGivenItem]}
+                                                onPress={() => router.push(`/bill-splitter/add-group-expense?groupId=${groupId}&id=${expense.id}`)}
+                                            >
+                                                <View style={[styles.expenseDate, isMoneyGiven && { backgroundColor: Colors.primary[50] }]}>
+                                                    <Text style={styles.dateMonth}>{format(new Date(expense.date), 'MMM')}</Text>
+                                                    <Text style={styles.dateDay}>{format(new Date(expense.date), 'dd')}</Text>
                                                 </View>
-                                                <Text style={styles.expensePaidBy}>
-                                                    {expense.paid_by_name} paid ₹{expense.amount.toLocaleString('en-IN')}
-                                                </Text>
-                                            </View>
-                                            <View style={styles.expenseAmount}>
-                                                <Text style={[styles.amountText, isMoneyGiven && { color: Colors.primary[600] }]}>₹{expense.amount}</Text>
-                                            </View>
-                                        </TouchableOpacity>
+                                                <View style={styles.expenseDetails}>
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                        {isMoneyGiven && <HandCoins size={14} color={Colors.primary[600]} style={{ marginRight: 6 }} />}
+                                                        <Text style={styles.expenseTitle}>{expense.title}</Text>
+                                                    </View>
+                                                    <Text style={styles.expensePaidBy}>
+                                                        {expense.paid_by_name} paid ₹{expense.amount.toLocaleString('en-IN')}
+                                                    </Text>
+                                                </View>
+                                                <View style={styles.expenseAmount}>
+                                                    <Text style={[styles.amountText, isMoneyGiven && { color: Colors.primary[600] }]}>₹{expense.amount}</Text>
+                                                </View>
+                                            </TouchableOpacity>
+                                        </SwipeableRow>
                                     );
                                 })
                             ) : (
@@ -201,7 +301,12 @@ export default function GroupDetailsScreen() {
                     </>
                 ) : (
                     <>
-                        <SettlementSummary settlements={settlements} balances={balances} />
+                        <SettlementSummary
+                            settlements={settlements}
+                            balances={balances}
+                            settledExpenses={expenses.filter(e => e.title.startsWith('Settlement:') || e.title.startsWith('Money given'))}
+                            onMarkSettled={handleMarkSettled}
+                        />
 
                         <View style={styles.settlementNote}>
                             <Text style={styles.noteTitle}>How this works</Text>
@@ -287,7 +392,77 @@ export default function GroupDetailsScreen() {
                     </View>
                 </View>
             </Modal>
+
+            {confirmSheet && (
+                <ConfirmActionSheet
+                    visible={!!confirmSheet}
+                    title={confirmSheet.title}
+                    description={confirmSheet.description}
+                    confirmLabel="Delete"
+                    actionType="delete"
+                    onConfirm={confirmSheet.onConfirm}
+                    onCancel={() => setConfirmSheet(null)}
+                />
+            )}
+
+            {/* Share / Export Options Modal */}
+            <Modal visible={showExportOptions} transparent animationType="slide">
+                <TouchableOpacity
+                    style={styles.modalOverlay}
+                    activeOpacity={1}
+                    onPress={() => setShowExportOptions(false)}
+                >
+                    <View style={styles.exportModalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Share & Export</Text>
+                            <TouchableOpacity onPress={() => setShowExportOptions(false)} style={styles.modalClose}>
+                                <X size={22} color={Colors.gray[600]} />
+                            </TouchableOpacity>
+                        </View>
+                        <Text style={{ fontSize: 14, color: Colors.gray[600], marginBottom: 20 }}>
+                            Choose how you would like to export "{group?.name}":
+                        </Text>
+
+                        <TouchableOpacity
+                            style={styles.exportOptionBtn}
+                            onPress={handleExportPdf}
+                            disabled={exportingPdf}
+                        >
+                            <View style={[styles.exportIconBox, { backgroundColor: '#EEF2FF' }]}>
+                                {exportingPdf ? (
+                                    <ActivityIndicator size="small" color={Colors.primary[600]} />
+                                ) : (
+                                    <FileText size={24} color={Colors.primary[600]} />
+                                )}
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.exportOptionTitle}>Export as PDF</Text>
+                                <Text style={styles.exportOptionSub}>
+                                    {exportingPdf ? 'Generating PDF report...' : 'Includes spending chart, expense list & settlements'}
+                                </Text>
+                            </View>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.exportOptionBtn}
+                            onPress={() => {
+                                setShowExportOptions(false);
+                                handleExportGroupSummary();
+                            }}
+                        >
+                            <View style={[styles.exportIconBox, { backgroundColor: '#ECFDF5' }]}>
+                                <MessageSquare size={24} color="#059669" />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.exportOptionTitle}>Share as Text</Text>
+                                <Text style={styles.exportOptionSub}>Quick summary report for WhatsApp or SMS</Text>
+                            </View>
+                        </TouchableOpacity>
+                    </View>
+                </TouchableOpacity>
+            </Modal>
         </View>
+        </GestureHandlerRootView>
     );
 }
 
@@ -428,4 +603,38 @@ const styles = StyleSheet.create({
     input: { backgroundColor: Colors.gray[100], borderRadius: 12, padding: 16, fontSize: 18, fontWeight: '700', color: Colors.gray[900], marginBottom: 20 },
     saveMoneyBtn: { backgroundColor: Colors.primary[600], borderRadius: 16, paddingVertical: 16, alignItems: 'center' },
     saveMoneyText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
+    exportModalContent: {
+        backgroundColor: Colors.white,
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        padding: 24,
+    },
+    exportOptionBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: Colors.gray[50],
+        padding: 16,
+        borderRadius: 16,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: Colors.gray[200],
+    },
+    exportIconBox: {
+        width: 48,
+        height: 48,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 16,
+    },
+    exportOptionTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: Colors.gray[900],
+        marginBottom: 2,
+    },
+    exportOptionSub: {
+        fontSize: 13,
+        color: Colors.gray[500],
+    },
 });

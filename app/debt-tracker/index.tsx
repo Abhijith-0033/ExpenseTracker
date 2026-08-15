@@ -8,15 +8,11 @@ import { calculateCurrentBalance, DebtRecord } from '../../services/debttracker/
 import { formatCurrency } from '../../utils/currency';
 import { Snackbar } from '../../components/Snackbar';
 import { Swipeable } from 'react-native-gesture-handler';
-
-import { useSubscription } from '../../src/subscription/useSubscription';
-import PaywallScreen from '../../src/subscription/PaywallScreen';
 import { ConfirmActionSheet } from '../../components/ConfirmActionSheet';
 
 type FilterType = 'all' | 'borrowed' | 'lent' | 'completed';
 
 export default function DebtTrackerScreen() {
-  const { isPremium, isTrialActive } = useSubscription();
   const router = useRouter();
   const [debts, setDebts] = useState<DebtRecord[]>([]);
   const [filteredDebts, setFilteredDebts] = useState<DebtRecord[]>([]);
@@ -99,10 +95,6 @@ export default function DebtTrackerScreen() {
     
     setFilteredDebts(filtered);
   }, [activeFilter, debts]);
-
-  if (!isPremium && !isTrialActive) {
-    return <PaywallScreen showClose={true} />;
-  }
 
   const handleDelete = (debt: DebtRecord) => {
     setConfirmSheet({

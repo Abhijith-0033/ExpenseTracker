@@ -64,22 +64,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     useEffect(() => {
         const init = async () => {
-            await initDatabase();
-
-            // Load sound setting
             try {
-                const savedSound = await AsyncStorage.getItem('sound_enabled');
-                if (savedSound !== null) {
-                    setSoundEnabledState(savedSound === 'true');
-                }
-            } catch (e) {
-                console.error("Error loading sound preference", e);
-            }
+                await initDatabase();
 
-            await refreshData();
-            setLoading(false);
+                // Load sound setting
+                try {
+                    const savedSound = await AsyncStorage.getItem('sound_enabled');
+                    if (savedSound !== null) {
+                        setSoundEnabledState(savedSound === 'true');
+                    }
+                } catch (e) {
+                    console.error("Error loading sound preference", e);
+                }
+
+                await refreshData();
+            } catch (error) {
+                console.error("AppContext initialization error:", error);
+            } finally {
+                setLoading(false);
+            }
         };
-        init();
+        init().catch((err) => console.error("Unhandled init error:", err));
     }, []);
 
     return (

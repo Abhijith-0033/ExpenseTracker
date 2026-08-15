@@ -6,19 +6,15 @@ import { useApp } from '../context/AppContext';
 import { addAccount, updateAccount, Account, checkTransactionsExistForAccount, deleteAccount, getDatabase, initDatabase } from '../services/database';
 import { ConfirmActionSheet, ConfirmActionType } from '../components/ConfirmActionSheet';
 import { SwipeableRow } from '../components/SwipeableRow';
-import { Plus, X, Lock } from 'lucide-react-native';
+import { Plus, X } from 'lucide-react-native';
 import { formatCurrency } from '../utils/currency';
 import { Colors, Layout, Typography } from '../constants/Theme';
 import { useTheme } from '../context/ThemeContext';
 import { useRouter } from 'expo-router';
-import { useSubscription } from '../src/subscription/useSubscription';
-
 export default function ManageAccountsScreen() {
     const router = useRouter();
     const { accounts, refreshData } = useApp();
     const { colors } = useTheme();
-    const { isPremium, isTrialActive } = useSubscription();
-    const isFreeUser = !isPremium && !isTrialActive;
 
     const [modalVisible, setModalVisible] = useState(false);
     const [editingAccount, setEditingAccount] = useState<Account | null>(null);
@@ -37,10 +33,6 @@ export default function ManageAccountsScreen() {
     const [type, setType] = useState('General');
 
     const openAdd = () => {
-        if (isFreeUser && accounts.length >= 1) {
-            router.push('/paywall');
-            return;
-        }
         setEditingAccount(null);
         setName('');
         setBalance('');
@@ -157,22 +149,6 @@ export default function ManageAccountsScreen() {
                     keyExtractor={(item) => item.id.toString()}
                     renderItem={renderItem}
                     contentContainerStyle={{ padding: 16 }}
-                    ListFooterComponent={
-                        isFreeUser ? (
-                            <TouchableOpacity 
-                                style={styles.lockedCard} 
-                                activeOpacity={0.8}
-                                onPress={() => router.push('/paywall')}
-                            >
-                                <Lock size={20} color={Colors.warning[500]} />
-                                <View style={{ flex: 1, marginLeft: 12 }}>
-                                    <Text style={styles.lockedTitle}>Unlock Unlimited Accounts</Text>
-                                    <Text style={styles.lockedSubtitle}>Free tier is limited to 1 account. Tap to upgrade.</Text>
-                                </View>
-                                <Text style={styles.upgradeText}>Upgrade →</Text>
-                            </TouchableOpacity>
-                        ) : null
-                    }
                 />
 
                 <Modal visible={modalVisible} animationType="slide" transparent>

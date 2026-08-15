@@ -17,11 +17,7 @@ import { FormField } from '../components/FormField';
 import { Snackbar } from '../components/Snackbar';
 import { ConfirmActionSheet, ConfirmActionType } from '../components/ConfirmActionSheet';
 
-import { useSubscription } from '../src/subscription/useSubscription';
-import PaywallScreen from '../src/subscription/PaywallScreen';
-
 export default function SubscriptionsScreen() {
-    const { isPremium, isTrialActive } = useSubscription();
     const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
     const [monthlyBurn, setMonthlyBurn] = useState(0);
     const [activeTab, setActiveTab] = useState<'active' | 'cancelled'>('active');
@@ -56,10 +52,6 @@ export default function SubscriptionsScreen() {
     useEffect(() => {
         loadData();
     }, []);
-
-    if (!isPremium && !isTrialActive) {
-        return <PaywallScreen showClose={true} />;
-    }
 
     const loadData = async () => {
         setLoading(true);

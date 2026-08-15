@@ -16,11 +16,7 @@ import {
   compareRegimes, suggestRemainingInvestment, TaxProfile, TaxDeduction
 } from '../../services/taxplanner/TaxEngine';
 
-import { useSubscription } from '../../src/subscription/useSubscription';
-import PaywallScreen from '../../src/subscription/PaywallScreen';
-
 export default function TaxPlannerScreen() {
-  const { isPremium, isTrialActive } = useSubscription();
   const router = useRouter();
   const currentFY = getCurrentFY();
 
@@ -131,10 +127,6 @@ export default function TaxPlannerScreen() {
       { value: comparison.newRegimeTax, label: 'New', frontColor: comparison.recommendedRegime === 'new' ? SemanticColors.income : SemanticColors.expense },
     ];
   }, [comparison]);
-
-  if (!isPremium && !isTrialActive) {
-    return <PaywallScreen showClose={true} />;
-  }
 
   const render80CProgress = () => {
     if (!comparison) return null;

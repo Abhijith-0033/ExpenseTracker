@@ -106,13 +106,6 @@ export default function RootLayout() {
         } catch (e) {
           console.warn('Failed to process scheduled expenses on foreground:', e);
         }
-
-        try {
-          const { maybeShowTrialEndScreen } = await import('../services/growthGate');
-          await maybeShowTrialEndScreen(router);
-        } catch (e) {
-          console.warn('Failed to check trial end screen on foreground:', e);
-        }
       }
     });
     return () => subscription.remove();
@@ -120,13 +113,19 @@ export default function RootLayout() {
 
   useEffect(() => {
     async function prepare() {
+      // 1. Critical Database Initialization
       try {
         await initDatabase();
+      } catch (e) {
+        console.error('Critical Database initialization error:', e);
+      }
+
+      // 2. Non-Critical Service Initializations
+      try {
         await initNotifications();
         await initializeNotificationManager();
         // Run AutoPay for EMI payments
         await runAutoPay();
-
 
         // Start Telegram polling (silently fails if not linked)
         startPolling();
@@ -151,24 +150,15 @@ export default function RootLayout() {
           console.warn('Failed to register scheduled expense task:', e);
         }
 
-        // Schedule / check trial journey and growth notifications
+        // Check and fire growth notifications (payday/month-end only)
         try {
-          const { scheduleTrialJourney, checkAndFireGrowthNotifications } = await import('../services/notifications/GrowthNotifications');
-          await scheduleTrialJourney();
+          const { checkAndFireGrowthNotifications } = await import('../services/notifications/GrowthNotifications');
           await checkAndFireGrowthNotifications();
         } catch (e) {
           console.warn('Failed to setup growth notifications:', e);
         }
-
-        // Check if trial-end screen needs to be shown
-        try {
-          const { maybeShowTrialEndScreen } = await import('../services/growthGate');
-          await maybeShowTrialEndScreen(router);
-        } catch (e) {
-          console.warn('Failed to check trial end screen on mount:', e);
-        }
       } catch (e) {
-        console.warn('Error initializing notifications:', e);
+        console.warn('Error initializing non-critical app services:', e);
       }
     }
 
@@ -395,6 +385,10 @@ export default function RootLayout() {
                     <Stack.Screen name="cash-flow" options={{ headerShown: false }} />
                     <Stack.Screen name="subscriptions" options={{ headerShown: false }} />
                     <Stack.Screen name="financial-report" options={{ headerShown: false }} />
+                    <Stack.Screen name="reports/index" options={{ headerShown: false }} />
+                    <Stack.Screen name="reports/daily" options={{ headerShown: false }} />
+                    <Stack.Screen name="reports/weekly" options={{ headerShown: false }} />
+                    <Stack.Screen name="reports/monthly" options={{ headerShown: false }} />
                     <Stack.Screen name="account-detail" options={{ headerShown: false }} />
                     <Stack.Screen name="category-detail" options={{ headerShown: false }} />
                     <Stack.Screen name="income-breakdown" options={{ headerShown: false }} />

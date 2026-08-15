@@ -36,7 +36,7 @@ export const SuccessAnimation = ({ visible, onAnimationFinish, message = "Succes
         <View style={styles.container}>
           <LottieView
             ref={animationRef}
-            source={require('../assets/animations/success.json')}
+            source={require('../assets/animations/check-mark.json')}
             autoPlay={false}
             loop={false}
             onAnimationFinish={onAnimationFinish}
@@ -58,8 +58,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   container: {
-    width: 180,
-    height: 180,
+    minWidth: 200,
+    minHeight: 200,
+    paddingHorizontal: 20,
+    paddingVertical: 24,
     backgroundColor: Colors.white,
     borderRadius: 28,
     justifyContent: 'center',
@@ -71,13 +73,14 @@ const styles = StyleSheet.create({
     elevation: 12,
   },
   lottie: {
-    width: 120,
-    height: 120,
+    width: 100,
+    height: 100,
   },
   message: {
     fontSize: Typography.size.md,
     fontFamily: Typography.family.bold,
     color: Colors.gray[900],
-    marginTop: -4,
+    textAlign: 'center',
+    marginTop: 8,
   }
 });

@@ -10,8 +10,6 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { Colors, Typography, Layout } from '../../constants/Theme';
 import { getDatabase } from '../../services/database';
 import { addUpcomingBill, updateUpcomingBill, UpcomingBill } from '../../services/upcomingBills';
-import { useSubscription } from '../../src/subscription/useSubscription';
-import PaywallScreen from '../../src/subscription/PaywallScreen';
 import { format, parseISO } from 'date-fns';
 import { formatCurrency } from '../../utils/currency';
 import { CategoryPicker } from '../../components/CategoryPicker';
@@ -23,8 +21,6 @@ export default function AddEditUpcomingBill() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const editId = params.id ? parseInt(params.id as string) : null;
-
-  const { isPremium, isTrialActive } = useSubscription();
 
   // Form State
   const [name, setName] = useState('');
@@ -50,11 +46,6 @@ export default function AddEditUpcomingBill() {
   useEffect(() => {
     loadMeta();
   }, []);
-
-  // Hook rules require early returns below hooks
-  if (!isPremium && !isTrialActive) {
-    return <PaywallScreen showClose={true} />;
-  }
 
   const loadMeta = async () => {
     try {

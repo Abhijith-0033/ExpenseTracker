@@ -53,7 +53,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   const sheetHeight = (SCREEN_HEIGHT * heightPercent) / 100;
 
   return (
-    <Modal visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={onClose} hardwareAccelerated>
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={styles.backdrop} />
       </TouchableWithoutFeedback>

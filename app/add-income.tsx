@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, Alert, StatusBar, Dimensions, ScrollView, DeviceEventEmitter, ActivityIndicator, InteractionManager } from 'react-native';
 import { useRouter , useFocusEffect } from 'expo-router';
 import { useApp } from '../context/AppContext';
-import { addTransaction, getIncomeSources } from '../services/database';
+import { addTransaction, getIncomeSourcesWithSubs } from '../services/database';
 import { playIncomeSound } from '../services/SoundService';
 import { Keypad } from '../components/ui/Keypad';
 import { Calendar as CalendarIcon, Wallet as WalletIcon, Tag as TagIcon, X, Briefcase, TrendingUp, Gift, DollarSign, Home, Globe, User, ChevronDown } from 'lucide-react-native';
@@ -19,6 +19,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SuccessAnimation } from '../components/SuccessAnimation';
 import { checkDuplicate } from '../services/duplicateCheck';
 import { DuplicateWarningSheet } from '../components/DuplicateWarningSheet';
+import { safeBack } from '../utils/navigation';
 import { TransactionForm } from '../components/transaction/TransactionForm';
 
 export default function AddIncomeScreen() {
@@ -39,6 +40,7 @@ export default function AddIncomeScreen() {
     // Fixed category for Income, but subcategory is selectable
     const category = 'Income';
     const [subcategory, setSubcategory] = useState('Salary');
+    const [incomeSubcategory, setIncomeSubcategory] = useState<string | undefined>(undefined);
     const [incomeSources, setIncomeSources] = useState<any[]>([]);
     const [selectedSourceIcon, setSelectedSourceIcon] = useState('Briefcase');
     const [date, setDate] = useState(new Date());
@@ -55,7 +57,7 @@ export default function AddIncomeScreen() {
 
     const loadIncomeSources = React.useCallback(async () => {
         try {
-            const sources = await getIncomeSources();
+            const sources = await getIncomeSourcesWithSubs();
             if (sources.length > 0) {
                 setIncomeSources(sources);
 
@@ -67,6 +69,7 @@ export default function AddIncomeScreen() {
                     // Initialize with first source
                     setSubcategory(sources[0].name);
                     setSelectedSourceIcon(sources[0].icon);
+                    setIncomeSubcategory(undefined);
                 }
             }
         } catch (e) {
@@ -173,10 +176,14 @@ export default function AddIncomeScreen() {
             setIsSubmitting(true);
             isSubmittingRef.current = true;
 
+            const finalSubcategory = incomeSubcategory
+                ? `${subcategory} › ${incomeSubcategory}`
+                : subcategory;
+
             await addTransaction({
                 amount: finalAmount,
                 category: 'Income',
-                subcategory,
+                subcategory: finalSubcategory,
                 account_id: selectedAccount.id,
                 date: date.toISOString(),
                 description
@@ -245,16 +252,18 @@ export default function AddIncomeScreen() {
             category={category}
             subcategory={subcategory}
             setSubcategory={setSubcategory}
+            incomeSubcategory={incomeSubcategory}
+            setIncomeSubcategory={setIncomeSubcategory}
             date={date}
             setDate={setDate}
             errors={errors}
             onSave={handleSave}
-            onClose={() => router.back()}
+            onClose={() => safeBack(router)}
             isSubmitting={isSubmitting}
             showSuccess={showSuccess}
             onSuccessFinish={() => {
                 setShowSuccess(false);
-                router.back();
+                safeBack(router);
             }}
             successMessage="Income Saved!"
             showDuplicateWarning={showDuplicateWarning}

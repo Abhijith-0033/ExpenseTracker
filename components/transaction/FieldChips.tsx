@@ -15,6 +15,7 @@ export interface FieldChipsProps {
   subcategory?: string;
   description?: string;
   incomeSource?: string;
+  incomeSubcategory?: string;
   errors?: Record<string, string>;
   onDatePress: () => void;
   onAccountPress?: () => void;
@@ -37,6 +38,7 @@ export const FieldChips: React.FC<FieldChipsProps> = ({
   subcategory,
   description,
   incomeSource,
+  incomeSubcategory,
   errors = {},
   onDatePress,
   onAccountPress,
@@ -138,7 +140,11 @@ export const FieldChips: React.FC<FieldChipsProps> = ({
         {type === 'income' &&
           renderChip(
             'Source',
-            incomeSource,
+            incomeSource
+              ? incomeSubcategory
+                ? `${incomeSource} › ${incomeSubcategory}`
+                : incomeSource
+              : undefined,
             '💼',
             onIncomeSourcePress
           )}

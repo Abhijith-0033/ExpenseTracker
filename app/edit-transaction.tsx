@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform, DeviceEventEmitter } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useApp } from '../context/AppContext';
 import { updateTransaction, deleteTransaction, getTransactionById } from '../services/database';
@@ -10,8 +11,8 @@ import { CategoryPicker } from '../components/CategoryPicker';
 import { Calendar as CalendarIcon, Wallet as WalletIcon, Tag as TagIcon, Trash2 } from 'lucide-react-native';
 import { ConfirmActionSheet } from '../components/ConfirmActionSheet';
 import { format } from 'date-fns';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { safeBack } from '../utils/navigation';
 import { Colors, Typography, Layout } from '../constants/Theme';
 
 function evaluateExpression(expr: string): number {
@@ -133,7 +134,7 @@ export default function EditTransactionScreen() {
                     });
                     await refreshData();
                     DeviceEventEmitter.emit('RECOMPUTE_SATISFACTION');
-                    router.back();
+                    safeBack(router);
                 } catch (_e) {
                     Alert.alert('Error', 'Failed to update transaction');
                 } finally {
@@ -163,7 +164,7 @@ export default function EditTransactionScreen() {
                 await deleteTransaction(originalTx.id, originalTx.account_id, originalTx.amount, originalTx.category);
                 await refreshData();
                 DeviceEventEmitter.emit('RECOMPUTE_SATISFACTION');
-                router.back();
+                safeBack(router);
             }
         });
     };

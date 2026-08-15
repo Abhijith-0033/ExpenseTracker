@@ -12,15 +12,11 @@ import { formatCurrency } from '../utils/currency';
 import { startOfMonth, subMonths, startOfYear } from 'date-fns';
 import { TransactionList } from '../components/TransactionList';
 
-import { useSubscription } from '../src/subscription/useSubscription';
-import PaywallScreen from '../src/subscription/PaywallScreen';
-
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 type Period = 'This Month' | 'Last 3M' | 'This Year' | 'All Time';
 
 export default function AccountDetailScreen() {
-    const { isPremium, isTrialActive } = useSubscription();
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const params = useLocalSearchParams();
@@ -93,10 +89,6 @@ export default function AccountDetailScreen() {
             loadAccountData();
         }
     }, [selectedAccountId, period, loadAccountData]);
-
-    if (!isPremium && !isTrialActive) {
-        return <PaywallScreen showClose={true} />;
-    }
 
 
 

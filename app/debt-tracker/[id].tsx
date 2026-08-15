@@ -11,13 +11,9 @@ import { Snackbar } from '../../components/Snackbar';
 import { AccountSelector } from '../../components/AccountSelector';
 import { LineChart, BarChart } from 'react-native-gifted-charts';
 import { format } from 'date-fns';
-import { useSubscription } from '../../src/subscription/useSubscription';
-import PaywallScreen from '../../src/subscription/PaywallScreen';
 import { ConfirmActionSheet } from '../../components/ConfirmActionSheet';
 
 export default function DebtDetailScreen() {
-  const { isPremium, isTrialActive } = useSubscription();
-
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const debtId = parseInt(id);
@@ -111,10 +107,6 @@ export default function DebtDetailScreen() {
     })),
     [paymentHistory]
   );
-
-  if (!isPremium && !isTrialActive) {
-    return <PaywallScreen showClose={true} />;
-  }
 
   const handleAddPayment = async () => {
     if (!paymentAmount || parseFloat(paymentAmount) <= 0) {

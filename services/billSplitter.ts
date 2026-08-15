@@ -294,38 +294,50 @@ export const calculateBalances = async (groupId: number): Promise<Balance[]> => 
 
     const spent: Record<number, number> = {};
     const share: Record<number, number> = {};
-    const memberNames: Record<number, string> = {};
 
-    // Initialize
+    // Initialize all members with 0
     members.forEach(m => {
-        spent[m.id] = 0;
-        share[m.id] = 0;
-        memberNames[m.id] = m.name;
+        const id = Number(m.id);
+        spent[id] = 0;
+        share[id] = 0;
     });
 
     // Process Expenses
     expenses.forEach(exp => {
-        // Payer's total spent
-        if (spent[exp.paid_by_member_id] !== undefined) {
-            spent[exp.paid_by_member_id] += exp.amount;
+        const payerId = Number(exp.paid_by_member_id);
+        const expAmount = Number(exp.amount) || 0;
+
+        if (spent[payerId] !== undefined) {
+            spent[payerId] += expAmount;
+        } else {
+            spent[payerId] = expAmount;
         }
 
-        // Each splitter's share
-        exp.splits.forEach(split => {
-            if (share[split.member_id] !== undefined) {
-                share[split.member_id] += split.amount;
-            }
-        });
+        if (Array.isArray(exp.splits)) {
+            exp.splits.forEach(split => {
+                const sMemberId = Number(split.member_id);
+                const sAmount = Number(split.amount) || 0;
+                if (share[sMemberId] !== undefined) {
+                    share[sMemberId] += sAmount;
+                } else {
+                    share[sMemberId] = sAmount;
+                }
+            });
+        }
     });
 
-    return Object.keys(memberNames).map(idStr => {
-        const id = parseInt(idStr);
+    return members.map(m => {
+        const id = Number(m.id);
+        const totalSpent = spent[id] || 0;
+        const totalShare = share[id] || 0;
+        const netAmount = totalSpent - totalShare;
+
         return {
             member_id: id,
-            member_name: memberNames[id],
-            total_spent: spent[id],
-            total_share: share[id],
-            amount: spent[id] - share[id]
+            member_name: m.name,
+            total_spent: totalSpent,
+            total_share: totalShare,
+            amount: Number(netAmount.toFixed(2))
         };
     });
 };
@@ -366,3 +378,284 @@ export const calculateSettlements = (balances: Balance[]): SettlementTransaction
 
     return transactions;
 };
+
+export const generateBillGroupShareSummary = async (groupId: number): Promise<string> => {
+    const group = await getGroupById(groupId);
+    if (!group) return '';
+
+    const expenses = await getGroupExpenses(groupId);
+    const balances = await calculateBalances(groupId);
+    const settlements = calculateSettlements(balances);
+
+    const totalSpent = expenses.reduce((sum, e) => sum + e.amount, 0);
+
+    let text = `🧾 *Bill Split Summary: ${group.name}*\n`;
+    if (group.description) text += `${group.description}\n`;
+    text += `─────────────\n`;
+    text += `💰 Total Expenses: ₹${totalSpent.toLocaleString('en-IN')}\n\n`;
+
+    text += `📊 *Individual Balances:*\n`;
+    balances.forEach(b => {
+        const sign = b.amount > 0 ? 'Gets back' : b.amount < 0 ? 'Owes' : 'Settled';
+        const amtStr = Math.abs(b.amount) < 0.01 ? '₹0' : `₹${Math.abs(b.amount).toFixed(2)}`;
+        text += `• ${b.member_name}: ${sign} ${amtStr} (Spent ₹${b.total_spent.toFixed(0)}, Share ₹${b.total_share.toFixed(0)})\n`;
+    });
+
+    if (settlements.length > 0) {
+        text += `\n🤝 *Settlement Plan:*\n`;
+        settlements.forEach(s => {
+            text += `• ${s.from_name} ➔ ${s.to_name}: ₹${s.amount.toLocaleString('en-IN')}\n`;
+        });
+    } else {
+        text += `\n🎉 All settled up!\n`;
+    }
+
+    text += `\nShared via ExpenseTracker`;
+    return text;
+};
+
+export const generateBillGroupPdfHtml = async (groupId: number): Promise<string> => {
+    const group = await getGroupById(groupId);
+    if (!group) return '';
+
+    const members = await getGroupMembers(groupId);
+    const expenses = await getGroupExpenses(groupId);
+    const balances = await calculateBalances(groupId);
+    const settlements = calculateSettlements(balances);
+
+    const totalSpent = expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+    const dateStr = new Date().toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+    });
+
+    // Generate SVG Pie Chart for Spending Breakdown
+    const pieColors = ['#4F46E5', '#10B981', '#F59E0B', '#EC4899', '#8B5CF6', '#3B82F6', '#14B8A6', '#F97316'];
+    const spendingMembers = balances.filter(b => b.total_spent > 0);
+    const totalPieSpent = spendingMembers.reduce((sum, b) => sum + b.total_spent, 0);
+
+    let pieSvg = '';
+    let legendHtml = '';
+
+    if (totalPieSpent > 0 && spendingMembers.length > 0) {
+        let currentAngle = 0;
+        const slices: string[] = [];
+
+        spendingMembers.forEach((b, idx) => {
+            const percentage = (b.total_spent / totalPieSpent);
+            const sliceAngle = percentage * 360;
+            const color = pieColors[idx % pieColors.length];
+
+            if (spendingMembers.length === 1 || sliceAngle >= 359.9) {
+                slices.push(`<circle cx="100" cy="100" r="75" fill="${color}" />`);
+            } else {
+                const startAngle = currentAngle;
+                const endAngle = currentAngle + sliceAngle;
+
+                const startRad = (startAngle - 90) * Math.PI / 180;
+                const endRad = (endAngle - 90) * Math.PI / 180;
+
+                const x1 = 100 + 75 * Math.cos(startRad);
+                const y1 = 100 + 75 * Math.sin(startRad);
+                const x2 = 100 + 75 * Math.cos(endRad);
+                const y2 = 100 + 75 * Math.sin(endRad);
+
+                const largeArc = sliceAngle > 180 ? 1 : 0;
+                const pathData = `M 100 100 L ${x1.toFixed(2)} ${y1.toFixed(2)} A 75 75 0 ${largeArc} 1 ${x2.toFixed(2)} ${y2.toFixed(2)} Z`;
+                slices.push(`<path d="${pathData}" fill="${color}" />`);
+            }
+
+            currentAngle += sliceAngle;
+
+            const pctStr = (percentage * 100).toFixed(1);
+            legendHtml += `
+                <div style="display:flex; align-items:center; margin-bottom:8px;">
+                    <span style="width:12px; height:12px; border-radius:50%; background-color:${color}; display:inline-block; margin-right:8px;"></span>
+                    <span style="flex:1; font-size:13px; color:#374151;"><strong>${b.member_name}</strong></span>
+                    <span style="font-size:13px; font-weight:600; color:#111827;">₹${b.total_spent.toLocaleString('en-IN')} (${pctStr}%)</span>
+                </div>
+            `;
+        });
+
+        pieSvg = `
+            <svg width="200" height="200" viewBox="0 0 200 200" style="display:block; margin:0 auto;">
+                ${slices.join('')}
+                <circle cx="100" cy="100" r="42" fill="#FFFFFF" />
+            </svg>
+        `;
+    } else {
+        pieSvg = `
+            <svg width="200" height="200" viewBox="0 0 200 200" style="display:block; margin:0 auto;">
+                <circle cx="100" cy="100" r="75" fill="#E5E7EB" />
+                <circle cx="100" cy="100" r="42" fill="#FFFFFF" />
+            </svg>
+        `;
+        legendHtml = `<p style="color:#6B7280; font-size:13px; text-align:center;">No spending data available</p>`;
+    }
+
+    // Expenses Table Rows
+    const expenseRowsHtml = expenses.map((e, index) => {
+        const expDate = new Date(e.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+        const bg = index % 2 === 0 ? '#FFFFFF' : '#F9FAFB';
+        return `
+            <tr style="background-color:${bg}; border-bottom:1px solid #E5E7EB;">
+                <td style="padding:10px 12px; font-size:13px; color:#4B5563;">${expDate}</td>
+                <td style="padding:10px 12px; font-size:13px; font-weight:600; color:#111827;">${e.title}</td>
+                <td style="padding:10px 12px; font-size:13px; color:#4B5563;">${e.paid_by_name}</td>
+                <td style="padding:10px 12px; font-size:13px; font-weight:700; color:#111827; text-align:right;">₹${e.amount.toLocaleString('en-IN')}</td>
+            </tr>
+        `;
+    }).join('');
+
+    // Balances Rows
+    const balanceRowsHtml = balances.map((b, index) => {
+        const bg = index % 2 === 0 ? '#FFFFFF' : '#F9FAFB';
+        const isReceiving = b.amount > 0.01;
+        const isOwing = b.amount < -0.01;
+        const statusText = isReceiving ? `Gets back ₹${b.amount.toFixed(2)}` : isOwing ? `Owes ₹${Math.abs(b.amount).toFixed(2)}` : 'Settled';
+        const statusColor = isReceiving ? '#059669' : isOwing ? '#DC2626' : '#4B5563';
+        const badgeBg = isReceiving ? '#D1FAE5' : isOwing ? '#FEE2E2' : '#E5E7EB';
+
+        return `
+            <tr style="background-color:${bg}; border-bottom:1px solid #E5E7EB;">
+                <td style="padding:10px 12px; font-size:13px; font-weight:600; color:#111827;">${b.member_name}</td>
+                <td style="padding:10px 12px; font-size:13px; color:#4B5563; text-align:right;">₹${b.total_spent.toLocaleString('en-IN')}</td>
+                <td style="padding:10px 12px; font-size:13px; color:#4B5563; text-align:right;">₹${b.total_share.toLocaleString('en-IN')}</td>
+                <td style="padding:10px 12px; font-size:13px; text-align:right;">
+                    <span style="background-color:${badgeBg}; color:${statusColor}; padding:4px 8px; border-radius:12px; font-weight:700; font-size:12px;">
+                        ${statusText}
+                    </span>
+                </td>
+            </tr>
+        `;
+    }).join('');
+
+    // Settlements HTML
+    let settlementHtml = '';
+    if (settlements.length > 0) {
+        settlementHtml = settlements.map(s => `
+            <div style="display:flex; justify-content:space-between; align-items:center; background-color:#EEF2FF; border:1px solid #C7D2FE; padding:12px 16px; border-radius:8px; margin-bottom:8px;">
+                <div style="font-size:14px; font-weight:600; color:#3730A3;">
+                    <span>${s.from_name}</span>
+                    <span style="color:#6366F1; margin:0 8px;">➔</span>
+                    <span>${s.to_name}</span>
+                </div>
+                <div style="font-size:15px; font-weight:700; color:#4338CA;">
+                    ₹${s.amount.toLocaleString('en-IN')}
+                </div>
+            </div>
+        `).join('');
+    } else {
+        settlementHtml = `
+            <div style="text-align:center; padding:16px; background-color:#ECFDF5; border:1px solid #A7F3D0; border-radius:8px; color:#065F46; font-weight:600;">
+                🎉 All balances are settled up!
+            </div>
+        `;
+    }
+
+    return `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <title>${group.name} - Bill Split Report</title>
+            <style>
+                body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 24px; color: #111827; background-color: #FFFFFF; }
+                .header { border-bottom: 2px solid #4F46E5; padding-bottom: 16px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: flex-end; }
+                .title { font-size: 24px; font-weight: 800; color: #1E1B4B; margin: 0 0 4px 0; }
+                .subtitle { font-size: 14px; color: #6B7280; margin: 0; }
+                .meta { font-size: 12px; color: #4B5563; text-align: right; }
+                .grid { display: flex; gap: 16px; margin-bottom: 24px; }
+                .card { flex: 1; background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 12px; padding: 14px; text-align: center; }
+                .card-val { font-size: 20px; font-weight: 800; color: #4F46E5; }
+                .card-lbl { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #6B7280; margin-top: 4px; font-weight: 600; }
+                .section-title { font-size: 16px; font-weight: 700; color: #111827; margin: 24px 0 12px 0; border-left: 4px solid #4F46E5; padding-left: 10px; }
+                table { width: 100%; border-collapse: collapse; margin-bottom: 16px; border-radius: 8px; overflow: hidden; border: 1px solid #E5E7EB; }
+                th { background-color: #4F46E5; color: #FFFFFF; text-align: left; padding: 10px 12px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+                .chart-container { display: flex; align-items: center; justify-content: space-around; background-color: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 12px; padding: 16px; margin-bottom: 24px; }
+                .footer { margin-top: 40px; border-top: 1px solid #E5E7EB; padding-top: 12px; text-align: center; font-size: 11px; color: #9CA3AF; }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <div>
+                    <h1 class="title">${group.name}</h1>
+                    <p class="subtitle">${group.description || 'Bill Split & Expense Summary'}</p>
+                </div>
+                <div class="meta">
+                    <div><strong>Date:</strong> ${dateStr}</div>
+                    <div><strong>App:</strong> ExpenseTracker</div>
+                </div>
+            </div>
+
+            <div class="grid">
+                <div class="card">
+                    <div class="card-val">₹${totalSpent.toLocaleString('en-IN')}</div>
+                    <div class="card-lbl">Total Group Spend</div>
+                </div>
+                <div class="card">
+                    <div class="card-val">${expenses.length}</div>
+                    <div class="card-lbl">Total Expenses</div>
+                </div>
+                <div class="card">
+                    <div class="card-val">${members.length}</div>
+                    <div class="card-lbl">Group Members</div>
+                </div>
+                <div class="card">
+                    <div class="card-val">${settlements.length}</div>
+                    <div class="card-lbl">Pending Settlements</div>
+                </div>
+            </div>
+
+            <div class="section-title">Spending Breakdown by Member</div>
+            <div class="chart-container">
+                <div style="flex:1;">
+                    ${pieSvg}
+                </div>
+                <div style="flex:1; padding-left:20px;">
+                    ${legendHtml}
+                </div>
+            </div>
+
+            <div class="section-title">Individual Balances & Shares</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Member</th>
+                        <th style="text-align:right;">Spent</th>
+                        <th style="text-align:right;">Fair Share</th>
+                        <th style="text-align:right;">Net Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${balanceRowsHtml}
+                </tbody>
+            </table>
+
+            <div class="section-title">Settlement Plan</div>
+            ${settlementHtml}
+
+            <div class="section-title">All Group Expenses</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Title</th>
+                        <th>Paid By</th>
+                        <th style="text-align:right;">Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${expenses.length > 0 ? expenseRowsHtml : '<tr><td colspan="4" style="text-align:center; padding:16px; color:#9CA3AF;">No expenses recorded yet</td></tr>'}
+                </tbody>
+            </table>
+
+            <div class="footer">
+                Report generated automatically by ExpenseTracker • All monetary values are in INR (₹)
+            </div>
+        </body>
+        </html>
+    `;
+};
+

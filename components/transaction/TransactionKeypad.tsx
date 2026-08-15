@@ -2,6 +2,8 @@ import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Delete, Check } from 'lucide-react-native';
 import { Colors, Typography, Layout } from '../../constants/Theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTheme } from '../../context/ThemeContext';
 
 export interface TransactionKeypadProps {
   onPress: (val: string) => void;
@@ -28,6 +30,10 @@ export const TransactionKeypad: React.FC<TransactionKeypadProps> = ({
   canSave,
   activeOperator,
 }) => {
+  const insets = useSafeAreaInsets();
+  const { themeConfig } = useTheme();
+  const isFloating = themeConfig.tabBarStyle !== 'standard';
+  const extraBottomPadding = isFloating ? 88 : Math.max(insets.bottom, 8);
   const renderKey = (label: string, value: string, isOperator = false, isDanger = false) => {
     const isActiveOp = activeOperator === value;
 
@@ -60,7 +66,7 @@ export const TransactionKeypad: React.FC<TransactionKeypadProps> = ({
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingBottom: extraBottomPadding }]}>
       {/* 4x4 Grid */}
       <View style={styles.gridRow}>
         {renderKey('7', '7')}
@@ -145,7 +151,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 28,
     paddingTop: 10,
     paddingHorizontal: 12,
-    paddingBottom: 28,
+    paddingBottom: 0,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.08,

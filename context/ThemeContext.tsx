@@ -23,6 +23,7 @@ export interface ThemeConfig {
   tabBarStyle: TabBarStyle;
   showGreeting: boolean;
   showDate: boolean;
+  showRupeeCoin: boolean;
 }
 
 export interface DashboardWidget {
@@ -64,6 +65,7 @@ const DEFAULT_THEME_CONFIG: ThemeConfig = {
   tabBarStyle: 'floating',
   showGreeting: true,
   showDate: true,
+  showRupeeCoin: true,
 };
 
 const DEFAULT_DASHBOARD_WIDGETS: DashboardWidget[] = [

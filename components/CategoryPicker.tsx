@@ -1,8 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
-import { Modal, View, Text, TouchableOpacity, StyleSheet, FlatList, SafeAreaView } from 'react-native';
+import { Modal, View, Text, TouchableOpacity, StyleSheet, FlatList } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../context/AppContext';
-import { CategoryNode, getIncomeSources } from '../services/database';
+import { CategoryNode, getIncomeSourcesWithSubs, IncomeSource } from '../services/database';
 import { X, ChevronRight } from 'lucide-react-native';
 
 interface CategoryPickerProps {
@@ -15,17 +15,21 @@ interface CategoryPickerProps {
 export const CategoryPicker: React.FC<CategoryPickerProps> = ({ visible, onClose, onSelect, type = 'expense' }) => {
     const { categories } = useApp();
     const [selectedParent, setSelectedParent] = useState<CategoryNode | null>(null);
-    const [incomeSources, setIncomeSources] = useState<string[]>([]);
+    const [incomeSources, setIncomeSources] = useState<IncomeSource[]>([]);
+    const [incomeSubPicker, setIncomeSubPicker] = useState<IncomeSource | null>(null);
 
     useEffect(() => {
         if (visible && type === 'income') {
-            getIncomeSources()
+            getIncomeSourcesWithSubs()
                 .then(sources => {
-                    setIncomeSources(sources.map(s => s.name));
+                    setIncomeSources(sources);
                 })
                 .catch(err => {
                     console.error("Failed to load income sources in CategoryPicker", err);
                 });
+        }
+        if (!visible) {
+            setIncomeSubPicker(null);
         }
     }, [visible, type]);
 
@@ -73,10 +77,13 @@ export const CategoryPicker: React.FC<CategoryPickerProps> = ({ visible, onClose
             <SafeAreaView style={styles.modalContainer}>
                 <View style={styles.header}>
                     <Text style={styles.title}>
-                        {type === 'income' ? 'Select Income Category' : (selectedParent ? selectedParent.name : 'Select Category')}
+                        {type === 'income'
+                            ? (incomeSubPicker ? incomeSubPicker.name : 'Select Income Category')
+                            : (selectedParent ? selectedParent.name : 'Select Category')}
                     </Text>
                     <TouchableOpacity onPress={() => {
                         if (selectedParent) setSelectedParent(null);
+                        else if (incomeSubPicker) setIncomeSubPicker(null);
                         else onClose();
                     }}>
                         <X size={24} color="#1f2937" />
@@ -84,22 +91,66 @@ export const CategoryPicker: React.FC<CategoryPickerProps> = ({ visible, onClose
                 </View>
 
                 {type === 'income' ? (
-                    <FlatList
-                        data={incomeSources}
-                        keyExtractor={(i) => i}
-                        renderItem={({ item }) => (
+                    incomeSubPicker ? (
+                        <View style={{ flex: 1 }}>
+                            <TouchableOpacity style={styles.backButton} onPress={() => setIncomeSubPicker(null)}>
+                                <Text style={{ color: '#2563eb' }}>← Back to Sources</Text>
+                            </TouchableOpacity>
                             <TouchableOpacity
-                                style={styles.item}
+                                style={[styles.item, { backgroundColor: '#eff6ff' }]}
                                 onPress={() => {
-                                    onSelect('Income', item);
+                                    onSelect('Income', incomeSubPicker.name);
+                                    setIncomeSubPicker(null);
                                     onClose();
                                 }}
                             >
-                                <View style={styles.iconPlaceholder} />
-                                <Text style={styles.itemText}>{item}</Text>
+                                <Text style={[styles.itemText, { color: '#1d4ed8' }]}>
+                                    Use "{incomeSubPicker.name}" only (no subcategory)
+                                </Text>
                             </TouchableOpacity>
-                        )}
-                    />
+                            <FlatList
+                                data={incomeSubPicker.subcategories ?? []}
+                                keyExtractor={(i) => i.id.toString()}
+                                renderItem={({ item }) => (
+                                    <TouchableOpacity
+                                        style={styles.item}
+                                        onPress={() => {
+                                            onSelect('Income', `${incomeSubPicker.name} › ${item.name}`);
+                                            setIncomeSubPicker(null);
+                                            onClose();
+                                        }}
+                                    >
+                                        <Text style={styles.itemText}>{incomeSubPicker.name} › {item.name}</Text>
+                                    </TouchableOpacity>
+                                )}
+                            />
+                        </View>
+                    ) : (
+                        <FlatList
+                            data={incomeSources}
+                            keyExtractor={(i) => i.id.toString()}
+                            renderItem={({ item }) => {
+                                const hasSubs = (item.subcategories?.length ?? 0) > 0;
+                                return (
+                                    <TouchableOpacity
+                                        style={styles.item}
+                                        onPress={() => {
+                                            if (hasSubs) {
+                                                setIncomeSubPicker(item);
+                                            } else {
+                                                onSelect('Income', item.name);
+                                                onClose();
+                                            }
+                                        }}
+                                    >
+                                        <View style={styles.iconPlaceholder} />
+                                        <Text style={styles.itemText}>{item.name}</Text>
+                                        {hasSubs && <ChevronRight size={20} color="#9ca3af" />}
+                                    </TouchableOpacity>
+                                );
+                            }}
+                        />
+                    )
                 ) : selectedParent ? (
                     <View style={{ flex: 1 }}>
                         <TouchableOpacity style={styles.backButton} onPress={() => setSelectedParent(null)}>

@@ -516,6 +516,16 @@ export default function ThemeSettingsScreen() {
               thumbColor="#FFF"
             />
           </View>
+
+          <View style={[styles.toggleRow, { borderBottomWidth: 0 }]}>
+            <Text style={[styles.toggleText, { color: colors.gray[900] }]}>Show Rupee Coin Animation 🪙</Text>
+            <Switch
+              value={themeConfig.showRupeeCoin !== false}
+              onValueChange={v => updateTheme({ showRupeeCoin: v })}
+              trackColor={{ true: colors.primary[500], false: colors.gray[200] }}
+              thumbColor="#FFF"
+            />
+          </View>
         </View>
 
         {/* SidePanel Items Manager */}

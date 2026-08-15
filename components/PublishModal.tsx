@@ -54,7 +54,7 @@ export function PublishModal({ bookId, book, onClose, onPublished }: PublishModa
       <View style={styles.overlay}>
         <View style={styles.sheet}>
           <View style={styles.header}>
-            <Text style={styles.title}>🚀 Publish "{book.name}"?</Text>
+            <Text style={styles.title}>🚀 Publish {book.name}?</Text>
             <Pressable onPress={onClose} hitSlop={10}><X size={24} color={Colors.gray[500]} /></Pressable>
           </View>
 

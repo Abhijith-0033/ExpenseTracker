@@ -10,9 +10,6 @@ import { formatCurrency } from '../utils/currency';
 import { startOfMonth, subMonths, startOfYear, format, parseISO } from 'date-fns';
 import { TransactionList } from '../components/TransactionList';
 
-import { useSubscription } from '../src/subscription/useSubscription';
-import PaywallScreen from '../src/subscription/PaywallScreen';
-
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 type Period = 'This Month' | 'Last 6M' | 'This Year' | 'All Time';
@@ -22,10 +19,10 @@ const getSourceColor = (source: string, index: number) => {
         Colors.success[500],
         Colors.primary[500],
         Colors.warning[500],
-        '#8B5CF6', // Purple
+        '#8B5CF6',
         Colors.danger[400],
-        '#06B6D4', // Cyan
-        '#F43F5E'  // Rose
+        '#06B6D4',
+        '#F43F5E'
     ];
     return palette[index % palette.length];
 };
@@ -43,7 +40,6 @@ const getSourceIcon = (source: string) => {
 };
 
 export default function IncomeBreakdownScreen() {
-    const { isPremium, isTrialActive } = useSubscription();
     const router = useRouter();
     const insets = useSafeAreaInsets();
 
@@ -153,10 +149,6 @@ export default function IncomeBreakdownScreen() {
     useEffect(() => {
         loadData();
     }, [loadData, period, selectedSource]);
-
-    if (!isPremium && !isTrialActive) {
-        return <PaywallScreen showClose={true} />;
-    }
 
 
 

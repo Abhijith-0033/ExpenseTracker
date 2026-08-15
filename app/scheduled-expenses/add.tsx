@@ -5,8 +5,6 @@ import { ArrowLeft, Clock, ChevronDown, Check, Tag } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Typography, Layout } from '../../constants/Theme';
 import { getDatabase, getScheduledExpenseById, insertScheduledExpense, updateScheduledExpense } from '../../services/database';
-import { useSubscription } from '../../src/subscription/useSubscription';
-import PaywallScreen from '../../src/subscription/PaywallScreen';
 import { scheduleNotificationsForExpense, cancelNotificationsForExpense } from '../../src/scheduled/ScheduledExpenseEngine';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
@@ -24,8 +22,6 @@ export default function AddEditScheduledExpense() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const editId = params.id ? parseInt(params.id as string) : null;
-
-  const { isPremium, isTrialActive } = useSubscription();
 
   // Form State
   const [name, setName] = useState('');
@@ -56,10 +52,7 @@ export default function AddEditScheduledExpense() {
     loadMeta();
   }, []);
 
-  if (!isPremium && !isTrialActive) {
-    return <PaywallScreen showClose={true} />;
-  }
-  const isFreeUser = !isPremium && !isTrialActive;
+  const isFreeUser = false;
 
   const loadMeta = async () => {
     try {

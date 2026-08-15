@@ -2,6 +2,7 @@ import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { TabErrorFallback } from '../../components/ErrorBoundary';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, StatusBar, TouchableOpacity, Dimensions , Modal } from 'react-native';
+import LottieView from 'lottie-react-native';
 import { useRouter } from 'expo-router';
 import { useApp } from '../../context/AppContext';
 import {  TrendingUp, TrendingDown, ArrowRight, BookOpen, Activity , CalendarDays, CalendarRange, Calendar, BarChart3, X , Grid, Lock } from 'lucide-react-native';
@@ -392,11 +393,24 @@ function DashboardContent() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary[500]} />}
         >
           <View style={styles.header}>
-            <View>
-              {themeConfig.showGreeting && <Text style={[styles.greeting, { color: colors.gray[900] }]}>{getGreeting()}</Text>}
-              {themeConfig.showDate && <Text style={[styles.date, { color: colors.gray[500] }]}>{format(new Date(), 'EEEE, do MMMM')}</Text>}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              {(themeConfig.showRupeeCoin !== false) && (
+                <View style={{ width: 44, height: 44, justifyContent: 'center', alignItems: 'center' }}>
+                  <LottieView
+                    source={require('../../assets/animations/rupee-coin.json')}
+                    autoPlay
+                    loop
+                    style={{ width: 44, height: 44 }}
+                    resizeMode="contain"
+                  />
+                </View>
+              )}
+              <View>
+                {themeConfig.showGreeting && <Text style={[styles.greeting, { color: colors.gray[900] }]}>{getGreeting()}</Text>}
+                {themeConfig.showDate && <Text style={[styles.date, { color: colors.gray[500] }]}>{format(new Date(), 'EEEE, do MMMM')}</Text>}
+              </View>
             </View>
-            <View style={{ flexDirection: 'row', gap: 12 }}>
+            <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
               <TouchableOpacity
                 activeOpacity={0.7}
                 style={[styles.profilePlaceholder, { backgroundColor: colors.primary[50], borderColor: colors.primary[100] }]}

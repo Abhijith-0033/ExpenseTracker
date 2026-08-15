@@ -6,8 +6,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Typography, Layout } from '../../constants/Theme';
 import { formatCurrency } from '../../utils/currency';
 import { getDatabase, getScheduledExpenseById, updateScheduledExpense, softDeleteScheduledExpense, ScheduledExpenseJoined } from '../../services/database';
-import { useSubscription } from '../../src/subscription/useSubscription';
-import PaywallScreen from '../../src/subscription/PaywallScreen';
 import { scheduleNotificationsForExpense, cancelNotificationsForExpense } from '../../src/scheduled/ScheduledExpenseEngine';
 import { ConfirmActionSheet } from '../../components/ConfirmActionSheet';
 
@@ -17,8 +15,6 @@ export default function ScheduledExpenseDetail() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const id = params.id ? parseInt(params.id as string) : null;
-
-  const { isPremium, isTrialActive } = useSubscription();
 
   const [item, setItem] = useState<ScheduledExpenseJoined | null>(null);
   const [logs, setLogs] = useState<any[]>([]);
@@ -60,10 +56,6 @@ export default function ScheduledExpenseDetail() {
   useEffect(() => {
     loadData();
   }, [loadData]);
-
-  if (!isPremium && !isTrialActive) {
-    return <PaywallScreen showClose={true} />;
-  }
 
   const handleToggleActive = async () => {
     if (!item) return;

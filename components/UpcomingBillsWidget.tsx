@@ -1,26 +1,22 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Lock, CreditCard, Clock, CheckCircle2 } from 'lucide-react-native';
+import { CreditCard, Clock, CheckCircle2 } from 'lucide-react-native';
 import { Colors, Layout, Typography } from '../constants/Theme';
 import { getBillsDueInDays, markBillPaid, UpcomingBill } from '../services/upcomingBills';
-import { useSubscription } from '../src/subscription/useSubscription';
 import { useApp } from '../context/AppContext';
 import { formatCurrency } from '../utils/currency';
 import { format, differenceInDays, parseISO } from 'date-fns';
 
 export const UpcomingBillsWidget = () => {
   const router = useRouter();
-  const { isPremium, isTrialActive, restorePurchases } = useSubscription();
   const { accounts, refreshData } = useApp();
-  const isFreeUser = !isPremium && !isTrialActive;
 
   const [bills, setBills] = useState<UpcomingBill[]>([]);
   const [loading, setLoading] = useState(false);
   const [markingId, setMarkingId] = useState<number | null>(null);
 
   const loadBills = useCallback(async () => {
-    if (isFreeUser) return;
     try {
       setLoading(true);
       const data = await getBillsDueInDays(30);
@@ -31,7 +27,7 @@ export const UpcomingBillsWidget = () => {
     } finally {
       setLoading(false);
     }
-  }, [isFreeUser]);
+  }, []);
 
   useEffect(() => {
     loadBills();
@@ -62,46 +58,6 @@ export const UpcomingBillsWidget = () => {
       setMarkingId(null);
     }
   };
-
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // FREE USER LOCK SCREEN OVERLAY
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  if (isFreeUser) {
-    return (
-      <View style={styles.premiumContainer}>
-        <View style={styles.header}>
-          <Text style={styles.title}>📅 Upcoming Bills Manager</Text>
-          <View style={styles.premiumBadge}>
-            <Lock size={12} color={Colors.primary[600]} style={{ marginRight: 4 }} />
-            <Text style={styles.premiumBadgeText}>PREMIUM</Text>
-          </View>
-        </View>
-        <View style={styles.lockedCard}>
-          <View style={styles.lockIconContainer}>
-            <Lock size={28} color={Colors.primary[500]} />
-          </View>
-          <Text style={styles.lockedTitle}>Never Miss a Bill Payment</Text>
-          <Text style={styles.lockedDesc}>
-            Track utilities, rent, credit cards, and subscriptions with smart multi-tier notifications (7 days, 3 days, 2 days, and day-of reminders).
-          </Text>
-          <View style={styles.actionRow}>
-            <TouchableOpacity 
-              style={styles.upgradeBtn}
-              onPress={() => router.push('/paywall')}
-            >
-              <Text style={styles.upgradeBtnText}>Unlock Bills Manager</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.restoreBtn}
-              onPress={restorePurchases}
-            >
-              <Text style={styles.restoreBtnText}>Restore</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    );
-  }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // PREMIUM BILLS WIDGET

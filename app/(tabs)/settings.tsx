@@ -9,37 +9,21 @@ import { useTheme } from '../../context/ThemeContext';
 import { Colors, Typography, Layout } from '../../constants/Theme';
 import { checkReminderStatus, scheduleDailyReminder } from '../../services/notifications';
 import { exportData, exportCSV, restoreData } from '../../services/backup';
-import { useSubscription } from '../../src/subscription/useSubscription';
-
 function SettingsContent() {
     const router = useRouter();
     const { soundEnabled, setSoundEnabled } = useApp();
     const [reminderEnabled, setReminderEnabled] = useState(true);
-    const { isPremium, isTrialActive, trialHoursRemaining, restorePurchases } = useSubscription();
-    const isFreeUser = !isPremium && !isTrialActive;
 
     const handleBackupJSON = () => {
-        if (isFreeUser) {
-            router.push('/paywall');
-        } else {
-            exportData();
-        }
+        exportData();
     };
 
     const handleExportCSV = () => {
-        if (isFreeUser) {
-            router.push('/paywall');
-        } else {
-            exportCSV();
-        }
+        exportCSV();
     };
 
     const handleRestore = () => {
-        if (isFreeUser) {
-            router.push('/paywall');
-        } else {
-            restoreData();
-        }
+        restoreData();
     };
 
     useEffect(() => {
@@ -64,60 +48,6 @@ function SettingsContent() {
     return (
         <ScrollView style={styles.container}>
             <Text style={styles.headerTitle}>Settings</Text>
-
-            {/* Premium Billing Card */}
-            <View style={styles.premiumCardContainer}>
-                {isPremium ? (
-                    <View style={[styles.premiumCard, styles.premiumCardActive]}>
-                        <View style={styles.premiumHeader}>
-                            <Lock size={20} color="#FFD700" style={{ marginRight: 8 }} />
-                            <Text style={[styles.premiumTitle, { color: '#FFD700' }]}>Premium Active</Text>
-                        </View>
-                        <Text style={[styles.premiumDesc, { color: Colors.white, opacity: 0.9 }]}>
-                            Thank you for supporting us! You have full access to advanced analytics, multiple accounts, cloud backup, and scheduled expenses.
-                        </Text>
-                        <TouchableOpacity style={styles.restoreBtn} onPress={restorePurchases}>
-                            <Text style={styles.restoreBtnText}>Sync / Restore Purchase</Text>
-                        </TouchableOpacity>
-                    </View>
-                ) : isTrialActive ? (
-                    <View style={[styles.premiumCard, styles.premiumCardTrial]}>
-                        <View style={styles.premiumHeader}>
-                            <Lock size={20} color={Colors.primary[500]} style={{ marginRight: 8 }} />
-                            <Text style={[styles.premiumTitle, { color: Colors.primary[700] }]}>Free Trial Active</Text>
-                        </View>
-                        <Text style={styles.premiumDesc}>
-                            You have {Math.max(1, Math.round(trialHoursRemaining))} hours remaining on your free trial. Upgrade now to keep premium features forever!
-                        </Text>
-                        <View style={styles.premiumActionRow}>
-                            <TouchableOpacity style={styles.upgradeBtn} onPress={() => router.push('/paywall')}>
-                                <Text style={styles.upgradeBtnText}>Upgrade Now</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.restoreBtnLink} onPress={restorePurchases}>
-                                <Text style={styles.restoreBtnLinkText}>Restore</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                ) : (
-                    <View style={styles.premiumCard}>
-                        <View style={styles.premiumHeader}>
-                            <Lock size={20} color={Colors.primary[600]} style={{ marginRight: 8 }} />
-                            <Text style={styles.premiumTitle}>Unlock Premium Features</Text>
-                        </View>
-                        <Text style={styles.premiumDesc}>
-                            Get access to Cloud Backup/Restore, Advanced Analytics, Unlimited Accounts, and Scheduled Expenses.
-                        </Text>
-                        <View style={styles.premiumActionRow}>
-                            <TouchableOpacity style={styles.upgradeBtn} onPress={() => router.push('/paywall')}>
-                                <Text style={styles.upgradeBtnText}>Upgrade to Premium</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.restoreBtnLink} onPress={restorePurchases}>
-                                <Text style={styles.restoreBtnLinkText}>Restore</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                )}
-            </View>
 
 
             <View style={styles.section}>
@@ -282,10 +212,7 @@ function SettingsContent() {
                         <Calendar size={20} color={Colors.primary[600]} />
                     </View>
                     <View style={{ flex: 1 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            <Text style={styles.rowText}>Upcoming Bills</Text>
-                            {isFreeUser && <Lock size={12} color={Colors.primary[500]} style={{ marginLeft: 6 }} />}
-                        </View>
+                        <Text style={styles.rowText}>Upcoming Bills</Text>
                         <Text style={styles.rowSubtext}>Manage utility bills, rent, and credit cards</Text>
                     </View>
                     <ChevronRight size={20} color="#9ca3af" />
@@ -296,10 +223,7 @@ function SettingsContent() {
                         <CalendarClock size={20} color="#6366F1" />
                     </View>
                     <View style={{ flex: 1 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            <Text style={styles.rowText}>Scheduled Expenses</Text>
-                            {isFreeUser && <Lock size={12} color={Colors.primary[500]} style={{ marginLeft: 6 }} />}
-                        </View>
+                        <Text style={styles.rowText}>Scheduled Expenses</Text>
                         <Text style={styles.rowSubtext}>Automate or approve recurring transactions</Text>
                     </View>
                     <ChevronRight size={20} color="#9ca3af" />
@@ -375,10 +299,7 @@ function SettingsContent() {
                         <Database size={20} color={Colors.primary[600]} />
                     </View>
                     <View style={{ flex: 1 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            <Text style={styles.rowText}>Backup Data (JSON)</Text>
-                            {isFreeUser && <Lock size={12} color={Colors.primary[500]} style={{ marginLeft: 6 }} />}
-                        </View>
+                        <Text style={styles.rowText}>Backup Data (JSON)</Text>
                         <Text style={{ fontSize: Typography.size.xs, color: Colors.gray[500], fontFamily: Typography.family.regular }}>Full backup of all your data</Text>
                     </View>
                     <FileDown size={20} color={Colors.gray[400]} />
@@ -389,10 +310,7 @@ function SettingsContent() {
                         <FileText size={20} color={Colors.success[600]} />
                     </View>
                     <View style={{ flex: 1 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            <Text style={styles.rowText}>Export to CSV</Text>
-                            {isFreeUser && <Lock size={12} color={Colors.primary[500]} style={{ marginLeft: 6 }} />}
-                        </View>
+                        <Text style={styles.rowText}>Export to CSV</Text>
                         <Text style={{ fontSize: Typography.size.xs, color: Colors.gray[500], fontFamily: Typography.family.regular }}>Transactions for Excel</Text>
                     </View>
                     <FileDown size={20} color={Colors.gray[400]} />
@@ -403,10 +321,7 @@ function SettingsContent() {
                         <FileUp size={20} color={Colors.danger[500]} />
                     </View>
                     <View style={{ flex: 1 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            <Text style={[styles.rowText, { color: Colors.danger[600] }]}>Restore from Backup</Text>
-                            {isFreeUser && <Lock size={12} color={Colors.primary[500]} style={{ marginLeft: 6 }} />}
-                        </View>
+                        <Text style={[styles.rowText, { color: Colors.danger[600] }]}>Restore from Backup</Text>
                         <Text style={{ fontSize: Typography.size.xs, color: Colors.gray[500], fontFamily: Typography.family.regular }}>Replace current data</Text>
                     </View>
                 </TouchableOpacity>

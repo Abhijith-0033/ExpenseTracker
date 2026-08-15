@@ -12,7 +12,6 @@ import {
 } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Typography, Layout } from '../constants/Theme';
-import { useSubscription } from '../src/subscription/useSubscription';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getUserDisplayName, getCertificateNumber } from '../services/onboardingState';
 
@@ -30,13 +29,10 @@ interface GuideSection {
 
 export default function QuickGuideScreen() {
   const router = useRouter();
-  const { isPremium, isTrialActive } = useSubscription();
-  const isFreeUser = !isPremium && !isTrialActive;
 
   const [expandedId, setExpandedId] = useState<string | null>('getting-started');
   const [certUserName, setCertUserName] = useState<string>('');
   const [certNumber, setCertNumber] = useState<string>('');
-  const [showTrialTour, setShowTrialTour] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -54,30 +50,8 @@ export default function QuickGuideScreen() {
     }
     loadCertData();
 
-    async function checkTrialTourStatus() {
-      try {
-        const val = await AsyncStorage.getItem('trial_feature_tour_shown');
-        if (val !== 'true' && isTrialActive) {
-          setShowTrialTour(true);
-        }
-      } catch (e) {
-        console.warn('Failed to check trial feature tour status:', e);
-      }
-    }
-    checkTrialTourStatus();
-
     return () => { cancelled = true; };
-  }, [isTrialActive]);
-
-  const handleStartTrialTour = async (route: string) => {
-    try {
-      await AsyncStorage.setItem('trial_feature_tour_shown', 'true');
-      setShowTrialTour(false);
-      router.push(route as any);
-    } catch (e) {
-      console.warn('Failed to start trial tour:', e);
-    }
-  };
+  }, []);
 
   const toggleSection = (id: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -397,46 +371,6 @@ export default function QuickGuideScreen() {
           </LinearGradient>
         </Pressable>
 
-        {/* Start Your Trial (Guided Tour Card) */}
-        {showTrialTour && (
-          <LinearGradient
-            colors={['#7C3AED', '#4F46E5']}
-            style={styles.trialTourCard}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            <View style={styles.trialTourContent}>
-              <View style={styles.trialTourHeader}>
-                <Sparkles size={20} color="#FBBF24" />
-                <Text style={styles.trialTourTitle}>Premium Trial is Live!</Text>
-              </View>
-              <Text style={styles.trialTourBody}>
-                {"Let's explore 3 premium features together. Tap any module below to start your guided tour."}
-              </Text>
-              <View style={styles.trialTourGrid}>
-                <Pressable
-                  style={({ pressed }) => [styles.trialTourBtn, pressed && styles.trialTourBtnPressed]}
-                  onPress={() => handleStartTrialTour('/emi-tracker')}
-                >
-                  <Text style={styles.trialTourBtnText}>EMI Tracker</Text>
-                </Pressable>
-                <Pressable
-                  style={({ pressed }) => [styles.trialTourBtn, pressed && styles.trialTourBtnPressed]}
-                  onPress={() => handleStartTrialTour('/tax-planner')}
-                >
-                  <Text style={styles.trialTourBtnText}>Tax Planner</Text>
-                </Pressable>
-                <Pressable
-                  style={({ pressed }) => [styles.trialTourBtn, pressed && styles.trialTourBtnPressed]}
-                  onPress={() => handleStartTrialTour('/scheduled-expenses')}
-                >
-                  <Text style={styles.trialTourBtnText}>Scheduled Logs</Text>
-                </Pressable>
-              </View>
-            </View>
-          </LinearGradient>
-        )}
-
         {/* Intro Card */}
         <View style={styles.introCard}>
           <HelpCircle size={32} color={Colors.primary[600]} style={{ marginBottom: 12 }} />
@@ -459,12 +393,6 @@ export default function QuickGuideScreen() {
                 <View style={styles.sectionTitleRow}>
                   <View style={styles.iconContainer}>{section.icon}</View>
                   <Text style={styles.sectionTitleText}>{section.title}</Text>
-                  {section.isPremium && (
-                    <View style={styles.premiumBadge}>
-                      <Lock size={10} color="#D97706" style={{ marginRight: 2 }} />
-                      <Text style={styles.premiumBadgeText}>PREMIUM</Text>
-                    </View>
-                  )}
                 </View>
                 {isExpanded ? (
                   <ChevronUp size={20} color={Colors.gray[400]} />
@@ -480,14 +408,6 @@ export default function QuickGuideScreen() {
                       {paragraph}
                     </Text>
                   ))}
-                  {section.isPremium && isFreeUser && (
-                    <TouchableOpacity
-                      style={styles.unlockBtn}
-                      onPress={() => router.push('/paywall')}
-                    >
-                      <Text style={styles.unlockBtnText}>Unlock Feature</Text>
-                    </TouchableOpacity>
-                  )}
                 </View>
               )}
             </View>

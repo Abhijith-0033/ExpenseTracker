@@ -111,6 +111,7 @@ export const SwipeableRow: React.FC<SwipeableRowProps> = ({
     <Swipeable
       ref={swipeableRef}
       friction={2}
+      activeOffsetX={[-10, 10]}
       leftThreshold={30}
       rightThreshold={40}
       renderLeftActions={hasLeft ? renderLeftActions : undefined}

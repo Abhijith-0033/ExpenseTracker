@@ -25,6 +25,7 @@ import Animated, { FadeIn, FadeInDown, FadeInUp } from 'react-native-reanimated'
 import { checkDuplicate, getSmartSuggestions, getLastUsedForCategory, SmartSuggestion } from '../../services/duplicateCheck';
 import { DuplicateWarningSheet } from '../../components/DuplicateWarningSheet';
 import { useSubscription } from '../../src/subscription/useSubscription';
+import { safeBack } from '../../utils/navigation';
 import { TransactionForm } from '../../components/transaction/TransactionForm';
 
 
@@ -539,12 +540,12 @@ function AddTransactionContent() {
             setDate={setDate}
             errors={errors}
             onSave={handleSave}
-            onClose={() => router.back()}
+            onClose={() => safeBack(router)}
             isSubmitting={isSubmitting}
             showSuccess={showSuccess}
             onSuccessFinish={() => {
                 setShowSuccess(false);
-                router.back();
+                safeBack(router);
             }}
             successMessage="Expense Saved!"
             showDuplicateWarning={showDuplicateWarning}

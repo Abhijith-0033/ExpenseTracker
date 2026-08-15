@@ -38,10 +38,17 @@ export interface CategoryNode {
   }>;
 }
 
+export interface IncomeSourceSubcategory {
+  id: number;
+  income_source_id: number;
+  name: string;
+}
+
 export interface IncomeSource {
   id: number;
   name: string;
   icon: string;
+  subcategories?: IncomeSourceSubcategory[];
 }
 
 let db: SQLite.SQLiteDatabase | null = null;
@@ -818,36 +825,49 @@ const runMigrations = async (db: SQLite.SQLiteDatabase) => {
     await setDbVersion(db, version);
   }
 
+  if (version < 11) {
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS income_source_subcategories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        income_source_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        FOREIGN KEY (income_source_id) REFERENCES income_sources(id) ON DELETE CASCADE,
+        UNIQUE(income_source_id, name)
+      );
+    `);
+
+    version = 11;
+    await setDbVersion(db, version);
+  }
+
   console.log(`Database migrated successfully to version ${version}`);
 };
 
 export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
-  if (db) return db;
+  if (dbInitPromise) return dbInitPromise;
 
-  if (!dbInitPromise) {
-    dbInitPromise = (async () => {
-      try {
-        const openedDb = await SQLite.openDatabaseAsync(DB_NAME);
-        db = openedDb;
+  dbInitPromise = (async () => {
+    try {
+      const openedDb = await SQLite.openDatabaseAsync(DB_NAME);
 
-        // Enable WAL mode only on native platforms
-        if (Platform.OS !== 'web') {
-          await db.execAsync('PRAGMA journal_mode = WAL;');
-          await db.execAsync('PRAGMA foreign_keys = ON;');
-        }
-
-        await runMigrations(db);
-
-        console.log('Database initialized successfully');
-        return db;
-      } catch (error) {
-        console.error('Database initialization failed:', error);
-        dbInitPromise = null; // Allow retrying on next attempt
-        db = null;
-        throw error;
+      // Enable WAL mode only on native platforms
+      if (Platform.OS !== 'web') {
+        await openedDb.execAsync('PRAGMA journal_mode = WAL;');
+        await openedDb.execAsync('PRAGMA foreign_keys = ON;');
       }
-    })();
-  }
+
+      await runMigrations(openedDb);
+
+      db = openedDb;
+      console.log('Database initialized successfully');
+      return db;
+    } catch (error) {
+      console.error('Database initialization failed:', error);
+      dbInitPromise = null; // Allow retrying on next attempt
+      db = null;
+      throw error;
+    }
+  })();
 
   return dbInitPromise;
 };
@@ -911,8 +931,6 @@ export const addTransaction = async (tx: Omit<Transaction, 'id' | 'created_at'>)
       insertedId = result.lastInsertRowId;
 
       await db.runAsync(`UPDATE accounts SET balance = balance + ? WHERE id = ?`, [getAccountBalanceDelta(tx), tx.account_id]);
-      // Sync RevenueCat attributes on transaction change (non-blocking)
-      import('./revenueCatSync').then(m => m.checkAndSyncOnTransactionChange()).catch(() => {});
     });
     // Trigger growth checks in background
     setTimeout(() => triggerGrowthEvents(tx), 100);
@@ -954,8 +972,6 @@ export const addTransactionDirect = async (
         `UPDATE accounts SET balance = balance + ? WHERE id = ?`,
         [getAccountBalanceDelta(tx), tx.account_id]
       );
-      // Sync RevenueCat attributes on transaction change (non-blocking)
-      import('./revenueCatSync').then(m => m.checkAndSyncOnTransactionChange()).catch(() => {});
     });
     // Trigger growth checks in background
     setTimeout(() => triggerGrowthEvents(tx), 100);
@@ -1048,8 +1064,6 @@ export const addTransfer = async (
                 [newAmount, isComplete, timestamp, goal.id]
             );
         }
-        // Sync RevenueCat attributes on transaction change (non-blocking)
-        import('./revenueCatSync').then(m => m.checkAndSyncOnTransactionChange()).catch(() => {});
     });
 };
 
@@ -1064,8 +1078,6 @@ export const deleteTransaction = async (id: number, accountId: number, amount: n
         ? getAccountBalanceDelta(originalTX)
         : getAccountBalanceDelta({ amount, category, subcategory: '' });
       await db.runAsync('UPDATE accounts SET balance = balance - ? WHERE id = ?', [balanceDelta, accountId]);
-      // Sync RevenueCat attributes on transaction change (non-blocking)
-      import('./revenueCatSync').then(m => m.checkAndSyncOnTransactionChange()).catch(() => {});
     });
   } catch (e) { throw e; }
 };
@@ -1080,13 +1092,13 @@ export const getAccounts = async (): Promise<Account[]> => {
 export const addAccount = async (name: string, balance: number, type: string) => {
   await initDatabase();
   const db = getDatabase();
-  await db.runAsync('INSERT INTO accounts (name, balance, type) VALUES (?, ?, ?)', [name, balance, type]);
+  await db.runAsync('INSERT INTO accounts (name, balance, type) VALUES (?, ?, ?)', name, balance, type);
 };
 
 export const updateAccount = async (id: number, name: string, balance: number, type: string) => {
   await initDatabase();
   const db = getDatabase();
-  await db.runAsync('UPDATE accounts SET name = ?, balance = ?, type = ? WHERE id = ?', [name, balance, type, id]);
+  await db.runAsync('UPDATE accounts SET name = ?, balance = ?, type = ? WHERE id = ?', name, balance, type, id);
 }
 
 // ... Categories (Unchanged) ...
@@ -1244,6 +1256,54 @@ export const deleteIncomeSource = async (id: number) => {
   await initDatabase();
   const db = getDatabase();
   await db.runAsync('DELETE FROM income_sources WHERE id = ?', [id]);
+};
+
+// --- Income Source Subcategories ---
+
+export const getIncomeSourcesWithSubs = async (): Promise<IncomeSource[]> => {
+  await initDatabase();
+  const db = getDatabase();
+  const sources = await db.getAllAsync<IncomeSource>('SELECT * FROM income_sources ORDER BY name ASC');
+  for (const source of sources) {
+    source.subcategories = await db.getAllAsync<IncomeSourceSubcategory>(
+      'SELECT * FROM income_source_subcategories WHERE income_source_id = ? ORDER BY name ASC',
+      [source.id]
+    );
+  }
+  return sources;
+};
+
+export const addIncomeSourceSubcategory = async (
+  incomeSourceId: number,
+  name: string
+): Promise<void> => {
+  await initDatabase();
+  const db = getDatabase();
+  await db.runAsync(
+    'INSERT INTO income_source_subcategories (income_source_id, name) VALUES (?, ?)',
+    [incomeSourceId, name]
+  );
+};
+
+export const updateIncomeSourceSubcategory = async (
+  id: number,
+  name: string
+): Promise<void> => {
+  await initDatabase();
+  const db = getDatabase();
+  await db.runAsync(
+    'UPDATE income_source_subcategories SET name = ? WHERE id = ?',
+    [name, id]
+  );
+};
+
+export const deleteIncomeSourceSubcategory = async (id: number): Promise<void> => {
+  await initDatabase();
+  const db = getDatabase();
+  await db.runAsync(
+    'DELETE FROM income_source_subcategories WHERE id = ?',
+    [id]
+  );
 };
 
 // --- Debt & Receivables ---
