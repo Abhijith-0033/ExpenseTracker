@@ -20,7 +20,9 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins === '*' || allowedOrigins.includes(origin)) {
+    // Normalise: strip trailing slash from origin before comparison
+    const normOrigin = origin ? origin.replace(/\/$/, '') : null;
+    if (!normOrigin || allowedOrigins === '*' || allowedOrigins.includes(normOrigin)) {
       return callback(null, true);
     }
     return callback(new Error('CORS not allowed'), false);

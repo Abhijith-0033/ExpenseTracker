@@ -5,6 +5,9 @@ import { getDatabase } from '../../services/database';
 const SERVER_URL = 'https://gastos-server-wfl5.onrender.com';
 const PAYMENT_PAGE_URL = 'https://gastos-payment.netlify.app';
 
+// Must match APP_SECRET_KEY on the Render server
+const APP_SECRET_KEY = 'b6e3690000dbz';
+
 export async function initialize() {
   return await fetchTrialStatus();
 }
@@ -16,7 +19,10 @@ export async function getSubscriptionStatus(userId) {
 
   try {
     const res = await fetch(`${SERVER_URL}/api/subscription-status/${userId}`, {
-      headers: { 'Cache-Control': 'no-cache' }
+      headers: {
+        'Cache-Control': 'no-cache',
+        'X-App-Secret': APP_SECRET_KEY,
+      },
     });
     if (res.ok) {
       const data = await res.json();
@@ -24,7 +30,7 @@ export async function getSubscriptionStatus(userId) {
         tier: data.isPremium ? 'premium' : 'free',
         isPremium: !!data.isPremium,
         plan: data.plan || 'free',
-        expiry: data.expiresAt || null,
+        expiry: data.expiryDate || null,   // server returns 'expiryDate'
       };
 
       // Cache locally in SQLite
