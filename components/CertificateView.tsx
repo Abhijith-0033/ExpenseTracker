@@ -171,7 +171,7 @@ function GeometricArt() {
 
 /** Premium badge with star – aligned properly at top‑left of right column */
 function PremiumBadge() {
-  const size = H * 0.09;
+  const size = H * 0.16; // Increased size to prevent text overflow
   return (
     <View style={[s.badgeContainer, { width: size, height: size, borderRadius: size / 2 }]}>
       <View style={s.badgeInner}>
@@ -502,6 +502,7 @@ const s = StyleSheet.create({
     fontFamily: F_BOLD,
     color: '#FFFFFF',
     letterSpacing: 0.5,
+    textAlign: 'center',
   },
 
   badgeSubtext: {
@@ -509,6 +510,7 @@ const s = StyleSheet.create({
     fontFamily: F_MEDIUM,
     color: CERT.gold,
     letterSpacing: 0.3,
+    textAlign: 'center',
   },
 
   presentedText: {

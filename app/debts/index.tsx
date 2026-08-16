@@ -155,9 +155,9 @@ export default function DebtsScreen() {
                                 <DebtCard
                                     key={item.id}
                                     item={item}
-                                    onPress={() => router.push(`/debt-tracker/${item.id}` as any)}
-                                    onIncrease={() => router.push(`/debt-tracker/${item.id}` as any)}
-                                    onReduce={() => router.push(`/debt-tracker/${item.id}` as any)}
+                                    onPress={() => router.push(`/debts/${item.id}` as any)}
+                                    onIncrease={() => router.push(`/debts/${item.id}` as any)}
+                                    onReduce={() => router.push(`/debts/${item.id}` as any)}
                                     onDelete={() => handleDelete(item.id)}
                                 />
                             ))

@@ -33,7 +33,7 @@ const TESTIMONIALS = [
 
 export default function PaywallScreen({ showClose = true, context = 'default' }) {
   const router = useRouter();
-  const { purchaseMonthly, purchaseYearly, purchaseLifetime, restorePurchases, isTrialActive, trialHoursRemaining, plan, userId, refreshSubscription } = useSubscription();
+  const { purchaseMonthly, purchaseYearly, purchaseLifetime, restorePurchases, isTrialActive, trialDaysRemaining, plan, userId, refreshSubscription } = useSubscription();
   const [loading, setLoading] = useState(false);
   const [activeTestimonial, setActiveTestimonial] = useState(0);
 
@@ -180,10 +180,15 @@ export default function PaywallScreen({ showClose = true, context = 'default' })
           <View style={styles.trialBanner}>
             <Sparkles size={16} color={Colors.warning[500]} />
             <Text style={styles.trialText}>
-              You are currently on a <Text style={{ fontFamily: Typography.family.bold }}>48-hour free trial</Text> ({Math.round(trialHoursRemaining)}h left)
+              You are currently on a <Text style={{ fontFamily: Typography.family.bold }}>7-day free trial</Text> ({Math.round(trialDaysRemaining)} days left)
             </Text>
           </View>
         )}
+
+        {/* Launch Offer Banner */}
+        <View style={styles.launchBanner}>
+          <Text style={styles.launchBannerText}>🚀 Launch Offer: Up to 80% Off</Text>
+        </View>
 
         {/* Pricing Cards */}
         <View style={styles.pricingContainer}>
@@ -198,11 +203,11 @@ export default function PaywallScreen({ showClose = true, context = 'default' })
             </View>
             <Text style={[styles.planTitle, { color: Colors.white }]}>Lifetime Access</Text>
             <View style={styles.priceRow}>
+              <Text style={[styles.originalPrice, { color: Colors.gray[500] }]}>₹5000</Text>
               <Text style={[styles.currencySymbol, { color: Colors.gray[300] }]}>₹</Text>
               <Text style={[styles.priceValue, { color: Colors.white }]}>999</Text>
-              <Text style={[styles.priceDuration, { color: Colors.gray[400] }]}>/ lifetime</Text>
             </View>
-            <Text style={[styles.priceMeta, { color: Colors.gray[400] }]}>Pay once. Premium forever.</Text>
+            <Text style={[styles.priceMeta, { color: Colors.warning[400] }]}>Save 80% • One-time payment</Text>
             
             <View style={[styles.buyButton, styles.monthlyBuyButton]}>
               <Text style={[styles.buyButtonText, { color: Colors.white }]}>Get Lifetime Access</Text>
@@ -221,6 +226,7 @@ export default function PaywallScreen({ showClose = true, context = 'default' })
             </View>
             <Text style={styles.planTitle}>Yearly Access</Text>
             <View style={styles.priceRow}>
+              <Text style={[styles.originalPrice, styles.originalPriceHighlight]}>₹999</Text>
               <Text style={styles.currencySymbol}>₹</Text>
               <Text style={styles.priceValue}>333</Text>
               <Text style={styles.priceDuration}>/ year</Text>
@@ -228,7 +234,7 @@ export default function PaywallScreen({ showClose = true, context = 'default' })
             
             {/* Yearly strike-through pricing comparison */}
             <Text style={styles.priceMeta}>
-              ₹27.75/month · <Text style={{ textDecorationLine: 'line-through', opacity: 0.7 }}>₹348/year if monthly</Text> (Save 4%)
+              Save 67% (₹27.75/month effective)
             </Text>
             
             <View style={[styles.buyButton, styles.yearlyBuyButton]}>
@@ -245,11 +251,12 @@ export default function PaywallScreen({ showClose = true, context = 'default' })
           >
             <Text style={[styles.planTitle, { color: Colors.white }]}>Monthly Pass</Text>
             <View style={styles.priceRow}>
+              <Text style={[styles.originalPrice, { color: Colors.gray[500] }]}>₹99</Text>
               <Text style={[styles.currencySymbol, { color: Colors.gray[300] }]}>₹</Text>
               <Text style={[styles.priceValue, { color: Colors.white }]}>29</Text>
               <Text style={[styles.priceDuration, { color: Colors.gray[400] }]}>/ month</Text>
             </View>
-            <Text style={[styles.priceMeta, { color: Colors.gray[400] }]}>Billed monthly. Cancel anytime.</Text>
+            <Text style={[styles.priceMeta, { color: Colors.gray[400] }]}>Save 70% • Cancel anytime</Text>
             
             <View style={[styles.buyButton, styles.monthlyBuyButton]}>
               <Text style={[styles.buyButtonText, { color: Colors.white }]}>Get Monthly Pass</Text>
@@ -566,11 +573,38 @@ const styles = StyleSheet.create({
     color: Colors.gray[700],
     marginLeft: 4,
   },
+  originalPrice: {
+    fontSize: Typography.size.md,
+    fontFamily: Typography.family.bold,
+    textDecorationLine: 'line-through',
+    marginRight: 8,
+    opacity: 0.8,
+  },
+  originalPriceHighlight: {
+    color: 'rgba(255, 255, 255, 0.7)',
+  },
   priceMeta: {
     fontSize: Typography.size.xs + 1,
     fontFamily: Typography.family.medium,
     color: Colors.gray[800],
     marginBottom: 20,
+  },
+  launchBanner: {
+    backgroundColor: '#F59E0B',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginHorizontal: 24,
+    marginBottom: 16,
+    alignItems: 'center',
+    ...Layout.shadows.sm,
+  },
+  launchBannerText: {
+    color: '#FFFFFF',
+    fontFamily: Typography.family.bold,
+    fontSize: Typography.size.sm,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
   buyButton: {
     flexDirection: 'row',

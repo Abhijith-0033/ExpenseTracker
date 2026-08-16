@@ -127,6 +127,9 @@ export default function TabLayout() {
       >
         <Animated.View style={{ flex: 1, transform: [{ translateX: clampedTranslateX }] }}>
           <Tabs
+            sceneContainerStyle={{
+              paddingBottom: isStandard ? 0 : (showLabels ? 140 : 130),
+            }}
             screenOptions={{
               headerShown: false,
               tabBarStyle: dynamicTabBarStyle,

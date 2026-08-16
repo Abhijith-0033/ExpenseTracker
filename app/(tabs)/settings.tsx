@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { TabErrorFallback } from '../../components/ErrorBoundary';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Switch } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Switch, Linking } from 'react-native';
 import { useRouter, Link } from 'expo-router';
-import { ChevronRight, Wallet, Tag, Database, Bell, FileUp, FileDown, FileText, Info, Calendar, Users, Target, CalendarClock, RefreshCw, FileBarChart, Send, Lock, PiggyBank, Trash2, Palette } from 'lucide-react-native';
+import { ChevronRight, Wallet, Tag, Database, Bell, FileUp, FileDown, FileText, Info, Calendar, Users, Target, CalendarClock, RefreshCw, FileBarChart, Send, Lock, PiggyBank, Trash2, Palette, Mail } from 'lucide-react-native';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import { Colors, Typography, Layout } from '../../constants/Theme';
@@ -63,7 +63,7 @@ function SettingsContent() {
     };
 
     return (
-        <ScrollView style={styles.container}>
+        <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 140 }}>
             <Text style={styles.headerTitle}>Settings</Text>
 
             {/* Premium Status Header Card */}
@@ -411,6 +411,20 @@ function SettingsContent() {
                     <View style={{ flex: 1 }}>
                         <Text style={styles.rowText}>Help & In-App Guide</Text>
                         <Text style={styles.rowSubtext}>Learn how to use Gastos features</Text>
+                    </View>
+                    <ChevronRight size={20} color="#9ca3af" />
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                    style={styles.row} 
+                    onPress={() => Linking.openURL('mailto:gastos.support@gmail.com?subject=Gastos%20App%20Support')}
+                >
+                    <View style={[styles.rowIcon, { backgroundColor: Colors.primary[50] }]}>
+                        <Mail size={20} color={Colors.primary[600]} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.rowText}>Contact Support</Text>
+                        <Text style={styles.rowSubtext}>Feel free to reach us anytime, anywhere</Text>
                     </View>
                     <ChevronRight size={20} color="#9ca3af" />
                 </TouchableOpacity>

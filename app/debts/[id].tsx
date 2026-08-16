@@ -21,7 +21,7 @@ export default function DebtDetailScreen() {
     const [actionType, setActionType] = useState<'increase' | 'reduce'>('increase');
     const [amount, setAmount] = useState('');
     const [notes, setNotes] = useState('');
-    const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
+    const [selectedAccountId, setSelectedAccountId] = useState<number | null | undefined>(undefined);
     const { refreshData } = useApp();
     const [isSubmitting, setIsSubmitting] = useState(false);
     const isSubmittingRef = React.useRef(false);
@@ -36,8 +36,8 @@ export default function DebtDetailScreen() {
             setDebt(d);
             setHistory(h);
             setAccounts(accs);
-            // v2.0.0: Default to null — user must explicitly choose an account
-            setSelectedAccountId(null);
+            // v2.0.0: Default to undefined — user must explicitly choose an account
+            setSelectedAccountId(undefined);
         } catch (e) {
             console.error(e);
         } finally {
@@ -55,8 +55,8 @@ export default function DebtDetailScreen() {
             Alert.alert('Error', 'Please enter a valid amount');
             return;
         }
-        if (!selectedAccountId) {
-            Alert.alert('Error', 'Please select an account');
+        if (selectedAccountId === undefined) {
+            Alert.alert('Error', 'Please select an account or choose "No Account"');
             return;
         }
 
